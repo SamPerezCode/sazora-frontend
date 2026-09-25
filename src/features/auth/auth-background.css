@@ -1,0 +1,32 @@
+@layer components {
+  .auth-background {
+    --auth-glow-top: rgb(177 218 252 / 78%);
+    --auth-glow-bottom: rgb(186 220 255 / 62%);
+    --auth-glow-warm: rgb(237 107 46 / 7%);
+
+    background-color: var(--sazora-background);
+    background-image:
+      radial-gradient(
+        ellipse at 0% 0%,
+        var(--auth-glow-top),
+        transparent 65%
+      ),
+      radial-gradient(
+        ellipse at 50% 100%,
+        var(--auth-glow-bottom),
+        transparent 65%
+      ),
+      radial-gradient(
+        ellipse at 100% 40%,
+        var(--auth-glow-warm),
+        transparent 60%
+      );
+    background-repeat: no-repeat;
+  }
+
+  :root[data-theme="dark"] .auth-background {
+    --auth-glow-top: rgb(28 42 77 / 95%);
+    --auth-glow-bottom: rgb(42 57 93 / 48%);
+    --auth-glow-warm: rgb(241 130 45 / 4%);
+  }
+}

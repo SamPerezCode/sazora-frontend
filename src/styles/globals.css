@@ -1,46 +1,81 @@
 @import "tailwindcss";
+@import "../features/auth/auth-background.css";
+@import "../features/auth/login-layout.css";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
-  --color-brand: var(--sazora-brand);
+  --color-danger: #c9302d;
+  --color-background: var(--sazora-background);
   --color-heading: var(--sazora-heading);
   --color-muted: var(--sazora-muted);
+
   --color-surface: var(--sazora-surface);
+  --color-popover: var(--sazora-popover);
+  --color-secondary: var(--sazora-secondary);
+  --color-subtle: var(--sazora-subtle);
+
+  --color-brand: var(--sazora-brand);
+  --color-accent: var(--sazora-accent);
+  --color-on-accent: var(--sazora-on-accent);
+
   --color-outline: var(--sazora-outline);
+  --color-input-border: var(--sazora-input-border);
 }
 
 @layer base {
   :root {
-    font-family: Arial, Helvetica, sans-serif;
     color-scheme: light;
 
-    --sazora-brand: #f66b27;
-    --sazora-heading: #14213f;
-    --sazora-muted: #4b5c76;
-    --sazora-surface: #f4f8ff;
-    --sazora-outline: #ffffff;
-    --sazora-background: linear-gradient(135deg, #c4e4fc, #edf3fc);
+    --sazora-background: #f4f7fb;
+    --sazora-heading: #1c2a4d;
+    --sazora-muted: #576478;
+
+    --sazora-surface: #ffffff;
+    --sazora-popover: #ffffff;
+    --sazora-secondary: #e3ecf6;
+    --sazora-subtle: #e8edf3;
+
+    --sazora-brand: #ed6b2e;
+    --sazora-accent: #ed6b2e;
+    --sazora-on-accent: #ffffff;
+
+    --sazora-outline: #ced9e5;
+    --sazora-input-border: #c5d3e1;
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      color-scheme: dark;
+  :root[data-theme="dark"] {
+    color-scheme: dark;
 
-      --sazora-brand: #ff8424;
-      --sazora-heading: #f5f7ff;
-      --sazora-muted: #b4bfd3;
-      --sazora-surface: #192749;
-      --sazora-outline: #35425f;
-      --sazora-background: linear-gradient(135deg, #203157, #0c142b);
-    }
+    --sazora-background: #101a34;
+    --sazora-heading: #ebeff4;
+    --sazora-muted: #99a6b4;
+
+    --sazora-surface: #182440;
+    --sazora-popover: #1b2745;
+    --sazora-secondary: #18273c;
+    --sazora-subtle: #182334;
+
+    --sazora-brand: #ed6b2e;
+    --sazora-accent: #f1822d;
+    --sazora-on-accent: #101a34;
+
+    --sazora-outline: #414e60;
+    --sazora-input-border: #4a596f;
+  }
+
+  html {
+    font-family: Arial, Helvetica, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
     margin: 0;
     min-width: 320px;
     min-height: 100svh;
+    background-color: var(--sazora-background);
     color: var(--sazora-heading);
-    background: var(--sazora-background);
-    -webkit-font-smoothing: antialiased;
   }
 
   #root {
