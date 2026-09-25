@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-brand: var(--sazora-brand);
+  --color-heading: var(--sazora-heading);
+  --color-muted: var(--sazora-muted);
+  --color-surface: var(--sazora-surface);
+  --color-outline: var(--sazora-outline);
+}
+
+@layer base {
+  :root {
+    font-family: Arial, Helvetica, sans-serif;
+    color-scheme: light;
+
+    --sazora-brand: #f66b27;
+    --sazora-heading: #14213f;
+    --sazora-muted: #4b5c76;
+    --sazora-surface: #f4f8ff;
+    --sazora-outline: #ffffff;
+    --sazora-background: linear-gradient(135deg, #c4e4fc, #edf3fc);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+
+      --sazora-brand: #ff8424;
+      --sazora-heading: #f5f7ff;
+      --sazora-muted: #b4bfd3;
+      --sazora-surface: #192749;
+      --sazora-outline: #35425f;
+      --sazora-background: linear-gradient(135deg, #203157, #0c142b);
+    }
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100svh;
+    color: var(--sazora-heading);
+    background: var(--sazora-background);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #root {
+    min-height: 100svh;
+  }
+}
