@@ -68,7 +68,7 @@ export function TextField({
             trailing ? "pr-12" : "pr-4",
             error
               ? "border-danger"
-              : "border-white/80 dark:border-input-border/70",
+              : "border-input-border dark:border-input-border/70",
             className,
           ].join(" ")}
         />

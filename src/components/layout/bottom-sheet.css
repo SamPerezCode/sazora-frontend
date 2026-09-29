@@ -52,3 +52,28 @@
     border-radius: 0.75rem;
   }
 }
+
+@layer components {
+  .bottom-sheet.bottom-sheet-modal {
+    inset: 0;
+    width: calc(100% - 2rem);
+    max-width: 28rem;
+    height: fit-content;
+    max-height: calc(100dvh - 2rem);
+    margin: auto;
+    padding: 1rem;
+    border: 1px solid var(--sazora-outline);
+    border-radius: 1rem;
+    background: var(--sazora-surface);
+    box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 22%);
+  }
+
+  .bottom-sheet-modal .bottom-sheet-heading {
+    margin-bottom: 1rem;
+  }
+
+  .bottom-sheet-close:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
