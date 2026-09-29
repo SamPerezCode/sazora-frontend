@@ -133,3 +133,57 @@
     }
   }
 }
+
+@layer components {
+  @supports (
+    (backdrop-filter: blur(8px)) or
+      (-webkit-backdrop-filter: blur(8px))
+  ) {
+    .mobile-bottom-nav,
+    .bottom-sheet:has(.mobile-menu-grid) {
+      -webkit-backdrop-filter: blur(8px) saturate(125%);
+      backdrop-filter: blur(8px) saturate(125%);
+    }
+
+    /* Barra inferior */
+    .mobile-bottom-nav {
+      background: color-mix(
+        in srgb,
+        var(--sazora-surface) 55%,
+        transparent
+      );
+
+      box-shadow: 0 -4px 18px rgb(8 15 32 / 8%);
+    }
+
+    /* Menú de navegación desplegable */
+    .bottom-sheet:has(.mobile-menu-grid) {
+      background: color-mix(
+        in srgb,
+        var(--sazora-background) 65%,
+        transparent
+      );
+    }
+
+    .bottom-sheet:has(.mobile-menu-grid)::backdrop {
+      background: rgb(0 0 0 / 30%);
+    }
+
+    /* Tarjetas interiores */
+    .mobile-menu-item:not(.is-active) {
+      background: color-mix(
+        in srgb,
+        var(--sazora-surface) 55%,
+        transparent
+      );
+    }
+
+    .mobile-menu-business {
+      background: color-mix(
+        in srgb,
+        var(--sazora-secondary) 65%,
+        transparent
+      );
+    }
+  }
+}

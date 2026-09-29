@@ -618,3 +618,48 @@
     }
   }
 }
+
+@layer components {
+  .app-shell {
+    --shell-header-opacity: 48%;
+    --shell-sidebar-opacity: 78%;
+  }
+
+  :root[data-theme="dark"] .app-shell {
+    --shell-header-opacity: 52%;
+    --shell-sidebar-opacity: 62%;
+  }
+
+  @supports (
+    (backdrop-filter: blur(8px)) or
+      (-webkit-backdrop-filter: blur(8px))
+  ) {
+    .shell-header,
+    .shell-sidebar {
+      -webkit-backdrop-filter: blur(8px) saturate(125%);
+      backdrop-filter: blur(8px) saturate(125%);
+    }
+
+    .shell-header {
+      background: color-mix(
+        in srgb,
+        var(--sazora-background) var(--shell-header-opacity),
+        transparent
+      );
+    }
+
+    .shell-sidebar {
+      background: linear-gradient(
+        160deg,
+        rgb(42 57 93 / var(--shell-sidebar-opacity)),
+        rgb(28 42 77 / var(--shell-sidebar-opacity))
+      );
+
+      border-color: rgb(135 154 188 / 40%);
+
+      box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 12%),
+        0 8px 24px rgb(8 15 32 / 10%);
+    }
+  }
+}
