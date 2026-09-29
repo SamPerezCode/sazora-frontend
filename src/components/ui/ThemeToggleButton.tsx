@@ -5,10 +5,13 @@ import { useTheme } from "../../app/providers/theme-context";
 type ThemeToggleButtonProps = Omit<
   ComponentPropsWithoutRef<"button">,
   "children" | "onClick"
->;
+> & {
+  variant?: "default" | "shell";
+};
 
 export function ThemeToggleButton({
   className = "",
+  variant = "default",
   ...props
 }: ThemeToggleButtonProps) {
   const { theme, setTheme } = useTheme();
@@ -33,7 +36,11 @@ export function ThemeToggleButton({
     >
       <span
         aria-hidden="true"
-        className="inline-flex size-[var(--theme-toggle-size,2.5rem)] items-center justify-center rounded-full border border-outline bg-surface text-heading shadow-sm group-hover:bg-secondary dark:border-outline/60 dark:bg-surface/60 dark:shadow-none"
+        className={
+          variant === "shell"
+            ? "shell-theme-disc"
+            : "inline-flex size-[var(--theme-toggle-size,2.5rem)] items-center justify-center rounded-full border border-outline bg-surface text-heading shadow-sm group-hover:bg-secondary dark:border-outline/60 dark:bg-surface/60 dark:shadow-none"
+        }
       >
         <Icon aria-hidden="true" size={14} strokeWidth={1.75} />
       </span>

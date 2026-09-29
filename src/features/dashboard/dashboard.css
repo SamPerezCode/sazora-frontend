@@ -1,0 +1,48 @@
+@layer components {
+  .dashboard-middle-grid {
+    display: grid;
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  .dashboard-chart {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: clamp(0.5rem, 2vw, 1.5rem);
+    height: 13rem;
+    padding-top: 0.5rem;
+  }
+
+  .dashboard-chart-column {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .dashboard-chart-track {
+    display: flex;
+    flex: 1;
+    align-items: flex-end;
+    width: 100%;
+    min-height: 0;
+    border-bottom: 1px solid var(--sazora-outline);
+  }
+
+  .dashboard-chart-bar {
+    width: 100%;
+    border-radius: 0.5rem 0.5rem 0 0;
+    background: var(--sazora-accent);
+  }
+
+  @media (min-width: 80rem) {
+    .dashboard-middle-grid {
+      grid-template-columns:
+        minmax(0, 1.4fr)
+        minmax(0, 1fr);
+      align-items: stretch;
+    }
+  }
+}

@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "../app/layout/app-shell.css";
+@import "../components/layout/bottom-sheet.css";
+@import "../app/layout/mobile-navigation.css";
+@import "../features/dashboard/dashboard.css";
 @import "../features/auth/auth-background.css";
 @import "../features/auth/login-layout.css";
 

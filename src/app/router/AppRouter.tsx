@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router";
 import { LoginPage } from "../../features/auth/pages/LoginPage";
-import { SessionPage } from "../../features/auth/pages/SessionPage";
+import { DashboardPage } from "../../features/dashboard/pages/DashboardPage";
+import { AppShell } from "../layout/AppShell";
 import {
   GuestOnly,
   RequireAuth,
@@ -16,7 +17,9 @@ export function AppRouter() {
         </Route>
 
         <Route element={<RequireAuth />}>
-          <Route path="/panel" element={<SessionPage />} />
+          <Route element={<AppShell />}>
+            <Route path="/panel" element={<DashboardPage />} />
+          </Route>
         </Route>
 
         <Route path="*" element={<Navigate to="/login" replace />} />
