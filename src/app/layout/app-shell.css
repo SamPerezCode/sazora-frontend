@@ -608,3 +608,13 @@
     }
   }
 }
+
+@layer components {
+  @media (min-width: 64rem) {
+    .shell-sidebar[data-collapsed="true"]
+      .shell-business
+      > :first-child {
+      justify-content: center;
+    }
+  }
+}

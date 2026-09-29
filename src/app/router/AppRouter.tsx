@@ -1,10 +1,12 @@
 import { Navigate, Route, Routes } from "react-router";
 import { LoginPage } from "../../features/auth/pages/LoginPage";
 import { DashboardPage } from "../../features/dashboard/pages/DashboardPage";
+import { BusinessSettingsPage } from "../../features/business/settings/BusinessSettingsPage";
 import { AppShell } from "../layout/AppShell";
 import {
   GuestOnly,
   RequireAuth,
+  RequireRole,
   SessionBoundary,
 } from "./AuthGuards";
 
@@ -19,6 +21,15 @@ export function AppRouter() {
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
             <Route path="/panel" element={<DashboardPage />} />
+
+            <Route
+              path="/mi-negocio"
+              element={
+                <RequireRole role="ADMIN">
+                  <BusinessSettingsPage />
+                </RequireRole>
+              }
+            />
           </Route>
         </Route>
 

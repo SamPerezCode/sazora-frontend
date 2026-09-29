@@ -5,13 +5,14 @@ interface AvatarProps {
   variant?: "default" | "profile";
   src?: string | null;
   className?: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
 }
 
 const sizes = {
   sm: "size-8",
   md: "size-10",
   lg: "size-12",
+  xl: "size-24 sm:size-28",
 };
 
 export function Avatar({

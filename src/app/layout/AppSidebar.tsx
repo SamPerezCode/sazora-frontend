@@ -123,23 +123,47 @@ export function AppSidebar({
       </nav>
 
       <div className="shell-business" title={business.name}>
-        <div className="flex min-w-0 items-center gap-3">
-          <Avatar name={business.name} src={business.logoUrl} />
+        {settings?.status === "ready" ? (
+          <NavLink
+            to={settings.to}
+            onClick={onNavigate}
+            className="shell-business-link"
+            aria-label={`Configuración de ${business.name}`}
+            title="Configuración del negocio"
+          >
+            <Avatar name={business.name} src={business.logoUrl} />
 
-          <div className="shell-label min-w-0">
-            <p className="text-[0.625rem] text-slate-300">Negocio</p>
-            <p className="truncate text-sm font-semibold">
-              {business.name}
-            </p>
+            <div className="shell-label min-w-0">
+              <p className="text-[0.625rem] text-slate-300">
+                Negocio
+              </p>
+
+              <p className="truncate text-sm font-semibold">
+                {business.name}
+              </p>
+            </div>
+          </NavLink>
+        ) : (
+          <div className="flex min-w-0 items-center gap-3">
+            <Avatar name={business.name} src={business.logoUrl} />
+
+            <div className="shell-label min-w-0">
+              <p className="text-[0.625rem] text-slate-300">
+                Negocio
+              </p>
+
+              <p className="truncate text-sm font-semibold">
+                {business.name}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
-        {settings && (
-          <button
-            type="button"
-            disabled
+        {settings?.status === "ready" && (
+          <NavLink
+            to={settings.to}
+            onClick={onNavigate}
             className="shell-settings shell-label"
-            title="Configuración del negocio · Próximamente"
           >
             <settings.icon
               aria-hidden="true"
@@ -147,7 +171,7 @@ export function AppSidebar({
               strokeWidth={1.75}
             />
             Configuración del negocio
-          </button>
+          </NavLink>
         )}
 
         <div className="shell-label mt-3 border-t border-white/15 pt-3">

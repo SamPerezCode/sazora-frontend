@@ -1,0 +1,315 @@
+@layer components {
+  .business-settings {
+    --form-control-height: 2.75rem;
+    --button-radius: 0.75rem;
+    --field-label-size: 0.6875rem;
+    --checkbox-font-size: 0.8125rem;
+
+    display: grid;
+    align-items: start;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+
+  .business-settings-editor {
+    display: grid;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+
+  .business-settings-tabs {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 0.25rem;
+    min-width: 0;
+    padding: 0.375rem;
+    border: 1px solid var(--sazora-outline);
+    border-radius: 1rem;
+    background: var(--sazora-surface);
+  }
+
+  .business-settings-tabs button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-width: 0;
+    min-height: 2.75rem;
+    padding: 0.5rem;
+    border-radius: 0.75rem;
+    color: var(--sazora-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .business-settings-tabs button span {
+    display: none;
+  }
+
+  .business-settings-tabs button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .business-settings-tabs svg {
+    flex-shrink: 0;
+  }
+
+  .business-settings-tabs [aria-selected="true"] {
+    background: var(--sazora-accent);
+    color: var(--sazora-on-accent);
+  }
+
+  .business-settings-tabs button:focus-visible,
+  .business-settings [role="tabpanel"]:focus-visible,
+  .business-color-field input[type="color"]:focus-visible {
+    outline: 2px solid var(--sazora-accent);
+    outline-offset: -3px;
+  }
+
+  .business-settings-fields {
+    display: grid;
+    gap: 1.25rem 1rem;
+    min-width: 0;
+  }
+
+  .business-logo-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .business-color-field {
+    display: grid;
+    grid-template-columns: 3rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--sazora-outline);
+    border-radius: 1rem;
+  }
+
+  .business-color-field input[type="color"] {
+    width: 3rem;
+    height: 2.75rem;
+    padding: 0.125rem;
+    border: 1px solid var(--sazora-outline);
+    border-radius: 0.625rem;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .business-settings-save {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--sazora-outline);
+  }
+
+  .business-settings-preview {
+    min-width: 0;
+  }
+
+  .business-preview {
+    overflow: hidden;
+    border: 1px solid var(--sazora-outline);
+    border-radius: 1rem;
+    background: var(--sazora-surface);
+  }
+
+  .business-preview-heading {
+    padding: 1rem 1.25rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--sazora-muted);
+  }
+
+  .business-brand-preview {
+    padding: 1.5rem 1.25rem;
+    color: #ffffff;
+    overflow-wrap: anywhere;
+  }
+
+  .business-ticket-preview {
+    width: min(100%, 20rem);
+    margin-inline: auto;
+    padding: 1rem 1.5rem 2rem;
+    font-family: monospace;
+    font-size: 0.625rem;
+    line-height: 1.6;
+    text-align: center;
+  }
+
+  .shell-business-link {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.75rem;
+    border-radius: 0.5rem;
+  }
+
+  a.shell-settings {
+    min-height: 2.5rem;
+    margin-top: 0.25rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+  }
+
+  a.shell-settings[aria-current="page"] {
+    color: var(--sazora-accent);
+  }
+
+  .shell-business-link:focus-visible,
+  a.shell-settings:focus-visible {
+    outline: 2px solid var(--sazora-accent);
+    outline-offset: 3px;
+  }
+
+  @media (hover: hover) {
+    .business-settings-tabs button:not([aria-selected="true"]):hover {
+      background: var(--sazora-secondary);
+      color: var(--sazora-heading);
+    }
+
+    .shell-business-link:hover,
+    a.shell-settings:hover {
+      background: rgb(255 255 255 / 8%);
+    }
+    .business-settings-tabs
+      button:enabled:not([aria-selected="true"]):hover {
+      background: var(--sazora-secondary);
+      color: var(--sazora-heading);
+    }
+  }
+
+  @media (min-width: 40rem) {
+    .business-settings {
+      --field-font-size: 0.8125rem;
+    }
+
+    .business-settings-fields {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .business-settings-tabs button {
+      min-height: 3rem;
+      padding: 0.625rem 0.5rem;
+    }
+
+    .business-settings-tabs button span {
+      display: block;
+      min-width: 0;
+    }
+  }
+
+  @media (min-width: 80rem) {
+    .business-settings {
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    }
+  }
+}
+
+@layer components {
+  .business-logo-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  @media (max-width: 39.999rem) {
+    .business-settings {
+      --form-control-height: 2.5rem;
+      --field-font-size: 0.8125rem;
+      --textarea-font-size: 0.8125rem;
+    }
+
+    .business-settings-fields {
+      gap: 1rem;
+    }
+
+    /* Logo centrado encima de los botones. */
+    .business-logo-controls {
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .business-logo-actions {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .business-logo-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: stretch;
+      gap: 0.5rem;
+    }
+
+    .business-logo-buttons > button:only-child {
+      grid-column: 1 / -1;
+      justify-self: center;
+    }
+
+    .business-logo-help {
+      text-align: center;
+    }
+
+    /* Muestras de color más grandes. */
+    .business-color-field {
+      grid-template-columns: 4rem minmax(0, 1fr);
+      gap: 0.75rem;
+    }
+
+    .business-color-field input[type="color"] {
+      width: 4rem;
+      height: 4rem;
+      padding: 0.125rem;
+    }
+
+    .business-color-field
+      input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    .business-color-field input[type="color"]::-webkit-color-swatch {
+      border: 0;
+      border-radius: 0.5rem;
+    }
+
+    .business-color-field input[type="color"]::-moz-color-swatch {
+      border: 0;
+      border-radius: 0.5rem;
+    }
+  }
+}
+
+@layer components {
+  @media (max-width: 39.999rem) {
+    .business-settings-save {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) max-content;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .business-settings-save > p {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .business-settings-save > button {
+      white-space: nowrap;
+    }
+  }
+}

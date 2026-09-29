@@ -65,7 +65,9 @@ export async function request<T>(
     Accept: "application/json",
   });
 
-  if (options.body !== undefined) {
+  const multipart = options.body instanceof FormData;
+
+  if (options.body !== undefined && !multipart) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -88,7 +90,9 @@ export async function request<T>(
       body:
         options.body === undefined
           ? undefined
-          : JSON.stringify(options.body),
+          : options.body instanceof FormData
+            ? options.body
+            : JSON.stringify(options.body),
       credentials: "omit",
       signal,
     });

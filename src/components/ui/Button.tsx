@@ -2,7 +2,7 @@ import type { ComponentPropsWithoutRef } from "react";
 import { LoaderCircle } from "lucide-react";
 
 interface ButtonProps extends ComponentPropsWithoutRef<"button"> {
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "danger";
   size?: "sm" | "md";
   loading?: boolean;
   loadingText?: string;
@@ -11,8 +11,12 @@ interface ButtonProps extends ComponentPropsWithoutRef<"button"> {
 const variants = {
   primary:
     "bg-accent text-on-accent shadow-[0_12px_24px_-10px] shadow-accent/30 enabled:hover:brightness-95",
+
   secondary:
     "border border-outline bg-surface text-heading enabled:hover:bg-secondary",
+
+  danger:
+    "border border-[#c45b4d] bg-transparent text-[#ae483c] transition-colors enabled:hover:bg-[#c45b4d]/10 dark:border-[#e58c7a] dark:text-[#efa38f] dark:enabled:hover:bg-[#e58c7a]/10 motion-reduce:transition-none",
 };
 
 const sizes = {

@@ -113,7 +113,8 @@ const navigation: readonly NavigationItem[] = [
     icon: Settings,
     roles: ["ADMIN"],
     group: "business",
-    status: "planned",
+    status: "ready",
+    to: "/mi-negocio",
   },
 ];
 

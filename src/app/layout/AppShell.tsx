@@ -25,8 +25,10 @@ export function AppShell() {
   const session =
     state.status === "authenticated" ? state.session : null;
 
-  const { business, error, retry } = useBusinessProfile(session);
+  const { business, settings, error, retry } =
+    useBusinessProfile(session);
 
+  const isSettings = location.pathname === "/mi-negocio";
   const isPanel = location.pathname === "/panel";
   const dashboard = useDashboard(session, isPanel);
 
@@ -42,6 +44,7 @@ export function AppShell() {
     session,
     dashboard,
     business,
+    settings,
   };
 
   function toggleSidebar(): void {
@@ -72,12 +75,16 @@ export function AppShell() {
           title={
             isPanel
               ? `Buen servicio, ${session.user.fullName.trim().split(/\s+/)[0]}`
-              : (current?.label ?? "Panel")
+              : isSettings
+                ? "Mi negocio"
+                : (current?.label ?? "Panel")
           }
           subtitle={
-            isPanel && dashboard.data
-              ? `${businessDate(dashboard.data.period.today)} · ${dashboard.data.business.name}`
-              : business.name
+            isSettings
+              ? "Personaliza el perfil, menú y documentos de tu restaurante."
+              : isPanel && dashboard.data
+                ? `${businessDate(dashboard.data.period.today)} · ${business.name}`
+                : business.name
           }
           session={session}
           business={business}
@@ -90,7 +97,7 @@ export function AppShell() {
           tabIndex={-1}
           className="shell-content"
         >
-          {error && (
+          {error && !isSettings && (
             <Alert className="mb-5">
               <p>{error}</p>
 

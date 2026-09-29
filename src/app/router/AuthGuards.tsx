@@ -3,6 +3,8 @@ import { Alert } from "../../components/feedback/Alert";
 import { LoadingState } from "../../components/feedback/LoadingState";
 import { Button } from "../../components/ui/Button";
 import { useAuth } from "../../features/auth/hooks/useAuth";
+import type { ReactNode } from "react";
+import type { RoleCode } from "../../features/auth/types/auth.types";
 
 export function SessionBoundary() {
   const { state, retrySession, logout } = useAuth();
@@ -56,5 +58,25 @@ export function GuestOnly() {
     <Navigate to="/panel" replace />
   ) : (
     <Outlet />
+  );
+}
+
+export function RequireRole({
+  role,
+  children,
+}: {
+  role: RoleCode;
+  children: ReactNode;
+}) {
+  const { state } = useAuth();
+
+  if (state.status !== "authenticated") {
+    return <Navigate to="/login" replace />;
+  }
+
+  return state.session.authorization.roles.includes(role) ? (
+    children
+  ) : (
+    <Navigate to="/panel" replace />
   );
 }
