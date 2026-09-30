@@ -10,6 +10,8 @@ interface BottomSheetProps {
   children: ReactNode;
   variant?: "sheet" | "modal";
   busy?: boolean;
+  onBack?: () => void;
+  className?: string;
 }
 
 export function BottomSheet({
@@ -20,6 +22,8 @@ export function BottomSheet({
   children,
   variant = "sheet",
   busy = false,
+  onBack,
+  className = "",
 }: BottomSheetProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -69,14 +73,15 @@ export function BottomSheet({
       ref={dialogRef}
       aria-labelledby={titleId}
       aria-busy={busy || undefined}
-      className={
-        variant === "modal"
-          ? "bottom-sheet bottom-sheet-modal"
-          : "bottom-sheet"
-      }
+      className={`bottom-sheet ${
+        variant === "modal" ? "bottom-sheet-modal" : ""
+      } ${className}`}
       onCancel={(event) => {
         event.preventDefault();
-        requestClose();
+
+        if (!busy) {
+          (onBack ?? onClose)();
+        }
       }}
       onClick={(event) => {
         if (event.target !== event.currentTarget) return;
@@ -98,10 +103,18 @@ export function BottomSheet({
 
         <button
           type="button"
-          aria-label={`Cerrar ${title.toLowerCase()}`}
+          aria-label={
+            onBack
+              ? "Volver a navegación"
+              : `Cerrar ${title.toLowerCase()}`
+          }
           className="bottom-sheet-close"
           disabled={busy}
-          onClick={requestClose}
+          onClick={() => {
+            if (!busy) {
+              (onBack ?? onClose)();
+            }
+          }}
         >
           <X aria-hidden="true" size={18} strokeWidth={1.75} />
         </button>

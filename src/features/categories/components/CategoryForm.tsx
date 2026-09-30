@@ -1,69 +1,62 @@
 import { useEffect, useRef, useState } from "react";
 import { Save } from "lucide-react";
-import { Alert } from "../../components/feedback/Alert";
-import { TextField } from "../../components/forms/TextField";
-import { TextAreaField } from "../../components/forms/TextAreaField";
-import { Button } from "../../components/ui/Button";
-import { ApiError } from "../../lib/http/client";
-import { areaDraft, areaFormSchema } from "./preparation-area.schema";
+import { Alert } from "../../../components/feedback/Alert";
+import { TextField } from "../../../components/forms/TextField";
+import { TextAreaField } from "../../../components/forms/TextAreaField";
+import { Button } from "../../../components/ui/Button";
+import { ApiError } from "../../../lib/http/client";
+import {
+  categoryDraft,
+  categoryFormSchema,
+} from "../schemas/category.schema";
 import type {
-  AreaDraft,
-  AreaInput,
-  PreparationArea,
-} from "./preparation-area.schema";
+  Category,
+  CategoryDraft,
+  CategoryInput,
+} from "../schemas/category.schema";
 
-interface PreparationAreaFormProps {
-  area?: PreparationArea;
+interface CategoryFormProps {
+  category?: Category;
   busy: boolean;
-  onSave: (values: AreaInput) => Promise<void>;
+  onSave: (values: CategoryInput) => Promise<void>;
   onCancel: () => void;
 }
 
-export function PreparationAreaForm({
-  area,
+export function CategoryForm({
+  category,
   busy,
   onSave,
   onCancel,
-}: PreparationAreaFormProps) {
-  const [draft, setDraft] = useState(() => areaDraft(area));
+}: CategoryFormProps) {
+  const [draft, setDraft] = useState(() => categoryDraft(category));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const alive = useRef(false);
 
-  const baseline = areaDraft(area);
-
+  const baseline = categoryDraft(category);
   const dirty =
-    !area ||
+    !category ||
     draft.name !== baseline.name ||
     draft.description !== baseline.description ||
     draft.displayOrder !== baseline.displayOrder;
 
   useEffect(() => {
     alive.current = true;
-
     return () => {
       alive.current = false;
     };
   }, []);
 
-  function change(key: keyof AreaDraft, value: string): void {
-    setDraft((previous) => ({
-      ...previous,
-      [key]: value,
-    }));
-
-    setErrors((previous) => ({
-      ...previous,
-      [key]: "",
-    }));
-
+  function change(key: keyof CategoryDraft, value: string) {
+    setDraft((previous) => ({ ...previous, [key]: value }));
+    setErrors((previous) => ({ ...previous, [key]: "" }));
     setMessage("");
   }
 
-  async function submit(form: HTMLFormElement): Promise<void> {
+  async function submit(form: HTMLFormElement) {
     if (busy || !dirty) return;
 
-    const parsed = areaFormSchema.safeParse(draft);
+    const parsed = categoryFormSchema.safeParse(draft);
 
     if (!parsed.success) {
       const next: Record<string, string> = {};
@@ -100,17 +93,16 @@ export function PreparationAreaForm({
           next[issue.field] ??= issue.message;
         }
 
-        if (error.code === "PREPARATION_AREA_NAME_CONFLICT") {
+        if (error.code === "CATEGORY_NAME_CONFLICT") {
           next.name = error.message;
         }
       }
 
       setErrors(next);
-
       setMessage(
         error instanceof ApiError
           ? error.message
-          : "No pudimos guardar el área."
+          : "No pudimos guardar la categoría."
       );
     }
   }
@@ -126,22 +118,19 @@ export function PreparationAreaForm({
     >
       <fieldset disabled={busy} className="min-w-0 space-y-4">
         <legend className="sr-only">
-          {area ? "Editar área" : "Nueva área"}
+          {category ? "Editar categoría" : "Nueva categoría"}
         </legend>
 
         <TextField
           autoFocus
           data-dialog-initial-focus
           name="name"
-          label="Nombre del área"
+          label="Nombre de la categoría"
           required
           maxLength={100}
           value={draft.name}
           error={errors.name}
           onChange={(event) => change("name", event.target.value)}
-          className={
-            errors.name ? "" : "border-outline dark:border-outline"
-          }
         />
 
         <TextAreaField
@@ -170,16 +159,11 @@ export function PreparationAreaForm({
           onChange={(event) =>
             change("displayOrder", event.target.value)
           }
-          className={
-            errors.displayOrder
-              ? ""
-              : "border-outline dark:border-outline"
-          }
         />
 
         <p className="text-xs text-muted">
-          Los números menores aparecen primero. Las áreas nuevas se
-          crean activas.
+          Los números menores aparecen primero. Las categorías nuevas
+          se crean activas.
         </p>
       </fieldset>
 
@@ -203,7 +187,7 @@ export function PreparationAreaForm({
           loadingText="Guardando…"
         >
           <Save aria-hidden="true" size={16} />
-          {area ? "Guardar cambios" : "Crear área"}
+          {category ? "Guardar cambios" : "Crear categoría"}
         </Button>
       </div>
     </form>

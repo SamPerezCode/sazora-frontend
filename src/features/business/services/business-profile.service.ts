@@ -1,11 +1,11 @@
-import { ApiError, request } from "../../lib/http/client";
-import { resolveFileUrl } from "../../lib/files";
-import { businessSettingsResponseSchema } from "./business-settings.schema";
+import { ApiError, request } from "../../../lib/http/client";
+import { resolveFileUrl } from "../../../lib/files";
+import { businessSettingsResponseSchema } from "../schemas/business-settings.schema";
 import type {
   BusinessMutation,
   BusinessSettings,
-} from "./business-settings.schema";
-import type { BusinessIdentity } from "./business-profile.schema";
+} from "../schemas/business-settings.schema";
+import type { BusinessIdentity } from "../schemas/business-profile.schema";
 
 function verify(
   settings: BusinessSettings,

@@ -9,21 +9,21 @@ import {
   ToggleLeft,
   ToggleRight,
 } from "lucide-react";
-import { useAppShell } from "../../app/layout/shell-context";
-import { Alert } from "../../components/feedback/Alert";
-import { LoadingState } from "../../components/feedback/LoadingState";
-import { Button } from "../../components/ui/Button";
-import { Card } from "../../components/ui/Card";
-import { ApiError } from "../../lib/http/client";
-import { areaChanges } from "./preparation-area.schema";
-import { BottomSheet } from "../../components/layout/BottomSheet";
-import { ActionMenu } from "../../components/ui/ActionMenu";
+import { useAppShell } from "../../../app/layout/shell-context";
+import { Alert } from "../../../components/feedback/Alert";
+import { LoadingState } from "../../../components/feedback/LoadingState";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
+import { ApiError } from "../../../lib/http/client";
+import { areaChanges } from "../schemas/preparation-area.schema";
+import { BottomSheet } from "../../..//components/layout/BottomSheet";
+import { ActionMenu } from "../../../components/ui/ActionMenu";
 import type {
   AreaInput,
   PreparationArea,
-} from "./preparation-area.schema";
-import { PreparationAreaForm } from "./PreparationAreaForm";
-import { usePreparationAreas } from "./usePreparationAreas";
+} from "../schemas/preparation-area.schema";
+import { PreparationAreaForm } from "../components/PreparationAreaForm";
+import { usePreparationAreas } from "../hooks/usePreparationAreas";
 
 export function PreparationAreasPanel() {
   const { session } = useAppShell();

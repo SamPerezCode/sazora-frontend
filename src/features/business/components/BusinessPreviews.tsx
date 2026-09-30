@@ -3,7 +3,7 @@ import { resolveFileUrl } from "../../../lib/files";
 import type {
   BusinessDraft,
   BusinessSettings,
-} from "../business-settings.schema";
+} from "../schemas/business-settings.schema";
 
 interface BrandPreviewProps {
   draft: BusinessDraft;

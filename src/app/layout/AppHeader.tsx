@@ -1,7 +1,7 @@
 import { ArrowUpRight } from "lucide-react";
 import { ThemeToggleButton } from "../../components/ui/ThemeToggleButton";
 import type { AuthSession } from "../../features/auth/types/auth.types";
-import type { BusinessIdentity } from "../../features/business/business-profile.schema";
+import type { BusinessIdentity } from "../../features/business/schemas/business-profile.schema";
 import { UserMenu } from "./UserMenu";
 
 interface AppHeaderProps {

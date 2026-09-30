@@ -5,7 +5,7 @@ interface AvatarProps {
   variant?: "default" | "profile";
   src?: string | null;
   className?: string;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "list";
 }
 
 const sizes = {
@@ -13,6 +13,7 @@ const sizes = {
   md: "size-10",
   lg: "size-12",
   xl: "size-24 sm:size-28",
+  list: "size-14 sm:size-10",
 };
 
 export function Avatar({

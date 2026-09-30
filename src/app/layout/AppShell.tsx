@@ -3,7 +3,7 @@ import { Outlet, useLocation } from "react-router";
 import { Alert } from "../../components/feedback/Alert";
 import { Button } from "../../components/ui/Button";
 import { useAuth } from "../../features/auth/hooks/useAuth";
-import { useBusinessProfile } from "../../features/business/useBusinessProfile";
+import { useBusinessProfile } from "../../features/business/hooks/useBusinessProfile";
 import { useDashboard } from "../../features/dashboard/hooks/useDashboard";
 import { businessDate } from "../../features/dashboard/utils/dashboard-format";
 import {
@@ -36,9 +36,14 @@ export function AppShell() {
     return null;
   }
 
-  const current = getNavigation(session.authorization.roles).find(
-    (item) => item.status === "ready" && item.to === location.pathname
-  );
+  const current = getNavigation(session.authorization.roles)
+    .flatMap((item) =>
+      item.status === "group" ? item.children : [item]
+    )
+    .find(
+      (item) =>
+        item.status === "ready" && item.to === location.pathname
+    );
 
   const context: AppShellContext = {
     session,

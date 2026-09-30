@@ -1,5 +1,6 @@
 @import "tailwindcss";
-@import "../features/business/settings/business-settings.css";
+@import "../features/categories/categories.css";
+@import "../features/business/business-settings.css";
 @import "../app/layout/app-shell.css";
 @import "../components/layout/bottom-sheet.css";
 @import "../app/layout/mobile-navigation.css";

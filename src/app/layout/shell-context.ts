@@ -1,7 +1,7 @@
 import { useOutletContext } from "react-router";
-import type { BusinessSettingsResource } from "../../features/business/business-settings.schema";
+import type { BusinessSettingsResource } from "../../features/business/schemas/business-settings.schema";
 import type { AuthSession } from "../../features/auth/types/auth.types";
-import type { BusinessIdentity } from "../../features/business/business-profile.schema";
+import type { BusinessIdentity } from "../../features/business/schemas/business-profile.schema";
 import type { DashboardResource } from "../../features/dashboard/types/dashboard.types";
 
 export interface AppShellContext {

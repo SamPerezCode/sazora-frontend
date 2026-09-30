@@ -1,9 +1,10 @@
-import { NavLink } from "react-router";
+import { NavLink, useLocation } from "react-router";
 import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import symbol from "../../assets/brand/sazora_icon_dark.png";
 import { Avatar } from "../../components/ui/Avatar";
 import { IconButton } from "../../components/ui/IconButton";
-import type { BusinessIdentity } from "../../features/business/business-profile.schema";
+import { SidebarGroup } from "./SidebarGroup";
+import type { BusinessIdentity } from "../../features/business/schemas/business-profile.schema";
 import type { AuthSession } from "../../features/auth/types/auth.types";
 import { getNavigation, ROLE_LABELS } from "../navigation";
 
@@ -24,6 +25,7 @@ export function AppSidebar({
   onToggle,
   onNavigate,
 }: AppSidebarProps) {
+  const { pathname } = useLocation();
   const items = getNavigation(session.authorization.roles);
   const settings = items.find((item) => item.group === "business");
 
@@ -80,6 +82,17 @@ export function AppSidebar({
         {items
           .filter((item) => item.group === "main")
           .map((item) => {
+            if (item.status === "group") {
+              return (
+                <SidebarGroup
+                  key={`${item.id}:${pathname}`}
+                  item={item}
+                  collapsed={collapsed}
+                  onExpand={onToggle}
+                  onNavigate={onNavigate}
+                />
+              );
+            }
             const Icon = item.icon;
 
             const content = (

@@ -1,0 +1,16 @@
+@layer components {
+  .categories-page {
+    --button-radius: 0.75rem;
+    --form-control-height: 2.75rem;
+    --field-font-size: 0.875rem;
+    --textarea-font-size: 0.875rem;
+  }
+
+  @media (max-width: 39.999rem) {
+    .categories-page {
+      --form-control-height: 2.5rem;
+      --field-font-size: 0.8125rem;
+      --textarea-font-size: 0.8125rem;
+    }
+  }
+}

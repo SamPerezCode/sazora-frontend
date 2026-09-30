@@ -1,13 +1,13 @@
-import { request } from "../../lib/http/client";
+import { request } from "../../../lib/http/client";
 import {
   areaIdSchema,
   areaListResponseSchema,
   areaResponseSchema,
-} from "./preparation-area.schema";
+} from "../schemas/preparation-area.schema";
 import type {
   AreaAction,
   PreparationArea,
-} from "./preparation-area.schema";
+} from "../schemas/preparation-area.schema";
 
 export async function getPreparationAreas(
   accessToken: string,

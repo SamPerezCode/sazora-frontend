@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   PackageOpen,
   Settings,
+  Tags,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { RoleCode } from "../features/auth/types/auth.types";
@@ -29,8 +30,15 @@ interface NavigationBase {
   group: "main" | "business";
 }
 
-export type NavigationItem = NavigationBase &
+export type NavigationLeaf = NavigationBase &
   ({ status: "ready"; to: string } | { status: "planned" });
+
+export type NavigationItem =
+  | NavigationLeaf
+  | (NavigationBase & {
+      status: "group";
+      children: readonly NavigationLeaf[];
+    });
 
 const navigation: readonly NavigationItem[] = [
   {
@@ -86,7 +94,28 @@ const navigation: readonly NavigationItem[] = [
     icon: PackageOpen,
     roles: ["ADMIN"],
     group: "main",
-    status: "planned",
+    status: "group",
+    children: [
+      {
+        id: "product-list",
+        label: "Productos",
+        description: "Crea y administra tu carta",
+        icon: PackageOpen,
+        roles: ["ADMIN"],
+        group: "main",
+        status: "planned",
+      },
+      {
+        id: "categories",
+        label: "Categorías",
+        description: "Organiza las secciones del menú",
+        icon: Tags,
+        roles: ["ADMIN"],
+        group: "main",
+        status: "ready",
+        to: "/productos/categorias",
+      },
+    ],
   },
   {
     id: "statistics",
@@ -121,9 +150,25 @@ const navigation: readonly NavigationItem[] = [
 export function getNavigation(
   roles: readonly RoleCode[]
 ): NavigationItem[] {
-  return navigation.filter(
-    (item) =>
-      item.roles === null ||
-      item.roles.some((role) => roles.includes(role))
-  );
+  const allowed = (item: NavigationBase) =>
+    item.roles === null ||
+    item.roles.some((role) => roles.includes(role));
+
+  const visible: NavigationItem[] = [];
+
+  for (const item of navigation) {
+    if (!allowed(item)) continue;
+
+    if (item.status === "group") {
+      const children = item.children.filter(allowed);
+
+      if (children.length) {
+        visible.push({ ...item, children });
+      }
+    } else {
+      visible.push(item);
+    }
+  }
+
+  return visible;
 }

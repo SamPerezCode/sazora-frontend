@@ -1,3 +1,4 @@
+import "./styles/globals.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
@@ -5,7 +6,6 @@ import App from "./App";
 import { ThemeProvider } from "./app/providers/ThemeProvider";
 import { AuthProvider } from "./features/auth/context/AuthProvider";
 import { initializeTheme } from "./lib/theme";
-import "./styles/globals.css";
 
 const initialTheme = initializeTheme();
 const rootElement = document.getElementById("root");

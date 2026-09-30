@@ -663,3 +663,39 @@
     }
   }
 }
+
+@layer components {
+  .shell-subnavigation {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0.25rem 0 0.5rem 1.625rem;
+    padding-left: 0.75rem;
+    border-left: 1px solid rgb(184 197 216 / 22%);
+  }
+
+  .shell-subnav-item {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    border-radius: 0.75rem;
+    color: #b8c5d8;
+    font-size: 0.75rem;
+    text-align: left;
+  }
+
+  .shell-subnav-item.is-active,
+  .shell-subnav-item:not(:disabled):hover {
+    background: rgb(135 154 188 / 12%);
+    color: #ebeff4;
+  }
+
+  .shell-subnav-item:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+
+  .shell-subnav-item:focus-visible {
+    outline: 2px solid var(--sazora-accent);
+    outline-offset: 2px;
+  }
+}

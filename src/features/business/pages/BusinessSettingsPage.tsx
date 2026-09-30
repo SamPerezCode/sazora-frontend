@@ -19,14 +19,17 @@ import { Avatar } from "../../../components/ui/Avatar";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { resolveFileUrl } from "../../../lib/files";
-import { PreparationAreasPanel } from "../../preparation-areas/PreparationAreasPanel";
+import { PreparationAreasPanel } from "../../preparation-areas/components/PreparationAreasPanel";
 import type {
   BusinessSettings,
   BusinessSettingsResource,
   SettingsSection,
-} from "../business-settings.schema";
-import { BrandPreview, TicketPreview } from "./BusinessPreviews";
-import { useSettingsEditor } from "./useSettingsEditor";
+} from "../schemas/business-settings.schema";
+import {
+  BrandPreview,
+  TicketPreview,
+} from "../components/BusinessPreviews";
+import { useSettingsEditor } from "../hooks/useSettingsEditor";
 
 const tabs = [
   {

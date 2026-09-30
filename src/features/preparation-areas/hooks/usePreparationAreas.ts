@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import type { AuthSession } from "../auth/types/auth.types";
-import { ApiError } from "../../lib/http/client";
+import type { AuthSession } from "../../auth/types/auth.types";
+import { ApiError } from "../../../lib/http/client";
 import type {
   AreaAction,
   PreparationArea,
-} from "./preparation-area.schema";
+} from "../schemas/preparation-area.schema";
 import {
   getPreparationAreas,
   savePreparationArea,
-} from "./preparation-area.service";
+} from "../services/preparation-area.service";
 
 interface Snapshot {
   scope: string;

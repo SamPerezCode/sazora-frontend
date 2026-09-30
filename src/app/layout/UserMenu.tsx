@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Avatar } from "../../components/ui/Avatar";
 import type { AuthSession } from "../../features/auth/types/auth.types";
-import type { BusinessIdentity } from "../../features/business/business-profile.schema";
+import type { BusinessIdentity } from "../../features/business/schemas/business-profile.schema";
 import { ROLE_LABELS } from "../navigation";
 
 interface UserMenuProps {

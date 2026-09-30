@@ -140,7 +140,7 @@
       (-webkit-backdrop-filter: blur(8px))
   ) {
     .mobile-bottom-nav,
-    .bottom-sheet:has(.mobile-menu-grid) {
+    .bottom-sheet.mobile-navigation-sheet {
       -webkit-backdrop-filter: blur(8px) saturate(125%);
       backdrop-filter: blur(8px) saturate(125%);
     }
@@ -157,7 +157,7 @@
     }
 
     /* Menú de navegación desplegable */
-    .bottom-sheet:has(.mobile-menu-grid) {
+    .bottom-sheet.mobile-navigation-sheet {
       background: color-mix(
         in srgb,
         var(--sazora-background) 65%,
@@ -165,7 +165,7 @@
       );
     }
 
-    .bottom-sheet:has(.mobile-menu-grid)::backdrop {
+    .bottom-sheet.mobile-navigation-sheet::backdrop {
       background: rgb(0 0 0 / 30%);
     }
 

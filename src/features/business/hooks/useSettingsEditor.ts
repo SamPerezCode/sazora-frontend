@@ -5,13 +5,13 @@ import {
   sectionSchemas,
   selectSection,
   toBusinessDraft,
-} from "../business-settings.schema";
+} from "../schemas/business-settings.schema";
 import type {
   BusinessDraft,
   BusinessSettings,
   BusinessSettingsResource,
   SettingsSection,
-} from "../business-settings.schema";
+} from "../schemas/business-settings.schema";
 
 interface Notice {
   errors: Record<string, string>;

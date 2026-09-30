@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AuthSession } from "../auth/types/auth.types";
-import type { BusinessIdentity } from "./business-profile.schema";
+import type { AuthSession } from "../../auth/types/auth.types";
+import type { BusinessIdentity } from "../schemas/business-profile.schema";
 import type {
   BusinessMutation,
   BusinessSettings,
   BusinessSettingsResource,
-} from "./business-settings.schema";
+} from "../schemas/business-settings.schema";
 import {
   getBusinessSettings,
   mutateBusinessSettings,
   toBusinessIdentity,
-} from "./business-profile.service";
-import { ApiError } from "../../lib/http/client";
+} from "../services/business-profile.service";
+import { ApiError } from "../../../lib/http/client";
 
 interface Snapshot {
   scope: string;
