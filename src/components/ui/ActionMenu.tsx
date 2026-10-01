@@ -235,7 +235,7 @@ export function ActionMenu({
             role="menuitem"
             tabIndex={-1}
             className={[
-              "flex min-h-11 w-full cursor-pointer items-center gap-2",
+              "group/action flex min-h-11 w-full cursor-pointer items-center gap-2",
               "rounded-lg bg-transparent px-3 py-2 text-left text-sm text-heading",
               "hover:bg-accent hover:text-on-accent",
               "focus:outline-none",
@@ -251,7 +251,10 @@ export function ActionMenu({
               }
             }}
           >
-            {action.icon}
+            <span className="flex shrink-0 text-accent group-hover/action:text-on-accent">
+              {action.icon}
+            </span>
+
             {action.label}
           </button>
         ))}

@@ -54,12 +54,13 @@ function NavigationEntry({
   const content = detail ? (
     <>
       <span className="mobile-submenu-icon">
-        <Icon aria-hidden="true" size={22} />
+        <Icon aria-hidden="true" size={22} strokeWidth={1.75} />
       </span>
 
       <span className="min-w-0 flex-1">
-        <span className="block text-xs font-semibold">{label}</span>
-        <span className="mt-1 block text-[0.625rem] text-muted">
+        <span className="mobile-submenu-title">{label}</span>
+
+        <span className="mobile-submenu-description">
           {item.description}
         </span>
       </span>
@@ -67,7 +68,7 @@ function NavigationEntry({
       <ChevronRight
         aria-hidden="true"
         size={16}
-        className="shrink-0 text-muted"
+        className="mobile-submenu-chevron"
       />
     </>
   ) : (
@@ -132,8 +133,11 @@ function MobileNavigationContent({
   business,
   onLogout,
 }: MobileNavigationProps) {
+  const { pathname } = useLocation();
+
   const [open, setOpen] = useState(false);
   const [groupId, setGroupId] = useState<string | null>(null);
+
   const sheetId = useId();
   const submenuRef = useRef<HTMLElement>(null);
 
@@ -172,6 +176,24 @@ function MobileNavigationContent({
     });
   }
 
+  function openMenu() {
+    const currentPath = pathname.replace(/\/+$/, "") || "/";
+
+    const currentGroup = items.find(
+      (item) =>
+        item.status === "group" &&
+        item.children.some(
+          (child) =>
+            child.status === "ready" &&
+            (currentPath === child.to ||
+              currentPath.startsWith(`${child.to}/`))
+        )
+    );
+
+    setGroupId(currentGroup?.id ?? null);
+    setOpen(true);
+  }
+
   function openGroup(id: string) {
     setGroupId(id);
     setOpen(true);
@@ -199,10 +221,7 @@ function MobileNavigationContent({
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={sheetId}
-          onClick={() => {
-            setGroupId(null);
-            setOpen(true);
-          }}
+          onClick={openMenu}
         >
           <Menu aria-hidden="true" size={18} strokeWidth={1.75} />
           <span>Más</span>

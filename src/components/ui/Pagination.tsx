@@ -1,5 +1,5 @@
-import { useId } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { SelectField } from "../forms/SelectField";
 
 interface PaginationProps {
   page: number;
@@ -28,8 +28,6 @@ export function Pagination({
   onPageChange,
   onPageSizeChange,
 }: PaginationProps) {
-  const selectId = useId();
-
   const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
 
   const current = Math.max(1, Math.min(page, pageCount));
@@ -132,30 +130,28 @@ export function Pagination({
             </button>
           </nav>
 
-          <label className="pagination-size" htmlFor={selectId}>
-            <span className="pagination-size-label">Por página</span>
-
-            <span className="pagination-select">
-              <select
-                id={selectId}
-                value={pageSize}
-                disabled={disabled}
-                aria-label="Elementos por página"
-                aria-controls={controlsId}
-                onChange={(event) => {
-                  onPageSizeChange(Number(event.target.value));
-                }}
-              >
-                {pageSizeOptions.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
-
-              <ChevronDown aria-hidden="true" size={14} />
+          <div className="pagination-size">
+            <span
+              className="pagination-size-label"
+              aria-hidden="true"
+            >
+              Por página
             </span>
-          </label>
+
+            <SelectField
+              label="Elementos por página"
+              hideLabel
+              value={String(pageSize)}
+              disabled={disabled}
+              options={pageSizeOptions.map((size) => ({
+                value: String(size),
+                label: String(size),
+              }))}
+              onValueChange={(value) => {
+                onPageSizeChange(Number(value));
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>

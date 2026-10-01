@@ -864,3 +864,23 @@
     --app-scrollbar-thumb-hover: #6b81a3;
   }
 }
+
+@layer components {
+  @media (min-width: 64rem) {
+    /* Abierto: opciones arriba. */
+    .shell-sidebar[data-collapsed="false"] .shell-navigation {
+      align-content: start;
+    }
+
+    /* Plegado: opciones centradas en el espacio disponible. */
+    .shell-sidebar[data-collapsed="true"] .shell-navigation {
+      align-content: safe center;
+    }
+
+    /* Centrado horizontal de cada icono. */
+    .shell-sidebar[data-collapsed="true"] .shell-nav-item {
+      justify-content: center;
+      padding-inline: 0;
+    }
+  }
+}

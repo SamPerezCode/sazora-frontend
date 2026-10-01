@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { CircleAlert, CircleCheck, Plus, Tags } from "lucide-react";
+import { Plus, Tags } from "lucide-react";
 import { CategoryList } from "../components/CategoryList";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { Alert } from "../../../components/feedback/Alert";
@@ -145,50 +145,12 @@ function CategoriesContent({ session }: { session: AuthSession }) {
           Organiza las secciones de tu catálogo y menú.
         </p>
 
-        <div className="mt-4 grid h-16 grid-cols-[minmax(0,1fr)_auto] grid-rows-[minmax(0,1fr)] items-center gap-2 sm:gap-3">
-          <div className="flex h-full min-h-0 min-w-0 items-center overflow-hidden">
-            {resource.busy ? (
-              <p
-                role="status"
-                className="text-[11px] text-muted sm:text-xs"
-              >
-                Guardando…
-              </p>
-            ) : (
-              notice.message && (
-                <div
-                  role={notice.error ? "alert" : "status"}
-                  aria-atomic="true"
-                  className={[
-                    "flex max-h-full min-h-0 w-full items-start gap-1.5",
-                    "overflow-y-auto rounded-lg border px-2 py-1.5",
-                    "text-[11px] leading-4 sm:text-xs",
-                    notice.error
-                      ? "border-danger/35 bg-danger/10 text-danger dark:text-[#efa38f]"
-                      : "border-emerald-600/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200",
-                  ].join(" ")}
-                >
-                  {notice.error ? (
-                    <CircleAlert
-                      aria-hidden="true"
-                      size={14}
-                      className="mt-0.5 shrink-0"
-                    />
-                  ) : (
-                    <CircleCheck
-                      aria-hidden="true"
-                      size={14}
-                      className="mt-0.5 shrink-0"
-                    />
-                  )}
-
-                  <span className="min-w-0 [overflow-wrap:anywhere]">
-                    {notice.message}
-                  </span>
-                </div>
-              )
-            )}
-          </div>
+        <div className="mt-4 flex min-h-16 items-center justify-end">
+          {resource.busy && (
+            <span role="status" className="sr-only">
+              Guardando…
+            </span>
+          )}
 
           <Button
             size="sm"
@@ -251,6 +213,14 @@ function CategoriesContent({ session }: { session: AuthSession }) {
           historial se conserva.
         </p>
       </Card>
+
+      {notice.message && (
+        <div className="fixed inset-x-4 bottom-24 z-40 sm:left-auto sm:bottom-6 sm:w-96">
+          <Alert variant={notice.error ? "error" : "success"}>
+            {notice.message}
+          </Alert>
+        </div>
+      )}
 
       {editor && (
         <BottomSheet

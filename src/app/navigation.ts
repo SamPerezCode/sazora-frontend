@@ -99,11 +99,12 @@ const navigation: readonly NavigationItem[] = [
       {
         id: "product-list",
         label: "Productos",
-        description: "Crea y administra tu carta",
+        description: "Consulta y organiza tu carta",
         icon: PackageOpen,
         roles: ["ADMIN"],
         group: "main",
-        status: "planned",
+        status: "ready",
+        to: "/productos",
       },
       {
         id: "categories",

@@ -4,6 +4,7 @@ import { DashboardPage } from "../../features/dashboard/pages/DashboardPage";
 import { BusinessSettingsPage } from "../../features/business/pages/BusinessSettingsPage";
 import { AppShell } from "../layout/AppShell";
 import { CategoriesPage } from "../../features/categories/pages/CategoriesPage";
+import { ProductsPage } from "../../features/products/pages/ProductsPage";
 import {
   GuestOnly,
   RequireAuth,
@@ -37,6 +38,15 @@ export function AppRouter() {
               element={
                 <RequireRole role="ADMIN">
                   <BusinessSettingsPage />
+                </RequireRole>
+              }
+            />
+
+            <Route
+              path="/productos"
+              element={
+                <RequireRole role="ADMIN">
+                  <ProductsPage />
                 </RequireRole>
               }
             />

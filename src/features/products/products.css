@@ -1,0 +1,62 @@
+@layer components {
+  .products-page {
+    --button-radius: 0.75rem;
+    --form-control-height: 2.5rem;
+    --field-font-size: 0.8125rem;
+    --textarea-font-size: 0.8125rem;
+    --field-label-size: 0.6875rem;
+    --field-gap: 0.5rem;
+  }
+}
+
+@layer components {
+  .products-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "category category"
+      "search create";
+    align-items: end;
+    gap: 0.75rem;
+
+    --button-font-size: 0.6875rem;
+  }
+
+  .products-toolbar-category {
+    grid-area: category;
+    min-width: 0;
+  }
+
+  .products-toolbar-search {
+    grid-area: search;
+    min-width: 0;
+
+    --field-font-size: 0.75rem;
+    --field-padding-start: 2rem;
+    --field-icon-left: 0.75rem;
+    --field-icon-size: 0.875rem;
+  }
+
+  .products-toolbar-create {
+    grid-area: create;
+    justify-self: end;
+    align-self: end;
+  }
+
+  @media (min-width: 64rem) {
+    .products-toolbar {
+      grid-template-columns:
+        minmax(0, 22.5rem)
+        minmax(0, 15rem)
+        minmax(0, 1fr)
+        auto;
+      grid-template-areas: "search category . create";
+
+      --button-font-size: 0.8125rem;
+    }
+
+    .products-toolbar-search {
+      --field-font-size: 0.8125rem;
+    }
+  }
+}
