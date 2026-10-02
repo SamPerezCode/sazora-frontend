@@ -19,7 +19,7 @@
 
   .business-settings-tabs {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     align-items: stretch;
     gap: 0.25rem;
     min-width: 0;
@@ -310,6 +310,61 @@
 
     .business-settings-save > button {
       white-space: nowrap;
+    }
+  }
+}
+
+@layer components {
+  .business-settings[data-management="true"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@layer components {
+  /*
+   * Las pestañas, los paneles y la vista previa
+   * participan en la misma cuadrícula.
+   */
+  .business-settings-editor {
+    display: contents;
+  }
+
+  .business-settings-tabs {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: 0.375rem;
+  }
+
+  .business-settings-tabs > button {
+    flex: 1 0 2.75rem;
+  }
+
+  .business-settings-editor > [role="tabpanel"] {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+  }
+
+  .business-settings-preview {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: start;
+  }
+
+  @media (min-width: 40rem) {
+    .business-settings-tabs > button {
+      flex-basis: 8.5rem;
+    }
+  }
+
+  @media (min-width: 80rem) {
+    .business-settings-preview {
+      grid-column: 2;
+      grid-row: 2;
     }
   }
 }

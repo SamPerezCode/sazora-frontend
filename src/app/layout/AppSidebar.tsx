@@ -7,6 +7,7 @@ import { SidebarGroup } from "./SidebarGroup";
 import type { BusinessIdentity } from "../../features/business/schemas/business-profile.schema";
 import type { AuthSession } from "../../features/auth/types/auth.types";
 import { getNavigation, ROLE_LABELS } from "../navigation";
+import { CollapsedSidebarItem } from "./CollapsedSidebarItem";
 
 interface AppSidebarProps {
   session: AuthSession;
@@ -82,6 +83,16 @@ export function AppSidebar({
         {items
           .filter((item) => item.group === "main")
           .map((item) => {
+            if (collapsed && !mobile) {
+              return (
+                <CollapsedSidebarItem
+                  key={`${item.id}:${pathname}`}
+                  item={item}
+                  onNavigate={onNavigate}
+                />
+              );
+            }
+
             if (item.status === "group") {
               return (
                 <SidebarGroup

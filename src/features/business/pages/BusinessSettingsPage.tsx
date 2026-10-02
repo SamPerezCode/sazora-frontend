@@ -18,8 +18,10 @@ import { TextField } from "../../../components/forms/TextField";
 import { Avatar } from "../../../components/ui/Avatar";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
+import { DiningTableIcon } from "../../../components/ui/DiningTableIcon";
 import { resolveFileUrl } from "../../../lib/files";
 import { PreparationAreasPanel } from "../../preparation-areas/components/PreparationAreasPanel";
+import { RestaurantTablesPanel } from "../../restaurant-tables/components/RestaurantTablesPanel";
 import type {
   BusinessSettings,
   BusinessSettingsResource,
@@ -56,6 +58,12 @@ const tabs = [
     label: "Menú público",
     icon: UtensilsCrossed,
     description: "Presentación y disponibilidad de tu menú público.",
+  },
+  {
+    id: "tables",
+    label: "Mesas",
+    icon: DiningTableIcon,
+    description: "Administra los espacios de atención de tu negocio.",
   },
   {
     id: "areas",
@@ -163,8 +171,13 @@ function BusinessSettingsEditor({
 }) {
   const editor = useSettingsEditor(settings, resource);
   const { draft, notice } = editor;
-  const [areasOpen, setAreasOpen] = useState(false);
-  const active = areasOpen ? "areas" : editor.active;
+  const [managementTab, setManagementTab] = useState<
+    "areas" | "tables" | null
+  >(null);
+
+  const areasOpen = managementTab === "areas";
+  const tablesOpen = managementTab === "tables";
+  const active = managementTab ?? editor.active;
 
   const id = useId();
   const upload = useRef<HTMLInputElement>(null);
@@ -172,10 +185,13 @@ function BusinessSettingsEditor({
   const selectedTab = tabs.find((tab) => tab.id === active)!;
   const Icon = selectedTab.icon;
 
-  function activateTab(next: SettingsSection | "areas"): void {
-    setAreasOpen(next === "areas");
-
-    if (next !== "areas") {
+  function activateTab(
+    next: SettingsSection | "areas" | "tables"
+  ): void {
+    if (next === "areas" || next === "tables") {
+      setManagementTab(next);
+    } else {
+      setManagementTab(null);
       editor.setActive(next);
     }
 
@@ -183,7 +199,10 @@ function BusinessSettingsEditor({
   }
 
   return (
-    <div className="business-settings">
+    <div
+      className="business-settings"
+      data-management={managementTab !== null}
+    >
       <div className="business-settings-editor">
         <div
           role="tablist"
@@ -242,8 +261,18 @@ function BusinessSettingsEditor({
           {areasOpen && <PreparationAreasPanel />}
         </div>
 
+        <div
+          role="tabpanel"
+          id={`${id}-panel-tables`}
+          aria-labelledby={`${id}-tab-tables`}
+          hidden={!tablesOpen}
+          tabIndex={0}
+        >
+          {tablesOpen && <RestaurantTablesPanel />}
+        </div>
+
         {tabs
-          .filter((tab) => tab.id !== "areas")
+          .filter((tab) => tab.id !== "areas" && tab.id !== "tables")
           .map((tab) => (
             <div
               key={tab.id}
@@ -610,8 +639,7 @@ function BusinessSettingsEditor({
             </div>
           ))}
       </div>
-
-      {!areasOpen && (
+      {managementTab === null && (
         <aside className="business-settings-preview">
           {active === "ticket" ? (
             <TicketPreview draft={draft} />
