@@ -7,6 +7,7 @@ import {
   Printer,
   RotateCcw,
   Save,
+  Users,
   UtensilsCrossed,
 } from "lucide-react";
 import { useAppShell } from "../../../app/layout/shell-context";
@@ -22,6 +23,8 @@ import { DiningTableIcon } from "../../../components/ui/DiningTableIcon";
 import { resolveFileUrl } from "../../../lib/files";
 import { PreparationAreasPanel } from "../../preparation-areas/components/PreparationAreasPanel";
 import { RestaurantTablesPanel } from "../../restaurant-tables/components/RestaurantTablesPanel";
+import { EmployeesPanel } from "../../employees/components/EmployeesPanel";
+
 import type {
   BusinessSettings,
   BusinessSettingsResource,
@@ -71,6 +74,12 @@ const tabs = [
     icon: ChefHat,
     description:
       "Organiza dónde se prepara o despacha cada producto.",
+  },
+  {
+    id: "employees",
+    label: "Empleados y roles",
+    icon: Users,
+    description: "Administra tu equipo y sus funciones.",
   },
 ] as const;
 
@@ -172,11 +181,12 @@ function BusinessSettingsEditor({
   const editor = useSettingsEditor(settings, resource);
   const { draft, notice } = editor;
   const [managementTab, setManagementTab] = useState<
-    "areas" | "tables" | null
+    "areas" | "tables" | "employees" | null
   >(null);
 
   const areasOpen = managementTab === "areas";
   const tablesOpen = managementTab === "tables";
+  const employeesOpen = managementTab === "employees";
   const active = managementTab ?? editor.active;
 
   const id = useId();
@@ -186,9 +196,13 @@ function BusinessSettingsEditor({
   const Icon = selectedTab.icon;
 
   function activateTab(
-    next: SettingsSection | "areas" | "tables"
+    next: SettingsSection | "areas" | "tables" | "employees"
   ): void {
-    if (next === "areas" || next === "tables") {
+    if (
+      next === "areas" ||
+      next === "tables" ||
+      next === "employees"
+    ) {
       setManagementTab(next);
     } else {
       setManagementTab(null);
@@ -271,8 +285,23 @@ function BusinessSettingsEditor({
           {tablesOpen && <RestaurantTablesPanel />}
         </div>
 
+        <div
+          role="tabpanel"
+          id={`${id}-panel-employees`}
+          aria-labelledby={`${id}-tab-employees`}
+          hidden={!employeesOpen}
+          tabIndex={0}
+        >
+          {employeesOpen && <EmployeesPanel />}
+        </div>
+
         {tabs
-          .filter((tab) => tab.id !== "areas" && tab.id !== "tables")
+          .filter(
+            (tab) =>
+              tab.id !== "areas" &&
+              tab.id !== "tables" &&
+              tab.id !== "employees"
+          )
           .map((tab) => (
             <div
               key={tab.id}
