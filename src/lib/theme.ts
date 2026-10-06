@@ -8,6 +8,14 @@ function isTheme(value: string | null): value is Theme {
 
 function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme;
+
+  const favicon =
+    document.querySelector<HTMLLinkElement>("#app-favicon");
+
+  if (favicon) {
+    favicon.href =
+      theme === "dark" ? "/favicon_dark.png" : "/favicon_ligth.png";
+  }
 }
 
 export function initializeTheme(): Theme {

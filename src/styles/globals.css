@@ -10,6 +10,8 @@
 @import "../features/auth/auth-background.css";
 @import "../features/auth/login-layout.css";
 @import "../components/ui/css/pagination.css";
+@import "../features/sales/sales.css";
+@import "../features/sales/sales-board.css";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 

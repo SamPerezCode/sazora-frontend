@@ -5,6 +5,7 @@ import { BusinessSettingsPage } from "../../features/business/pages/BusinessSett
 import { AppShell } from "../layout/AppShell";
 import { CategoriesPage } from "../../features/categories/pages/CategoriesPage";
 import { ProductsPage } from "../../features/products/pages/ProductsPage";
+import { SalesPage } from "../../features/sales/pages/SalesPage";
 import {
   GuestOnly,
   RequireAuth,
@@ -23,6 +24,7 @@ export function AppRouter() {
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
             <Route path="/panel" element={<DashboardPage />} />
+            <Route path="/ventas" element={<SalesPage />} />
 
             <Route
               path="/productos/categorias"

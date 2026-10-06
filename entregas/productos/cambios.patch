@@ -1,0 +1,3278 @@
+diff --git a/src/features/products/components/ComboComponentsEditor.tsx b/src/features/products/components/ComboComponentsEditor.tsx
+new file mode 100644
+--- /dev/null
++++ b/src/features/products/components/ComboComponentsEditor.tsx
+@@ -0,0 +1,52 @@
++import { useState } from "react";
++import { Plus, Trash2 } from "lucide-react";
++import { SelectField } from "../../../components/forms/SelectField";
++import { TextField } from "../../../components/forms/TextField";
++import { Button } from "../../../components/ui/Button";
++import type { Product } from "../schemas/product.schema";
++import type { ComboComponent } from "../schemas/product-action.schema";
++import { formatProductPrice } from "../utils/product-list";
++
++export function ComboComponentsEditor({ products, value, onChange, disabled, ownId }: {
++  products: readonly Product[]; value: ComboComponent[]; onChange: (v: ComboComponent[]) => void;
++  disabled: boolean; ownId?: string;
++}) {
++  const [selected, setSelected] = useState("");
++  const available = products.filter(p => p.id !== ownId);
++  const chosen = available.find(p => p.id === selected);
++  return <section className="space-y-3 rounded-xl border border-outline/60 p-3" aria-label="Componentes del combo">
++    <p className="text-sm font-semibold text-heading">Componentes del combo</p>
++    <SelectField label="Producto" value={selected} disabled={disabled}
++      onValueChange={setSelected} options={available.map(p => ({
++        value: p.id, label: p.name + (p.isActive ? "" : " · Inactivo"),
++      }))} />
++    <Button size="sm" variant="secondary" disabled={disabled || !chosen} onClick={() => {
++      if (!chosen) return;
++      const previous = value.find(i => i.productId === chosen.id);
++      onChange(previous
++        ? value.map(i => i.productId === chosen.id ? { ...i, quantity: i.quantity + 1 } : i)
++        : [...value, { productId: chosen.id, quantity: 1 }]);
++    }}><Plus size={16} />Agregar componente</Button>
++    {!value.length && <p className="text-xs text-muted">Selecciona al menos un producto.</p>}
++    {value.map(item => {
++      const product = products.find(p => p.id === item.productId);
++      return <div key={item.productId} className="space-y-2 border-t border-outline/60 pt-3">
++        <div className="flex items-start justify-between gap-2">
++          <div className="min-w-0 text-sm">
++            <p className="font-semibold text-heading">{product?.name ?? "Producto no disponible en el catálogo"}</p>
++            {product && <p className="text-xs text-muted">{formatProductPrice(product.currentPrice)} por unidad</p>}
++          </div>
++          <Button size="sm" variant="danger" disabled={disabled}
++            aria-label={`Quitar ${product?.name ?? item.productId}`}
++            onClick={() => onChange(value.filter(i => i.productId !== item.productId))}>
++            <Trash2 size={16} />
++          </Button>
++        </div>
++        <TextField label="Cantidad" type="number" min="0" step="any" value={item.quantity || ""}
++          disabled={disabled} required error={item.quantity > 0 ? undefined : "Debe ser mayor que cero."}
++          onChange={e => onChange(value.map(i => i.productId === item.productId
++            ? { ...i, quantity: Number(e.target.value) } : i))} />
++      </div>;
++    })}
++  </section>;
++}
+diff --git a/src/features/products/components/ProductActions.tsx b/src/features/products/components/ProductActions.tsx
+--- a/src/features/products/components/ProductActions.tsx
++++ b/src/features/products/components/ProductActions.tsx
+@@ -1,79 +1,24 @@
+-import {
+-  Boxes,
+-  ImagePlus,
+-  ListTree,
+-  Pencil,
+-  ToggleLeft,
+-  ToggleRight,
+-} from "lucide-react";
+-import { ActionMenu } from "../../../components/ui/ActionMenu";
+-import type { Product } from "../schemas/product.schema";
+-import type { ProductActionKind } from "../schemas/product-action.schema";
+-
+-interface ProductActionsProps {
+-  product: Product;
+-  disabled?: boolean;
+-  onAction: (kind: ProductActionKind, product: Product) => void;
+-}
+-
+-export function ProductActions({
+-  product,
+-  disabled,
+-  onAction,
+-}: ProductActionsProps) {
+-  const actions = [
+-    {
+-      id: "edit",
+-      label: "Editar",
+-      icon: <Pencil size={16} aria-hidden="true" />,
+-      onSelect: () => onAction("edit", product),
+-    },
+-    {
+-      id: "image",
+-      label: "Imagen",
+-      icon: <ImagePlus size={16} aria-hidden="true" />,
+-      onSelect: () => onAction("image", product),
+-    },
+-    {
+-      id: "status",
+-      label: product.isActive ? "Desactivar" : "Activar",
+-      icon: product.isActive ? (
+-        <ToggleRight size={20} aria-hidden="true" />
+-      ) : (
+-        <ToggleLeft size={20} aria-hidden="true" />
+-      ),
+-      onSelect: () => onAction("status", product),
+-    },
+-  ];
+-
+-  if (
+-    !product.isCombo &&
+-    product.isActive &&
+-    !product.hasInventory &&
+-    product.inventoryTrackingType === "NONE"
+-  ) {
+-    actions.push({
+-      id: "inventory",
+-      label: "Configurar inventario",
+-      icon: <Boxes size={16} aria-hidden="true" />,
+-      onSelect: () => onAction("inventory", product),
+-    });
+-  }
+-
+-  if (product.isCombo) {
+-    actions.push({
+-      id: "combo",
+-      label: "Ver composición",
+-      icon: <ListTree size={16} aria-hidden="true" />,
+-      onSelect: () => onAction("combo", product),
+-    });
+-  }
+-
+-  return (
+-    <ActionMenu
+-      label={`Acciones de ${product.name}`}
+-      disabled={disabled}
+-      actions={actions}
+-    />
+-  );
+-}
++import { Boxes, Eye, ImagePlus, Pencil, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
++import { ActionMenu } from "../../../components/ui/ActionMenu";
++import type { Product } from "../schemas/product.schema";
++import type { ProductActionKind } from "../schemas/product-action.schema";
++
++export function ProductActions({ product, disabled, onAction }: {
++  product: Product; disabled?: boolean;
++  onAction: (kind: ProductActionKind, product: Product) => void;
++}) {
++  const actions = [
++    { id: "detail", label: "Ver detalle", icon: <Eye size={16} />, onSelect: () => onAction("detail", product) },
++    { id: "edit", label: "Editar", icon: <Pencil size={16} />, onSelect: () => onAction("edit", product) },
++    { id: "image", label: "Cambiar imagen", icon: <ImagePlus size={16} />, onSelect: () => onAction("image", product) },
++    ...(product.imageUrl ? [{
++      id: "remove-image", label: "Retirar imagen", icon: <Trash2 size={16} />, onSelect: () => onAction("remove-image", product),
++    }] : []),
++    { id: "inventory", label: product.hasInventory ? "Gestionar en Inventario" : "Configurar en Inventario",
++      icon: <Boxes size={16} />, onSelect: () => onAction("inventory", product) },
++    { id: "status", label: product.isActive ? "Desactivar" : "Activar",
++      icon: product.isActive ? <ToggleRight size={20} /> : <ToggleLeft size={20} />,
++      onSelect: () => onAction("status", product) },
++  ];
++  return <ActionMenu label={`Acciones de ${product.name}`} disabled={disabled} actions={actions} />;
++}
+diff --git a/src/features/products/components/ProductBadges.tsx b/src/features/products/components/ProductBadges.tsx
+new file mode 100644
+--- /dev/null
++++ b/src/features/products/components/ProductBadges.tsx
+@@ -0,0 +1,31 @@
++import type { Product } from "../schemas/product.schema";
++
++const fulfillment = {
++  PREPARE_TO_ORDER: "Preparado al momento",
++  READY_TO_SERVE: "Listo para entregar",
++};
++const tracking = {
++  NONE: "Sin control de inventario",
++  RESALE: "Inventario · Reventa",
++  PRODUCTION: "Inventario · Producción",
++  COMBO: "Inventario · Combo",
++  CUSTOM: "Inventario · Configuración avanzada",
++};
++const style = "inline-flex rounded-lg bg-secondary/60 px-2 py-1 text-[0.6875rem] text-muted";
++export function ProductTypeBadge({ isCombo }: { isCombo: boolean }) {
++  return <span className={style}>{isCombo ? "Combo" : "Normal"}</span>;
++}
++export function FulfillmentModeBadge({ value }: { value: Product["fulfillmentMode"] }) {
++  return <span className={style}>{fulfillment[value]}</span>;
++}
++export function InventoryTrackingBadge({ product }: { product: Product }) {
++  return <span className={style}>{product.hasInventory
++    ? tracking[product.inventoryTrackingType] : "Sin inventario configurado"}</span>;
++}
++export function ProductBadges({ product }: { product: Product }) {
++  return <div className="mt-2 flex flex-wrap gap-1">
++    <ProductTypeBadge isCombo={product.isCombo} />
++    <FulfillmentModeBadge value={product.fulfillmentMode} />
++    <InventoryTrackingBadge product={product} />
++  </div>;
++}
+diff --git a/src/features/products/components/ProductDetail.tsx b/src/features/products/components/ProductDetail.tsx
+new file mode 100644
+--- /dev/null
++++ b/src/features/products/components/ProductDetail.tsx
+@@ -0,0 +1,41 @@
++import { Avatar } from "../../../components/ui/Avatar";
++import { resolveFileUrl } from "../../../lib/files";
++import type { Product } from "../schemas/product.schema";
++import type { CatalogDetail, ProductActionKind } from "../schemas/product-action.schema";
++import { ProductBadges } from "./ProductBadges";
++import { ProductActions } from "./ProductActions";
++import { formatProductPrice } from "../utils/product-list";
++
++export function ProductDetail({ detail, summary, busy, onAction }: {
++  detail: CatalogDetail; summary: Product; busy: boolean;
++  onAction: (kind: ProductActionKind, product: Product) => void;
++}) {
++  const product = { ...summary, ...detail };
++  return <section className="space-y-4">
++    <div className="flex items-start justify-between gap-3">
++      <Avatar name={detail.name} src={resolveFileUrl(detail.imageUrl)} size="xl" />
++      <ProductActions product={product} disabled={busy} onAction={onAction} />
++    </div>
++    <div>
++      <h3 className="text-lg font-semibold text-heading">{detail.name}</h3>
++      <p className="text-sm text-muted">{detail.sku || "Sin código"}</p>
++      <ProductBadges product={product} />
++    </div>
++    <dl className="grid grid-cols-2 gap-4 text-sm">
++      <div><dt className="text-muted">Precio</dt><dd className="font-semibold text-heading">{formatProductPrice(detail.currentPrice)}</dd></div>
++      <div><dt className="text-muted">Estado</dt><dd>{detail.isActive ? "Activo" : "Inactivo"}</dd></div>
++      <div><dt className="text-muted">Categoría</dt><dd>{summary.categoryName}</dd></div>
++      <div><dt className="text-muted">Área</dt><dd>{summary.preparationAreaName}</dd></div>
++    </dl>
++    <p className="whitespace-pre-wrap text-sm text-muted">{detail.description || "Sin descripción."}</p>
++    {detail.components && <section className="space-y-2">
++      <h4 className="font-semibold text-heading">Componentes guardados</h4>
++      <ul className="divide-y divide-outline/40">
++        {detail.components.map(item => <li key={item.productId} className="flex justify-between gap-3 py-2 text-sm">
++          <span>{item.productName}</span><span>× {item.quantity}</span>
++        </li>)}
++      </ul>
++    </section>}
++    <p className="text-xs text-muted">El inventario es opcional. Sus existencias y configuración se administran desde Inventario.</p>
++  </section>;
++}
+diff --git a/src/features/products/components/ProductEditor.tsx b/src/features/products/components/ProductEditor.tsx
+new file mode 100644
+--- /dev/null
++++ b/src/features/products/components/ProductEditor.tsx
+@@ -0,0 +1,24 @@
++import { Alert } from "../../../components/feedback/Alert";
++import { LoadingState } from "../../../components/feedback/LoadingState";
++import { Button } from "../../../components/ui/Button";
++import type { Product } from "../schemas/product.schema";
++import type { ProductActionKind, ProductMutation } from "../schemas/product-action.schema";
++import type { Category } from "../../categories/schemas/category.schema";
++import type { PreparationArea } from "../../preparation-areas/schemas/preparation-area.schema";
++import { useProductDetail } from "../hooks/useProductDetail";
++import { ProductDetail } from "./ProductDetail";
++import { ProductForm } from "./ProductForm";
++
++export function ProductEditor({ product, editing, token, products, categories, areas, busy, onSave, onCancel, onAction }: {
++  product: Product; editing: boolean; token: string; products: readonly Product[];
++  categories: readonly Category[]; areas: readonly PreparationArea[]; busy: boolean;
++  onSave: (action: ProductMutation) => Promise<void>; onCancel: () => void;
++  onAction: (kind: ProductActionKind, product: Product) => void;
++}) {
++  const detail = useProductDetail(product.id, product.isCombo, product.businessId, token);
++  if (detail.error) return <Alert><p>{detail.error}</p><Button size="sm" variant="secondary" onClick={detail.retry}>Reintentar detalle</Button></Alert>;
++  if (!detail.data) return <LoadingState message="Cargando detalle…" />;
++  return editing ? <ProductForm original={detail.data} isCombo={product.isCombo}
++    products={products} categories={categories} areas={areas} busy={busy} onSave={onSave} onCancel={onCancel} />
++    : <ProductDetail detail={detail.data} summary={product} busy={busy} onAction={onAction} />;
++}
+diff --git a/src/features/products/components/ProductForm.tsx b/src/features/products/components/ProductForm.tsx
+new file mode 100644
+--- /dev/null
++++ b/src/features/products/components/ProductForm.tsx
+@@ -0,0 +1,139 @@
++import { useRef, useState } from "react";
++import { Save } from "lucide-react";
++import { Alert } from "../../../components/feedback/Alert";
++import { TextField } from "../../../components/forms/TextField";
++import { TextAreaField } from "../../../components/forms/TextAreaField";
++import { SelectField } from "../../../components/forms/SelectField";
++import { Button } from "../../../components/ui/Button";
++import { ApiError } from "../../../lib/http/client";
++import type { Category } from "../../categories/schemas/category.schema";
++import type { PreparationArea } from "../../preparation-areas/schemas/preparation-area.schema";
++import type { Product } from "../schemas/product.schema";
++import { componentsSchema, productEditSchema } from "../schemas/product-action.schema";
++import type { CatalogDetail, ComboComponent, ProductEditInput, ProductMutation } from "../schemas/product-action.schema";
++import { ComboComponentsEditor } from "./ComboComponentsEditor";
++import { ProductImageField } from "./ProductImageField";
++import { formatProductPrice } from "../utils/product-list";
++
++export function ProductForm({ original, isCombo: originalIsCombo = false, products, categories, areas, busy, onSave, onCancel }: {
++  original?: CatalogDetail; isCombo?: boolean; products: readonly Product[];
++  categories: readonly Category[]; areas: readonly PreparationArea[]; busy: boolean;
++  onSave: (action: ProductMutation) => Promise<void>; onCancel: () => void;
++}) {
++  const [isCombo, setIsCombo] = useState(originalIsCombo);
++  const [draft, setDraft] = useState({
++    name: original?.name ?? "", sku: original?.sku ?? "",
++    description: original?.description ?? "", currentPrice: original?.currentPrice ?? "",
++    categoryId: original?.categoryId ?? "", preparationAreaId: original?.preparationAreaId ?? "",
++    fulfillmentMode: original?.fulfillmentMode ?? "",
++  });
++  const [components, setComponents] = useState<ComboComponent[]>(
++    original?.components?.map(({ productId, quantity }) => ({ productId, quantity })) ?? []
++  );
++  const [file, setFile] = useState<File | null>(null);
++  const [message, setMessage] = useState("");
++  const [errors, setErrors] = useState<Record<string, string>>({});
++  const saving = useRef(false);
++  const parsed = productEditSchema.safeParse(draft);
++  const compositionValid = !isCombo || (
++    componentsSchema.safeParse(components).success &&
++    components.every(c => c.productId !== original?.id && products.some(p => p.id === c.productId))
++  );
++  const setupValid =
++    categories.some(c => c.id === draft.categoryId && (c.isActive || original?.categoryId === c.id)) &&
++    areas.some(a => a.id === draft.preparationAreaId && (a.isActive || original?.preparationAreaId === a.id));
++  const valid = parsed.success && compositionValid && setupValid;
++  function change(key: keyof typeof draft, value: string) {
++    setDraft(previous => ({ ...previous, [key]: value }));
++    setErrors(previous => ({ ...previous, [key]: "" }));
++    setMessage("");
++  }
++  async function submit() {
++    if (busy || saving.current || !valid || !parsed.success) return;
++    saving.current = true;
++    setMessage("");
++    setErrors({});
++    try {
++      if (!original) {
++        await onSave({
++          kind: "create", isCombo, input: parsed.data,
++          ...(isCombo ? { components } : {}),
++          ...(file ? { file } : {}),
++        });
++      } else {
++        const input = Object.fromEntries(Object.entries(parsed.data).filter(([key, value]) => {
++          const previous = original[key as keyof ProductEditInput];
++          return key === "currentPrice"
++            ? formatProductPrice(String(value)) !== formatProductPrice(String(previous))
++            : value !== previous;
++        })) as Partial<ProductEditInput>;
++        const normalized = (items: ComboComponent[]) => JSON.stringify(
++          [...items].sort((a, b) => a.productId.localeCompare(b.productId))
++        );
++        const previous = original.components?.map(({ productId, quantity }) => ({ productId, quantity })) ?? [];
++        const changed = isCombo && normalized(previous) !== normalized(components);
++        if (!Object.keys(input).length && !changed) { onCancel(); return; }
++        await onSave({
++          kind: "edit", id: original.id, isCombo, input,
++          ...(changed ? { components } : {}),
++        });
++      }
++    } catch (cause) {
++      if (cause instanceof ApiError) {
++        setErrors(Object.fromEntries(cause.errors.map(e => [e.field, e.message])));
++        if (cause.code === "PRODUCT_SKU_CONFLICT") {
++          setErrors(previous => ({ ...previous, sku: cause.message }));
++        }
++      }
++      setMessage(cause instanceof Error ? cause.message : "No pudimos guardar el producto.");
++    } finally { saving.current = false; }
++  }
++  return <form className="space-y-4" onSubmit={e => { e.preventDefault(); void submit(); }}>
++    {!original && <SelectField label="Tipo de producto" value={isCombo ? "combo" : "normal"}
++      onValueChange={v => setIsCombo(v === "combo")} disabled={busy}
++      options={[{ value: "normal", label: "Producto normal" }, { value: "combo", label: "Producto combo" }]} />}
++    <TextField label="Nombre" placeholder="Ej. Combo desayuno" required maxLength={150}
++      value={draft.name} disabled={busy} error={errors.name} onChange={e => change("name", e.target.value)} />
++    <div className="grid gap-4 sm:grid-cols-2">
++      <TextField label="SKU (opcional)" placeholder="Ej. DESAYUNO-01" maxLength={50}
++        value={draft.sku} disabled={busy} error={errors.sku} onChange={e => change("sku", e.target.value)} />
++      <TextField label="Precio" placeholder="Ej. 15000.00" inputMode="decimal" required
++        value={draft.currentPrice} disabled={busy} error={errors.currentPrice}
++        onChange={e => change("currentPrice", e.target.value)} />
++      <SelectField label="Categoría" value={draft.categoryId} required disabled={busy}
++        error={errors.categoryId} onValueChange={v => change("categoryId", v)}
++        options={categories.filter(c => c.isActive || c.id === original?.categoryId).map(c => ({
++          value: c.id, label: c.name + (c.isActive ? "" : " · Inactiva"), disabled: !c.isActive,
++        }))} />
++      <SelectField label="Área de preparación" value={draft.preparationAreaId} required disabled={busy}
++        error={errors.preparationAreaId} onValueChange={v => change("preparationAreaId", v)}
++        options={areas.filter(a => a.isActive || a.id === original?.preparationAreaId).map(a => ({
++          value: a.id, label: a.name + (a.isActive ? "" : " · Inactiva"), disabled: !a.isActive,
++        }))} />
++    </div>
++    <SelectField label="¿Cómo se atiende este producto?" value={draft.fulfillmentMode}
++      required disabled={busy} error={errors.fulfillmentMode}
++      onValueChange={v => change("fulfillmentMode", v)}
++      options={[
++        { value: "PREPARE_TO_ORDER", label: "Preparar después de recibir el pedido" },
++        { value: "READY_TO_SERVE", label: "Ya está listo para entregar" },
++      ]} />
++    <p className="text-xs text-muted">Esta opción define la preparación y entrega. El control de inventario es opcional y se configura después, desde Inventario.</p>
++    <TextAreaField label="Descripción (opcional)" placeholder="Describe el producto o la oferta"
++      value={draft.description} maxLength={500} disabled={busy} error={errors.description}
++      onChange={e => change("description", e.target.value)} />
++    {isCombo && <ComboComponentsEditor products={products} value={components}
++      ownId={original?.id} onChange={setComponents} disabled={busy} />}
++    {!compositionValid && <p className="text-xs text-danger">Agrega componentes existentes con cantidades mayores que cero. El combo no puede incluirse a sí mismo.</p>}
++    {!original && <ProductImageField file={file} name={draft.name} disabled={busy} onChange={setFile} />}
++    {message && <Alert><p>{message}</p>{Object.entries(errors).filter(([key]) => key.startsWith("components")).map(([key, text]) => <p key={key}>{text}</p>)}</Alert>}
++    {!categories.some(c => c.isActive) && <Alert>Necesitas una categoría activa para crear productos.</Alert>}
++    {!areas.some(a => a.isActive) && <Alert>Necesitas un área de preparación activa para crear productos.</Alert>}
++    <div className="grid grid-cols-2 gap-2 border-t border-outline/60 pt-4">
++      <Button size="sm" variant="secondary" disabled={busy} onClick={onCancel}>Cancelar</Button>
++      <Button size="sm" type="submit" loading={busy} disabled={!valid || busy}>
++        <Save size={16} />Guardar
++      </Button>
++    </div>
++  </form>;
++}
+diff --git a/src/features/products/components/ProductImageField.tsx b/src/features/products/components/ProductImageField.tsx
+new file mode 100644
+--- /dev/null
++++ b/src/features/products/components/ProductImageField.tsx
+@@ -0,0 +1,41 @@
++import { useEffect, useId, useRef, useState } from "react";
++import { Upload } from "lucide-react";
++import { Avatar } from "../../../components/ui/Avatar";
++import { validateProductImage } from "../services/product.service";
++
++export function ProductImageField({ file, onChange, disabled, name }: {
++  file: File | null; onChange: (file: File | null) => void; disabled: boolean; name: string;
++}) {
++  const id = useId();
++  const [preview, setPreview] = useState<string | null>(null);
++  const [error, setError] = useState("");
++  const objectUrl = useRef<string | null>(null);
++  useEffect(() => () => {
++    if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
++  }, []);
++  return <div className="space-y-2">
++    {file && <Avatar name={name} src={preview} size="xl" />}
++    <label htmlFor={id} className="block text-sm font-medium text-heading">Imagen opcional</label>
++    <div className="relative rounded-xl border border-input-border bg-secondary/30 p-4 focus-within:ring-2 focus-within:ring-accent">
++      <input id={id} type="file" accept="image/jpeg,image/png,image/webp" disabled={disabled}
++        aria-describedby={id + "-help"} className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
++        onChange={e => {
++          const next = e.currentTarget.files?.[0];
++          if (!next) return;
++          const message = validateProductImage(next);
++          if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
++          objectUrl.current = message ? null : URL.createObjectURL(next);
++          setPreview(objectUrl.current);
++          setError(message ?? "");
++          onChange(message ? null : next);
++          if (message) e.currentTarget.value = "";
++        }} />
++      <div className="flex items-center gap-3 text-sm text-heading">
++        <Upload size={20} className="shrink-0 text-accent" />
++        <span className="min-w-0 break-words">{file?.name ?? "Seleccionar archivo"}</span>
++      </div>
++    </div>
++    <p id={id + "-help"} className="text-xs text-muted">JPEG, PNG o WebP. Máximo 5 MB.</p>
++    {error && <p role="alert" className="text-sm text-danger">{error}</p>}
++  </div>;
++}
+diff --git a/src/features/products/components/ProductList.tsx b/src/features/products/components/ProductList.tsx
+--- a/src/features/products/components/ProductList.tsx
++++ b/src/features/products/components/ProductList.tsx
+@@ -1,332 +1,334 @@
+-import { useId, useState } from "react";
+-import { Plus, Search } from "lucide-react";
+-import { TextField } from "../../../components/forms/TextField";
+-import { Avatar } from "../../../components/ui/Avatar";
+-import { Button } from "../../../components/ui/Button";
+-import { Pagination } from "../../../components/ui/Pagination";
+-import { resolveFileUrl } from "../../../lib/files";
+-import type { Category } from "../../categories/schemas/category.schema";
+-import type { Product } from "../schemas/product.schema";
+-import { SelectField } from "../../../components/forms/SelectField";
+-import { ProductActions } from "./ProductActions";
+-import type { ProductActionKind } from "../schemas/product-action.schema";
+-import {
+-  filterProducts,
+-  formatProductPrice,
+-} from "../utils/product-list";
+-import { ProductStatus } from "./ProductStatus";
+-
+-interface ProductListProps {
+-  products: readonly Product[];
+-  categories: readonly Category[];
+-  disabled: boolean;
+-  onCreate: () => void;
+-  onAction: (kind: ProductActionKind, product: Product) => void;
+-}
+-
+-function ProductIdentity({ product }: { product: Product }) {
+-  return (
+-    <div className="flex min-w-0 items-center gap-3">
+-      <Avatar
+-        name={product.name}
+-        src={resolveFileUrl(product.imageUrl)}
+-        size="list"
+-      />
+-
+-      <div className="min-w-0">
+-        <p className="text-sm font-semibold text-heading [overflow-wrap:anywhere]">
+-          {product.name}
+-        </p>
+-
+-        <p className="mt-1 text-[0.6875rem] text-muted [overflow-wrap:anywhere]">
+-          {product.sku || "Sin código"}
+-          {product.isCombo && " · Combo"}
+-        </p>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-export function ProductList({
+-  products,
+-  categories,
+-  disabled,
+-  onCreate,
+-  onAction,
+-}: ProductListProps) {
+-  const [query, setQuery] = useState("");
+-  const [categoryId, setCategoryId] = useState("");
+-  const [requestedPage, setRequestedPage] = useState(1);
+-  const [pageSize, setPageSize] = useState(10);
+-
+-  const listId = useId();
+-  const resultId = useId();
+-
+-  const filtered = filterProducts(products, query, categoryId);
+-
+-  const pageCount = Math.max(
+-    1,
+-    Math.ceil(filtered.length / pageSize)
+-  );
+-
+-  const page = Math.min(requestedPage, pageCount);
+-  const start = (page - 1) * pageSize;
+-  const visible = filtered.slice(start, start + pageSize);
+-  const hasFilters = query.trim() !== "" || categoryId !== "";
+-
+-  function clearFilters() {
+-    setQuery("");
+-    setCategoryId("");
+-    setRequestedPage(1);
+-  }
+-
+-  return (
+-    <section className="space-y-4" aria-label="Listado de productos">
+-      <div className="w-full min-w-0">
+-        {" "}
+-        <div className="products-toolbar">
+-          <div className="products-toolbar-category">
+-            <SelectField
+-              label="Categoría"
+-              value={categoryId}
+-              describedBy={resultId}
+-              onValueChange={(value) => {
+-                setCategoryId(value);
+-                setRequestedPage(1);
+-              }}
+-              options={[
+-                { value: "", label: "Todas las categorías" },
+-                ...categories.map((category) => ({
+-                  value: category.id,
+-                  label:
+-                    category.name +
+-                    (category.isActive ? "" : " (inactiva)"),
+-                })),
+-              ]}
+-            />
+-          </div>
+-
+-          <div className="products-toolbar-search">
+-            <TextField
+-              type="search"
+-              label="Buscar productos"
+-              placeholder="Nombre, código, categoría o área"
+-              icon={Search}
+-              value={query}
+-              aria-controls={listId}
+-              aria-describedby={resultId}
+-              onChange={(event) => {
+-                setQuery(event.target.value);
+-                setRequestedPage(1);
+-              }}
+-            />
+-          </div>
+-
+-          <Button
+-            className="products-toolbar-create whitespace-nowrap"
+-            disabled={disabled}
+-            onClick={onCreate}
+-          >
+-            <Plus aria-hidden="true" size={14} className="shrink-0" />
+-            Nuevo producto
+-          </Button>
+-        </div>
+-      </div>
+-
+-      <p
+-        id={resultId}
+-        role="status"
+-        aria-live="polite"
+-        aria-atomic="true"
+-        className="text-xs text-muted"
+-      >
+-        {hasFilters
+-          ? `${filtered.length} de ${products.length} productos`
+-          : `${products.length} ${
+-              products.length === 1 ? "producto" : "productos"
+-            } · ${categories.length} ${
+-              categories.length === 1 ? "categoría" : "categorías"
+-            }`}
+-      </p>
+-
+-      <div
+-        id={listId}
+-        className="rounded-xl border border-outline/60 bg-surface/50"
+-      >
+-        {visible.length === 0 ? (
+-          <div className="px-4 py-10 text-center">
+-            <p className="text-sm text-muted">
+-              {products.length === 0
+-                ? "Todavía no tienes productos registrados."
+-                : "No encontramos productos con estos filtros."}
+-            </p>
+-
+-            {hasFilters && (
+-              <Button
+-                size="sm"
+-                variant="secondary"
+-                className="mt-4"
+-                onClick={clearFilters}
+-              >
+-                Limpiar filtros
+-              </Button>
+-            )}
+-          </div>
+-        ) : (
+-          <>
+-            {/* Tabla de desktop */}
+-            <div className="hidden overflow-hidden rounded-xl lg:block">
+-              <table className="w-full table-fixed text-left">
+-                <caption className="sr-only">
+-                  Productos del negocio
+-                </caption>
+-
+-                <colgroup>
+-                  <col className="w-[28%]" />
+-                  <col />
+-                  <col />
+-                  <col className="w-32" />
+-                  <col className="w-36" />
+-                  <col className="w-24" />
+-                </colgroup>
+-
+-                <thead className="border-b border-outline/60 bg-secondary/30">
+-                  <tr className="text-[0.6875rem] uppercase tracking-wide text-muted">
+-                    <th scope="col" className="px-4 py-3 font-medium">
+-                      Producto
+-                    </th>
+-                    <th scope="col" className="px-4 py-3 font-medium">
+-                      Categoría
+-                    </th>
+-                    <th scope="col" className="px-4 py-3 font-medium">
+-                      Área
+-                    </th>
+-                    <th
+-                      scope="col"
+-                      className="px-4 py-3 text-right font-medium"
+-                    >
+-                      Precio
+-                    </th>
+-                    <th scope="col" className="px-4 py-3 font-medium">
+-                      Estado
+-                    </th>
+-                    <th
+-                      scope="col"
+-                      className="px-3 py-3 text-center font-medium"
+-                    >
+-                      Acciones
+-                    </th>
+-                  </tr>
+-                </thead>
+-
+-                <tbody className="divide-y divide-outline/40">
+-                  {visible.map((product) => (
+-                    <tr
+-                      key={product.id}
+-                      className="transition-colors hover:bg-secondary/30"
+-                    >
+-                      <th
+-                        scope="row"
+-                        className="px-4 py-4 font-normal"
+-                      >
+-                        <ProductIdentity product={product} />
+-                      </th>
+-
+-                      <td className="px-4 py-4 text-xs text-muted [overflow-wrap:anywhere]">
+-                        {product.categoryName}
+-                      </td>
+-
+-                      <td className="px-4 py-4 text-xs text-muted [overflow-wrap:anywhere]">
+-                        {product.preparationAreaName}
+-                      </td>
+-
+-                      <td className="px-4 py-4 text-right text-sm font-semibold tabular-nums text-heading [overflow-wrap:anywhere]">
+-                        {formatProductPrice(product.currentPrice)}
+-                      </td>
+-
+-                      <td className="px-4 py-4">
+-                        <ProductStatus product={product} />
+-                      </td>
+-                      <td className="px-3 py-4">
+-                        <div className="flex justify-center">
+-                          <ProductActions
+-                            product={product}
+-                            disabled={disabled}
+-                            onAction={onAction}
+-                          />
+-                        </div>
+-                      </td>
+-                    </tr>
+-                  ))}
+-                </tbody>
+-              </table>
+-            </div>
+-
+-            {/* Tarjetas de móvil */}
+-            <ul className="divide-y divide-outline/40 px-3 lg:hidden">
+-              {visible.map((product) => (
+-                <li key={product.id} className="space-y-3 py-4">
+-                  <div className="flex items-start justify-between gap-2">
+-                    <div className="min-w-0 flex-1">
+-                      <ProductIdentity product={product} />
+-                    </div>
+-
+-                    <ProductActions
+-                      product={product}
+-                      disabled={disabled}
+-                      onAction={onAction}
+-                    />
+-                  </div>
+-
+-                  <dl className="grid grid-cols-2 gap-3 text-xs">
+-                    <div className="min-w-0">
+-                      <dt className="text-[0.625rem] uppercase tracking-wide text-muted">
+-                        Categoría
+-                      </dt>
+-                      <dd className="mt-1 text-heading [overflow-wrap:anywhere]">
+-                        {product.categoryName}
+-                      </dd>
+-                    </div>
+-
+-                    <div className="min-w-0">
+-                      <dt className="text-[0.625rem] uppercase tracking-wide text-muted">
+-                        Área
+-                      </dt>
+-                      <dd className="mt-1 text-heading [overflow-wrap:anywhere]">
+-                        {product.preparationAreaName}
+-                      </dd>
+-                    </div>
+-                  </dl>
+-
+-                  <div className="flex flex-wrap items-center justify-between gap-2">
+-                    <p className="text-sm font-semibold tabular-nums text-heading [overflow-wrap:anywhere]">
+-                      <span className="sr-only">Precio: </span>
+-                      {formatProductPrice(product.currentPrice)}
+-                    </p>
+-
+-                    <ProductStatus product={product} />
+-                  </div>
+-                </li>
+-              ))}
+-            </ul>
+-          </>
+-        )}
+-      </div>
+-
+-      {products.length > 10 && (
+-        <Pagination
+-          page={page}
+-          pageSize={pageSize}
+-          totalItems={filtered.length}
+-          itemLabel={filtered.length === 1 ? "producto" : "productos"}
+-          controlsId={listId}
+-          onPageChange={setRequestedPage}
+-          onPageSizeChange={(size) => {
+-            setPageSize(size);
+-            setRequestedPage(1);
+-          }}
+-        />
+-      )}
+-    </section>
+-  );
+-}
++import { useId, useState } from "react";
++import { Plus, Search } from "lucide-react";
++import { TextField } from "../../../components/forms/TextField";
++import { Avatar } from "../../../components/ui/Avatar";
++import { Button } from "../../../components/ui/Button";
++import { Pagination } from "../../../components/ui/Pagination";
++import { resolveFileUrl } from "../../../lib/files";
++import type { Category } from "../../categories/schemas/category.schema";
++import type { Product } from "../schemas/product.schema";
++import { SelectField } from "../../../components/forms/SelectField";
++import { ProductActions } from "./ProductActions";
++import type { ProductActionKind } from "../schemas/product-action.schema";
++import {
++  filterProducts,
++  formatProductPrice,
++} from "../utils/product-list";
++import { ProductStatus } from "./ProductStatus";
++import { ProductBadges } from "./ProductBadges";
++
++interface ProductListProps {
++  products: readonly Product[];
++  categories: readonly Category[];
++  disabled: boolean;
++  onCreate: () => void;
++  onAction: (kind: ProductActionKind, product: Product) => void;
++}
++
++function ProductIdentity({ product }: { product: Product }) {
++  return (
++    <div className="flex min-w-0 items-center gap-3">
++      <Avatar
++        name={product.name}
++        src={resolveFileUrl(product.imageUrl)}
++        size="list"
++      />
++
++      <div className="min-w-0">
++        <p className="text-sm font-semibold text-heading [overflow-wrap:anywhere]">
++          {product.name}
++        </p>
++
++        <p className="mt-1 text-[0.6875rem] text-muted [overflow-wrap:anywhere]">
++          {product.sku || "Sin código"}
++          
++        </p>
++        <ProductBadges product={product} />
++      </div>
++    </div>
++  );
++}
++
++export function ProductList({
++  products,
++  categories,
++  disabled,
++  onCreate,
++  onAction,
++}: ProductListProps) {
++  const [query, setQuery] = useState("");
++  const [categoryId, setCategoryId] = useState("");
++  const [requestedPage, setRequestedPage] = useState(1);
++  const [pageSize, setPageSize] = useState(10);
++
++  const listId = useId();
++  const resultId = useId();
++
++  const filtered = filterProducts(products, query, categoryId);
++
++  const pageCount = Math.max(
++    1,
++    Math.ceil(filtered.length / pageSize)
++  );
++
++  const page = Math.min(requestedPage, pageCount);
++  const start = (page - 1) * pageSize;
++  const visible = filtered.slice(start, start + pageSize);
++  const hasFilters = query.trim() !== "" || categoryId !== "";
++
++  function clearFilters() {
++    setQuery("");
++    setCategoryId("");
++    setRequestedPage(1);
++  }
++
++  return (
++    <section className="space-y-4" aria-label="Listado de productos">
++      <div className="w-full min-w-0">
++        {" "}
++        <div className="products-toolbar">
++          <div className="products-toolbar-category">
++            <SelectField
++              label="Categoría"
++              value={categoryId}
++              describedBy={resultId}
++              onValueChange={(value) => {
++                setCategoryId(value);
++                setRequestedPage(1);
++              }}
++              options={[
++                { value: "", label: "Todas las categorías" },
++                ...categories.map((category) => ({
++                  value: category.id,
++                  label:
++                    category.name +
++                    (category.isActive ? "" : " (inactiva)"),
++                })),
++              ]}
++            />
++          </div>
++
++          <div className="products-toolbar-search">
++            <TextField
++              type="search"
++              label="Buscar productos"
++              placeholder="Nombre, código, categoría o área"
++              icon={Search}
++              value={query}
++              aria-controls={listId}
++              aria-describedby={resultId}
++              onChange={(event) => {
++                setQuery(event.target.value);
++                setRequestedPage(1);
++              }}
++            />
++          </div>
++
++          <Button
++            className="products-toolbar-create whitespace-nowrap"
++            disabled={disabled}
++            onClick={onCreate}
++          >
++            <Plus aria-hidden="true" size={14} className="shrink-0" />
++            Nuevo producto
++          </Button>
++        </div>
++      </div>
++
++      <p
++        id={resultId}
++        role="status"
++        aria-live="polite"
++        aria-atomic="true"
++        className="text-xs text-muted"
++      >
++        {hasFilters
++          ? `${filtered.length} de ${products.length} productos`
++          : `${products.length} ${
++              products.length === 1 ? "producto" : "productos"
++            } · ${categories.length} ${
++              categories.length === 1 ? "categoría" : "categorías"
++            }`}
++      </p>
++
++      <div
++        id={listId}
++        className="rounded-xl border border-outline/60 bg-surface/50"
++      >
++        {visible.length === 0 ? (
++          <div className="px-4 py-10 text-center">
++            <p className="text-sm text-muted">
++              {products.length === 0
++                ? "Todavía no tienes productos registrados."
++                : "No encontramos productos con estos filtros."}
++            </p>
++
++            {hasFilters && (
++              <Button
++                size="sm"
++                variant="secondary"
++                className="mt-4"
++                onClick={clearFilters}
++              >
++                Limpiar filtros
++              </Button>
++            )}
++          </div>
++        ) : (
++          <>
++            {/* Tabla de desktop */}
++            <div className="hidden overflow-hidden rounded-xl lg:block">
++              <table className="w-full table-fixed text-left">
++                <caption className="sr-only">
++                  Productos del negocio
++                </caption>
++
++                <colgroup>
++                  <col className="w-[28%]" />
++                  <col />
++                  <col />
++                  <col className="w-32" />
++                  <col className="w-36" />
++                  <col className="w-24" />
++                </colgroup>
++
++                <thead className="border-b border-outline/60 bg-secondary/30">
++                  <tr className="text-[0.6875rem] uppercase tracking-wide text-muted">
++                    <th scope="col" className="px-4 py-3 font-medium">
++                      Producto
++                    </th>
++                    <th scope="col" className="px-4 py-3 font-medium">
++                      Categoría
++                    </th>
++                    <th scope="col" className="px-4 py-3 font-medium">
++                      Área
++                    </th>
++                    <th
++                      scope="col"
++                      className="px-4 py-3 text-right font-medium"
++                    >
++                      Precio
++                    </th>
++                    <th scope="col" className="px-4 py-3 font-medium">
++                      Estado
++                    </th>
++                    <th
++                      scope="col"
++                      className="px-3 py-3 text-center font-medium"
++                    >
++                      Acciones
++                    </th>
++                  </tr>
++                </thead>
++
++                <tbody className="divide-y divide-outline/40">
++                  {visible.map((product) => (
++                    <tr
++                      key={product.id}
++                      className="transition-colors hover:bg-secondary/30"
++                    >
++                      <th
++                        scope="row"
++                        className="px-4 py-4 font-normal"
++                      >
++                        <ProductIdentity product={product} />
++                      </th>
++
++                      <td className="px-4 py-4 text-xs text-muted [overflow-wrap:anywhere]">
++                        {product.categoryName}
++                      </td>
++
++                      <td className="px-4 py-4 text-xs text-muted [overflow-wrap:anywhere]">
++                        {product.preparationAreaName}
++                      </td>
++
++                      <td className="px-4 py-4 text-right text-sm font-semibold tabular-nums text-heading [overflow-wrap:anywhere]">
++                        {formatProductPrice(product.currentPrice)}
++                      </td>
++
++                      <td className="px-4 py-4">
++                        <ProductStatus product={product} />
++                      </td>
++                      <td className="px-3 py-4">
++                        <div className="flex justify-center">
++                          <ProductActions
++                            product={product}
++                            disabled={disabled}
++                            onAction={onAction}
++                          />
++                        </div>
++                      </td>
++                    </tr>
++                  ))}
++                </tbody>
++              </table>
++            </div>
++
++            {/* Tarjetas de móvil */}
++            <ul className="divide-y divide-outline/40 px-3 lg:hidden">
++              {visible.map((product) => (
++                <li key={product.id} className="space-y-3 py-4">
++                  <div className="flex items-start justify-between gap-2">
++                    <div className="min-w-0 flex-1">
++                      <ProductIdentity product={product} />
++                    </div>
++
++                    <ProductActions
++                      product={product}
++                      disabled={disabled}
++                      onAction={onAction}
++                    />
++                  </div>
++
++                  <dl className="grid grid-cols-2 gap-3 text-xs">
++                    <div className="min-w-0">
++                      <dt className="text-[0.625rem] uppercase tracking-wide text-muted">
++                        Categoría
++                      </dt>
++                      <dd className="mt-1 text-heading [overflow-wrap:anywhere]">
++                        {product.categoryName}
++                      </dd>
++                    </div>
++
++                    <div className="min-w-0">
++                      <dt className="text-[0.625rem] uppercase tracking-wide text-muted">
++                        Área
++                      </dt>
++                      <dd className="mt-1 text-heading [overflow-wrap:anywhere]">
++                        {product.preparationAreaName}
++                      </dd>
++                    </div>
++                  </dl>
++
++                  <div className="flex flex-wrap items-center justify-between gap-2">
++                    <p className="text-sm font-semibold tabular-nums text-heading [overflow-wrap:anywhere]">
++                      <span className="sr-only">Precio: </span>
++                      {formatProductPrice(product.currentPrice)}
++                    </p>
++
++                    <ProductStatus product={product} />
++                  </div>
++                </li>
++              ))}
++            </ul>
++          </>
++        )}
++      </div>
++
++      {products.length > 10 && (
++        <Pagination
++          page={page}
++          pageSize={pageSize}
++          totalItems={filtered.length}
++          itemLabel={filtered.length === 1 ? "producto" : "productos"}
++          controlsId={listId}
++          onPageChange={setRequestedPage}
++          onPageSizeChange={(size) => {
++            setPageSize(size);
++            setRequestedPage(1);
++          }}
++        />
++      )}
++    </section>
++  );
++}
+diff --git a/src/features/products/components/ProductStatus.tsx b/src/features/products/components/ProductStatus.tsx
+--- a/src/features/products/components/ProductStatus.tsx
++++ b/src/features/products/components/ProductStatus.tsx
+@@ -1,45 +1,47 @@
+-import { CircleCheck, CircleSlash } from "lucide-react";
+-import type { Product } from "../schemas/product.schema";
+-
+-export function ProductStatus({ product }: { product: Product }) {
+-  const label = !product.isActive
+-    ? "Inactivo"
+-    : product.isAvailable
+-      ? "Disponible"
+-      : "No disponible";
+-
+-  const reason = !product.isActive
+-    ? "Producto desactivado."
+-    : [
+-        !product.categoryIsActive ? "Categoría desactivada." : "",
+-        !product.preparationAreaIsActive ? "Área desactivada." : "",
+-      ]
+-        .filter(Boolean)
+-        .join(" ");
+-
+-  const Icon = product.isAvailable ? CircleCheck : CircleSlash;
+-
+-  return (
+-    <span
+-      title={reason || label}
+-      aria-label={reason ? `${label}. ${reason}` : label}
+-      className="inline-flex items-center gap-1.5 rounded-full bg-secondary/70 px-2 py-1 text-[0.6875rem] font-medium"
+-    >
+-      <Icon
+-        aria-hidden="true"
+-        size={14}
+-        className={`shrink-0 ${
+-          product.isAvailable ? "text-accent" : "text-muted"
+-        }`}
+-      />
+-
+-      <span
+-        className={
+-          product.isAvailable ? "text-heading" : "text-muted"
+-        }
+-      >
+-        {label}
+-      </span>
+-    </span>
+-  );
+-}
++import { CircleCheck, CircleSlash } from "lucide-react";
++import type { Product } from "../schemas/product.schema";
++
++export function ProductStatus({ product }: { product: Product }) {
++  const label = !product.isActive
++    ? "Inactivo"
++    : product.isAvailable === undefined
++      ? "Activo"
++      : product.isAvailable
++      ? "Disponible"
++      : "No disponible";
++
++  const reason = !product.isActive
++    ? "Producto desactivado."
++    : [
++        product.categoryIsActive === false ? "Categoría desactivada." : "",
++        product.preparationAreaIsActive === false ? "Área desactivada." : "",
++      ]
++        .filter(Boolean)
++        .join(" ");
++
++  const Icon = product.isAvailable ? CircleCheck : CircleSlash;
++
++  return (
++    <span
++      title={reason || label}
++      aria-label={reason ? `${label}. ${reason}` : label}
++      className="inline-flex items-center gap-1.5 rounded-full bg-secondary/70 px-2 py-1 text-[0.6875rem] font-medium"
++    >
++      <Icon
++        aria-hidden="true"
++        size={14}
++        className={`shrink-0 ${
++          product.isAvailable ? "text-accent" : "text-muted"
++        }`}
++      />
++
++      <span
++        className={
++          product.isAvailable ? "text-heading" : "text-muted"
++        }
++      >
++        {label}
++      </span>
++    </span>
++  );
++}
+diff --git a/src/features/products/components/ProductStatusConfirmDialog.tsx b/src/features/products/components/ProductStatusConfirmDialog.tsx
+new file mode 100644
+--- /dev/null
++++ b/src/features/products/components/ProductStatusConfirmDialog.tsx
+@@ -0,0 +1,33 @@
++import { useState } from "react";
++import { Button } from "../../../components/ui/Button";
++import { Alert } from "../../../components/feedback/Alert";
++import type { Product } from "../schemas/product.schema";
++import type { ProductMutation } from "../schemas/product-action.schema";
++
++export function ProductStatusConfirmDialog({ product, kind, busy, onSave, onCancel }: {
++  product: Product; kind: "status" | "remove-image"; busy: boolean;
++  onSave: (action: ProductMutation) => Promise<void>; onCancel: () => void;
++}) {
++  const [error, setError] = useState("");
++  const removing = kind === "remove-image";
++  return <div className="space-y-4">
++    <p className="text-sm text-muted">{removing
++      ? "Se retirará únicamente la imagen. El producto y su información se conservarán."
++      : product.isActive
++        ? "Este producto dejará de estar disponible para nuevas órdenes. Su información histórica se conservará."
++        : "Se reactivará el producto. Su disponibilidad también depende de su categoría y área."}</p>
++    {error && <Alert>{error}</Alert>}
++    <div className="grid grid-cols-2 gap-2">
++      <Button size="sm" variant="secondary" disabled={busy} onClick={onCancel}>Volver</Button>
++      <Button size="sm" variant={removing || product.isActive ? "danger" : "primary"} loading={busy}
++        disabled={busy} onClick={() => {
++          setError("");
++          void onSave(removing ? { kind, id: product.id } : {
++            kind: "status", id: product.id, isActive: !product.isActive,
++          }).catch(cause => setError(cause instanceof Error ? cause.message : "No pudimos guardar el cambio."));
++        }}>
++        {removing ? "Retirar imagen" : product.isActive ? "Desactivar" : "Activar"}
++      </Button>
++    </div>
++  </div>;
++}
+diff --git a/src/features/products/hooks/useProductDetail.ts b/src/features/products/hooks/useProductDetail.ts
+new file mode 100644
+--- /dev/null
++++ b/src/features/products/hooks/useProductDetail.ts
+@@ -0,0 +1,22 @@
++import { useEffect, useState } from "react";
++import { getProductDetail } from "../services/product.service";
++import type { CatalogDetail } from "../schemas/product-action.schema";
++
++export function useProductDetail(id: string, isCombo: boolean, businessId: string, token: string) {
++  const [attempt, setAttempt] = useState(0);
++  const [result, setResult] = useState<{ key: string; data?: CatalogDetail; error?: string } | null>(null);
++  const key = `${businessId}:${id}:${isCombo}:${token}:${attempt}`;
++  useEffect(() => {
++    const controller = new AbortController();
++    void getProductDetail(id, isCombo, token, controller.signal).then(data => {
++      if (data.id !== id || data.businessId !== businessId) throw new Error("No pudimos verificar el producto.");
++      if (!controller.signal.aborted) setResult({ key, data });
++    }).catch(cause => {
++      if (!controller.signal.aborted) setResult({ key, error: cause instanceof Error ? cause.message : "No pudimos cargar el detalle." });
++    });
++    return () => controller.abort();
++  }, [id, isCombo, businessId, token, key]);
++  return { data: result?.key === key ? result.data : undefined,
++    error: result?.key === key ? result.error : undefined,
++    retry: () => setAttempt(v => v + 1) };
++}
+diff --git a/src/features/products/hooks/useProducts.ts b/src/features/products/hooks/useProducts.ts
+--- a/src/features/products/hooks/useProducts.ts
++++ b/src/features/products/hooks/useProducts.ts
+@@ -1,183 +1,89 @@
+-import { useEffect, useRef, useState } from "react";
+-import { ApiError } from "../../../lib/http/client";
+-import type { AuthSession } from "../../auth/types/auth.types";
+-import type { ProductMutation } from "../schemas/product-action.schema";
+-import {
+-  getProductCatalog,
+-  saveProduct,
+-} from "../services/product.service";
+-
+-type Catalog = Awaited<ReturnType<typeof getProductCatalog>>;
+-
+-interface Snapshot {
+-  scope: string;
+-  attempt: number;
+-  data: Catalog | null;
+-  error: string | null;
+-}
+-
+-export function useProducts(session: AuthSession) {
+-  const [attempt, setAttempt] = useState(0);
+-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+-  const [busy, setBusy] = useState(false);
+-
+-  const write = useRef<AbortController | null>(null);
+-  const read = useRef<AbortController | null>(null);
+-
+-  const { accessToken } = session;
+-  const businessId = session.business.id;
+-  const allowed = session.authorization.roles.includes("ADMIN");
+-  const scope = `${businessId}:${session.membership.id}:${accessToken}`;
+-
+-  function verify(data: Catalog) {
+-    if (
+-      [...data.products, ...data.categories, ...data.areas].some(
+-        (item) => item.businessId !== businessId
+-      )
+-    ) {
+-      throw new ApiError(
+-        502,
+-        "BUSINESS_MISMATCH",
+-        "No pudimos verificar el catálogo."
+-      );
+-    }
+-
+-    return data;
+-  }
+-
+-  useEffect(() => {
+-    if (!allowed) return;
+-
+-    const controller = new AbortController();
+-    read.current = controller;
+-
+-    void getProductCatalog(accessToken, controller.signal)
+-      .then((data) => {
+-        if (
+-          [...data.products, ...data.categories, ...data.areas].some(
+-            (item) => item.businessId !== businessId
+-          )
+-        ) {
+-          throw new ApiError(
+-            502,
+-            "BUSINESS_MISMATCH",
+-            "No pudimos verificar el catálogo."
+-          );
+-        }
+-
+-        if (!controller.signal.aborted) {
+-          setSnapshot({
+-            scope,
+-            attempt,
+-            data,
+-            error: null,
+-          });
+-        }
+-      })
+-      .catch((error: unknown) => {
+-        if (!controller.signal.aborted) {
+-          setSnapshot({
+-            scope,
+-            attempt,
+-            data: null,
+-            error:
+-              error instanceof ApiError
+-                ? error.message
+-                : "No pudimos cargar los productos.",
+-          });
+-        }
+-      });
+-
+-    return () => controller.abort();
+-  }, [accessToken, businessId, allowed, scope, attempt]);
+-
+-  useEffect(
+-    () => () => {
+-      write.current?.abort();
+-      write.current = null;
+-    },
+-    [scope]
+-  );
+-
+-  const current =
+-    snapshot?.scope === scope && snapshot.attempt === attempt
+-      ? snapshot
+-      : null;
+-
+-  async function mutate(
+-    action: ProductMutation
+-  ): Promise<string | null> {
+-    if (!allowed) {
+-      throw new ApiError(403, "FORBIDDEN", "No tienes acceso.");
+-    }
+-
+-    if (write.current || !current?.data) {
+-      throw new ApiError(
+-        409,
+-        "BUSY",
+-        "Espera a que termine la solicitud actual."
+-      );
+-    }
+-
+-    const controller = new AbortController();
+-    write.current = controller;
+-    read.current?.abort();
+-    setBusy(true);
+-
+-    try {
+-      await saveProduct(action, accessToken, controller.signal);
+-      controller.signal.throwIfAborted();
+-
+-      try {
+-        const data = verify(
+-          await getProductCatalog(accessToken, controller.signal)
+-        );
+-
+-        controller.signal.throwIfAborted();
+-
+-        setSnapshot({
+-          scope,
+-          attempt,
+-          data,
+-          error: null,
+-        });
+-
+-        return null;
+-      } catch (error) {
+-        if (controller.signal.aborted) throw error;
+-
+-        const message =
+-          "La acción se guardó, pero no pudimos actualizar el listado. Pulsa Reintentar.";
+-
+-        setSnapshot({
+-          scope,
+-          attempt,
+-          data: null,
+-          error: message,
+-        });
+-
+-        return message;
+-      }
+-    } finally {
+-      if (write.current === controller) {
+-        write.current = null;
+-        setBusy(false);
+-      }
+-    }
+-  }
+-
+-  return {
+-    data: allowed ? (current?.data ?? null) : null,
+-    loading: allowed && current === null,
+-    error: allowed
+-      ? (current?.error ?? null)
+-      : "No tienes acceso a los productos.",
+-    busy,
+-    mutate,
+-    retry: () => {
+-      if (!write.current) {
+-        setAttempt((value) => value + 1);
+-      }
+-    },
+-  };
+-}
++import { useEffect, useRef, useState } from "react";
++import { ApiError } from "../../../lib/http/client";
++import type { AuthSession } from "../../auth/types/auth.types";
++import type { ProductMutation } from "../schemas/product-action.schema";
++import { getProductCatalog, getProductDetail, saveProduct } from "../services/product.service";
++
++type Catalog = Awaited<ReturnType<typeof getProductCatalog>>;
++type Snapshot = { scope: string; data: Catalog | null; error: string | null };
++function verify(data: Catalog, businessId: string) {
++  if ([...data.products, ...data.categories, ...data.areas].some(i => i.businessId !== businessId)) {
++    throw new ApiError(502, "BUSINESS_MISMATCH", "No pudimos verificar el catálogo.");
++  }
++  return data;
++}
++export function useProducts(session: AuthSession) {
++  const [attempt, setAttempt] = useState(0);
++  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
++  const [busy, setBusy] = useState(false);
++  const write = useRef<AbortController | null>(null);
++  const read = useRef<AbortController | null>(null);
++  const { accessToken } = session;
++  const businessId = session.business.id;
++  const allowed = session.authorization.roles.includes("ADMIN");
++  const scope = `${businessId}:${session.membership.id}:${accessToken}`;
++  useEffect(() => {
++    if (!allowed) return;
++    const controller = new AbortController();
++    read.current = controller;
++    void getProductCatalog(accessToken, controller.signal).then(data => {
++      const checked = verify(data, businessId);
++      if (!controller.signal.aborted) setSnapshot({ scope, data: checked, error: null });
++    }).catch(cause => {
++      if (!controller.signal.aborted) setSnapshot(previous => ({
++        scope, data: previous?.scope === scope ? previous.data : null,
++        error: cause instanceof Error ? cause.message : "No pudimos cargar los productos.",
++      }));
++    });
++    return () => controller.abort();
++  }, [accessToken, businessId, allowed, scope, attempt]);
++  useEffect(() => () => { write.current?.abort(); write.current = null; }, [scope]);
++  const current = snapshot?.scope === scope ? snapshot : null;
++  async function mutate(action: ProductMutation): Promise<string | null> {
++    if (!allowed) throw new ApiError(403, "FORBIDDEN", "No tienes acceso.");
++    if (write.current || !current?.data) throw new ApiError(409, "BUSY", "Espera a que termine la solicitud actual.");
++    const controller = new AbortController();
++    write.current = controller;
++    read.current?.abort();
++    setBusy(true);
++    try {
++      await saveProduct(action, accessToken, controller.signal);
++      controller.signal.throwIfAborted();
++      const existing = action.kind === "create" ? undefined : current.data.products.find(p => p.id === action.id);
++      const [catalog, detail] = await Promise.allSettled([
++        getProductCatalog(accessToken, controller.signal).then(data => verify(data, businessId)),
++        existing ? getProductDetail(existing.id, existing.isCombo, accessToken, controller.signal) : Promise.resolve(null),
++      ]);
++      controller.signal.throwIfAborted();
++      let next = catalog.status === "fulfilled" ? catalog.value : current.data;
++      let detailError = "";
++      if (detail.status === "fulfilled" && detail.value && existing) {
++        if (detail.value.id !== existing.id || detail.value.businessId !== businessId) {
++          detailError = "No pudimos verificar el detalle actualizado.";
++        } else {
++          const updated = detail.value;
++          next = { ...next, products: next.products.map(p => p.id === updated.id ? { ...p, ...updated } : p) };
++        }
++      } else if (detail.status === "rejected") {
++        detailError = detail.reason instanceof Error ? detail.reason.message : "No pudimos actualizar el detalle.";
++      }
++      // La eliminación de imagen confirmada no depende de que la lectura posterior funcione.
++      if (action.kind === "remove-image") {
++        next = { ...next, products: next.products.map(p => p.id === action.id ? { ...p, imageUrl: null } : p) };
++      }
++      const listError = catalog.status === "rejected"
++        ? (catalog.reason instanceof Error ? catalog.reason.message : "No pudimos actualizar el listado.") : "";
++      const warning = [listError, detailError].filter(Boolean).join(" ");
++      setSnapshot({ scope, data: next, error: warning ? "El cambio se guardó. " + warning : null });
++      return warning ? "El cambio se guardó. " + warning + " Reintenta la consulta, no el guardado." : null;
++    } finally {
++      if (write.current === controller) { write.current = null; setBusy(false); }
++    }
++  }
++  return {
++    data: allowed ? current?.data ?? null : null,
++    loading: allowed && current === null,
++    error: allowed ? current?.error ?? null : "No tienes acceso a los productos.",
++    busy, mutate, retry: () => { if (!write.current) setAttempt(v => v + 1); },
++  };
++}
+diff --git a/src/features/products/pages/ProductsPage.tsx b/src/features/products/pages/ProductsPage.tsx
+--- a/src/features/products/pages/ProductsPage.tsx
++++ b/src/features/products/pages/ProductsPage.tsx
+@@ -1,213 +1,96 @@
+-import { useEffect, useId, useRef, useState } from "react";
+-import { Alert } from "../../../components/feedback/Alert";
+-import { LoadingState } from "../../../components/feedback/LoadingState";
+-import { BottomSheet } from "../../../components/layout/BottomSheet";
+-import { Button } from "../../../components/ui/Button";
+-import { useAppShell } from "../../../app/layout/shell-context";
+-import { ApiError } from "../../../lib/http/client";
+-import type { AuthSession } from "../../auth/types/auth.types";
+-import type { Product } from "../schemas/product.schema";
+-import type {
+-  ProductActionKind,
+-  ProductMutation,
+-} from "../schemas/product-action.schema";
+-import { ProductList } from "../components/ProductList";
+-import { ProductCreateForm } from "../components/ProductCreateForm";
+-import { ProductDataForm } from "../components/ProductDataForm";
+-import { ProductImageForm } from "../components/ProductImageForm";
+-import { ComboDetails } from "../components/ComboDetails";
+-import { useProducts } from "../hooks/useProducts";
+-
+-type Editor =
+-  | { kind: "create" }
+-  | {
+-      kind: Exclude<ProductActionKind, "status">;
+-      product: Product;
+-    };
+-
+-export function ProductsPage() {
+-  const { session } = useAppShell();
+-
+-  return (
+-    <ProductsContent
+-      key={`${session.business.id}:${session.membership.id}:${session.accessToken}`}
+-      session={session}
+-    />
+-  );
+-}
+-
+-function ProductsContent({ session }: { session: AuthSession }) {
+-  const resource = useProducts(session);
+-
+-  const [editor, setEditor] = useState<Editor | null>(null);
+-  const [notice, setNotice] = useState<{
+-    message: string;
+-    error: boolean;
+-  } | null>(null);
+-
+-  const modalId = useId();
+-  const alive = useRef(false);
+-
+-  useEffect(() => {
+-    alive.current = true;
+-
+-    return () => {
+-      alive.current = false;
+-    };
+-  }, []);
+-
+-  useEffect(() => {
+-    if (!notice) return;
+-
+-    const timer = window.setTimeout(() => setNotice(null), 5000);
+-    return () => window.clearTimeout(timer);
+-  }, [notice]);
+-
+-  async function save(action: ProductMutation) {
+-    const warning = await resource.mutate(action);
+-
+-    if (!alive.current) return;
+-
+-    setEditor(null);
+-    setNotice({
+-      error: !!warning,
+-      message:
+-        warning ??
+-        (action.kind === "create"
+-          ? "Producto creado."
+-          : action.kind === "status"
+-            ? action.isActive
+-              ? "Producto activado."
+-              : "Producto desactivado."
+-            : "Cambios guardados."),
+-    });
+-  }
+-
+-  function handleAction(kind: ProductActionKind, product: Product) {
+-    if (resource.busy) return;
+-
+-    setNotice(null);
+-
+-    if (kind === "status") {
+-      void save({
+-        kind: "status",
+-        id: product.id,
+-        isActive: !product.isActive,
+-      }).catch((error: unknown) => {
+-        if (alive.current) {
+-          setNotice({
+-            error: true,
+-            message:
+-              error instanceof ApiError
+-                ? error.message
+-                : "No pudimos cambiar el estado.",
+-          });
+-        }
+-      });
+-    } else {
+-      setEditor({ kind, product });
+-    }
+-  }
+-
+-  return (
+-    <div className="products-page">
+-      {resource.loading && (
+-        <div className="py-10">
+-          <LoadingState message="Cargando productos…" />
+-        </div>
+-      )}
+-
+-      {resource.error && (
+-        <Alert>
+-          <p>{resource.error}</p>
+-
+-          <Button
+-            size="sm"
+-            variant="secondary"
+-            className="mt-3"
+-            onClick={resource.retry}
+-          >
+-            Reintentar
+-          </Button>
+-        </Alert>
+-      )}
+-
+-      {resource.data && (
+-        <ProductList
+-          products={resource.data.products}
+-          categories={resource.data.categories}
+-          disabled={resource.busy || !!editor}
+-          onAction={handleAction}
+-          onCreate={() => {
+-            setNotice(null);
+-            setEditor({ kind: "create" });
+-          }}
+-        />
+-      )}
+-
+-      {notice && (
+-        <div className="fixed inset-x-4 bottom-24 z-40 sm:left-auto sm:bottom-6 sm:w-96">
+-          <Alert variant={notice.error ? "error" : "success"}>
+-            {notice.message}
+-          </Alert>
+-        </div>
+-      )}
+-
+-      {editor && resource.data && (
+-        <BottomSheet
+-          id={modalId}
+-          open
+-          variant="modal"
+-          busy={resource.busy}
+-          className="products-page"
+-          title={
+-            editor.kind === "create"
+-              ? "Nuevo producto"
+-              : editor.kind === "edit"
+-                ? "Editar producto"
+-                : editor.kind === "image"
+-                  ? "Imagen del producto"
+-                  : editor.kind === "inventory"
+-                    ? "Configurar inventario"
+-                    : "Composición del combo"
+-          }
+-          onClose={() => setEditor(null)}
+-        >
+-          {editor.kind === "create" ? (
+-            <ProductCreateForm
+-              categories={resource.data.categories}
+-              areas={resource.data.areas}
+-              busy={resource.busy}
+-              onSave={save}
+-              onCancel={() => setEditor(null)}
+-            />
+-          ) : editor.kind === "image" ? (
+-            <ProductImageForm
+-              product={editor.product}
+-              busy={resource.busy}
+-              onSave={save}
+-              onCancel={() => setEditor(null)}
+-            />
+-          ) : editor.kind === "combo" ? (
+-            <ComboDetails
+-              key={editor.product.id}
+-              product={editor.product}
+-              accessToken={session.accessToken}
+-            />
+-          ) : (
+-            <ProductDataForm
+-              key={`${editor.kind}:${editor.product.id}`}
+-              kind={editor.kind}
+-              product={editor.product}
+-              categories={resource.data.categories}
+-              areas={resource.data.areas}
+-              busy={resource.busy}
+-              onSave={save}
+-              onCancel={() => setEditor(null)}
+-            />
+-          )}
+-        </BottomSheet>
+-      )}
+-    </div>
+-  );
+-}
++import { useEffect, useId, useRef, useState } from "react";
++import { useNavigate } from "react-router";
++import { Alert } from "../../../components/feedback/Alert";
++import { LoadingState } from "../../../components/feedback/LoadingState";
++import { BottomSheet } from "../../../components/layout/BottomSheet";
++import { Button } from "../../../components/ui/Button";
++import { useAppShell } from "../../../app/layout/shell-context";
++import type { AuthSession } from "../../auth/types/auth.types";
++import type { Product } from "../schemas/product.schema";
++import type { ProductActionKind, ProductMutation } from "../schemas/product-action.schema";
++import { ProductList } from "../components/ProductList";
++import { ProductForm } from "../components/ProductForm";
++import { ProductEditor } from "../components/ProductEditor";
++import { ProductImageForm } from "../components/ProductImageForm";
++import { ProductStatusConfirmDialog } from "../components/ProductStatusConfirmDialog";
++import { productInventoryPath } from "../utils/product-inventory";
++import { useProducts } from "../hooks/useProducts";
++
++type Editor = { kind: "create" } | { kind: Exclude<ProductActionKind, "inventory">; id: string };
++export function ProductsPage() {
++  const { session } = useAppShell();
++  if (!session.authorization.roles.includes("ADMIN")) return <Alert>No tienes acceso a Productos.</Alert>;
++  return <ProductsContent key={`${session.business.id}:${session.membership.id}:${session.accessToken}`} session={session} />;
++}
++function ProductsContent({ session }: { session: AuthSession }) {
++  const resource = useProducts(session);
++  const navigate = useNavigate();
++  const [editor, setEditor] = useState<Editor | null>(null);
++  const [revision, setRevision] = useState(0);
++  const [notice, setNotice] = useState<{ message: string; error: boolean } | null>(null);
++  const alive = useRef(false);
++  const modalId = useId();
++  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
++  useEffect(() => {
++    if (!notice || notice.error) return;
++    const timer = window.setTimeout(() => setNotice(null), 7000);
++    return () => window.clearTimeout(timer);
++  }, [notice]);
++  async function save(action: ProductMutation) {
++    const warning = await resource.mutate(action);
++    if (!alive.current) return;
++    setRevision(v => v + 1);
++    setEditor(action.kind === "create" ? null : { kind: "detail", id: action.id });
++    setNotice({
++      error: !!warning,
++      message: warning ?? (action.kind === "create"
++        ? "Producto creado. El control de inventario es opcional y se configura desde Inventario."
++        : "Cambios guardados."),
++    });
++  }
++  function onAction(kind: ProductActionKind, product: Product) {
++    if (resource.busy) return;
++    setNotice(null);
++    if (kind === "inventory") {
++      setEditor(null);
++      const path = productInventoryPath(product.id, product.hasInventory);
++      if (path) navigate(path);
++      else setNotice({ error: false, message: "Inventario todavía no está disponible. La configuración se realizará en ese módulo." });
++      return;
++    }
++    setEditor({ kind, id: product.id });
++  }
++  const product = editor && editor.kind !== "create"
++    ? resource.data?.products.find(p => p.id === editor.id) : undefined;
++  const title = !editor ? "" : editor.kind === "create" ? "Nuevo producto"
++    : editor.kind === "detail" ? "Detalle del producto"
++    : editor.kind === "edit" ? "Editar producto"
++    : editor.kind === "image" ? "Imagen del producto"
++    : editor.kind === "remove-image" ? "Retirar imagen"
++    : product?.isActive ? "Desactivar producto" : "Activar producto";
++  return <div className="products-page">
++    {resource.loading && <LoadingState message="Cargando productos…" />}
++    {resource.error && <Alert><p>{resource.error}</p>
++      <Button size="sm" variant="secondary" disabled={resource.busy} onClick={resource.retry}>Reintentar consulta</Button>
++    </Alert>}
++    {resource.data && <ProductList products={resource.data.products} categories={resource.data.categories}
++      disabled={resource.busy || !!editor} onAction={onAction} onCreate={() => { setNotice(null); setEditor({ kind: "create" }); }} />}
++    {notice && <div className="fixed inset-x-4 bottom-24 z-40 sm:bottom-6 sm:left-auto sm:w-96">
++      <Alert variant={notice.error ? "error" : "success"}>{notice.message}</Alert>
++    </div>}
++    {editor && resource.data && <BottomSheet id={modalId} open variant="modal" title={title}
++      busy={resource.busy} className="products-page" onClose={() => setEditor(null)}>
++      {editor.kind === "create"
++        ? <ProductForm products={resource.data.products} categories={resource.data.categories} areas={resource.data.areas}
++            busy={resource.busy} onSave={save} onCancel={() => setEditor(null)} />
++        : !product ? <Alert>Este producto ya no aparece en el listado. Actualiza la consulta.</Alert>
++        : editor.kind === "image" ? <ProductImageForm key={product.id} product={product} busy={resource.busy} onSave={save} onCancel={() => setEditor(null)} />
++        : editor.kind === "status" || editor.kind === "remove-image"
++          ? <ProductStatusConfirmDialog key={`${product.id}:${editor.kind}`} product={product} kind={editor.kind}
++              busy={resource.busy} onSave={save} onCancel={() => setEditor(null)} />
++          : <ProductEditor key={`${product.id}:${editor.kind}:${revision}`} product={product} editing={editor.kind === "edit"}
++              token={session.accessToken} products={resource.data.products} categories={resource.data.categories} areas={resource.data.areas}
++              busy={resource.busy} onSave={save} onCancel={() => setEditor(null)} onAction={onAction} />}
++    </BottomSheet>}
++  </div>;
++}
+diff --git a/src/features/products/schemas/product-action.schema.ts b/src/features/products/schemas/product-action.schema.ts
+--- a/src/features/products/schemas/product-action.schema.ts
++++ b/src/features/products/schemas/product-action.schema.ts
+@@ -1,112 +1,48 @@
+-import { z } from "zod";
+-import { productSchema } from "./product.schema";
+-
+-const id = z.string().regex(/^[1-9]\d*$/, "Selecciona una opción.");
+-
+-const optionalText = (max: number) =>
+-  z
+-    .string()
+-    .trim()
+-    .max(max, `Máximo ${max} caracteres.`)
+-    .transform((value) => value || null);
+-
+-const decimal = (places: number) =>
+-  z
+-    .string()
+-    .trim()
+-    .transform((value) => value.replace(",", "."))
+-    .pipe(
+-      z
+-        .string()
+-        .regex(
+-          new RegExp(`^\\d+(?:\\.\\d{1,${places}})?$`),
+-          `Usa un número positivo o cero, con máximo ${places} decimales.`
+-        )
+-    );
+-
+-export const productEditSchema = z.object({
+-  name: z.string().trim().min(1, "Escribe el nombre.").max(150),
+-  sku: optionalText(50).transform(
+-    (value) => value?.toUpperCase() ?? null
+-  ),
+-  description: optionalText(500),
+-  currentPrice: decimal(2),
+-  categoryId: id,
+-  preparationAreaId: id,
+-  fulfillmentMode: z.enum(["PREPARE_TO_ORDER", "READY_TO_SERVE"]),
+-});
+-
+-export const inventorySetupSchema = z.object({
+-  trackingType: z.enum(["RESALE", "PRODUCTION"]),
+-  sku: optionalText(50).transform(
+-    (value) => value?.toUpperCase() ?? null
+-  ),
+-  baseUnit: z.enum([
+-    "UNIT",
+-    "GRAM",
+-    "KILOGRAM",
+-    "MILLILITER",
+-    "LITER",
+-    "PORTION",
+-    "PACKAGE",
+-  ]),
+-  openingQuantity: decimal(3),
+-  minimumStock: decimal(3),
+-  quantityPerProduct: decimal(3).refine(
+-    (value) => /[1-9]/.test(value),
+-    "Debe ser mayor que cero."
+-  ),
+-});
+-
+-export const comboDetailSchema = z.object({
+-  status: z.literal("success"),
+-  data: z.object({
+-    combo: z.object({
+-      product: productSchema.pick({
+-        id: true,
+-        businessId: true,
+-      }),
+-      components: z.array(
+-        z.object({
+-          productId: id,
+-          name: z.string(),
+-          sku: z.string().nullable(),
+-          quantity: z.string(),
+-          isActive: z.boolean(),
+-        })
+-      ),
+-    }),
+-  }),
+-});
+-
+-export type ProductActionKind =
+-  | "edit"
+-  | "image"
+-  | "status"
+-  | "inventory"
+-  | "combo";
+-
+-export type ProductEditInput = z.output<typeof productEditSchema>;
+-
+-export type InventoryInput = z.output<typeof inventorySetupSchema>;
+-
+-export type ComboDetail = z.infer<
+-  typeof comboDetailSchema
+->["data"]["combo"];
+-
+-export type ProductMutation =
+-  | {
+-      kind: "create";
+-      input: ProductEditInput;
+-      file?: File;
+-    }
+-  | {
+-      kind: "edit";
+-      id: string;
+-      isCombo: boolean;
+-      input: Partial<ProductEditInput>;
+-    }
+-  | { kind: "status"; id: string; isActive: boolean }
+-  | { kind: "image"; id: string; file: File }
+-  | { kind: "remove-image"; id: string }
+-  | { kind: "inventory"; id: string; input: InventoryInput };
++import { z } from "zod";
++import { fulfillmentModeSchema, productDetailSchema, productIdSchema } from "./product.schema";
++
++const optionalText = (max: number) => z.string().trim().max(max).nullable().transform(v => v || null);
++export const productEditSchema = z.object({
++  name: z.string().trim().min(1, "Escribe el nombre.").max(150),
++  sku: optionalText(50),
++  description: optionalText(500),
++  currentPrice: z.string().trim().transform(v => v.replace(",", "."))
++    .pipe(z.string().regex(/^\d+(?:\.\d{1,2})?$/, "Usa un importe con máximo dos decimales.")),
++  categoryId: productIdSchema,
++  preparationAreaId: productIdSchema,
++  fulfillmentMode: fulfillmentModeSchema,
++});
++export const componentsSchema = z.array(z.object({
++  productId: productIdSchema,
++  quantity: z.number().finite().positive("La cantidad debe ser mayor que cero."),
++})).min(1, "Agrega al menos un componente.").superRefine((items, ctx) => {
++  if (new Set(items.map(i => i.productId)).size !== items.length) {
++    ctx.addIssue({ code: "custom", message: "No repitas componentes." });
++  }
++});
++
++export const comboResponseSchema = z.object({
++  status: z.literal("success"),
++  data: z.object({
++    product: productDetailSchema.extend({
++      isCombo: z.literal(true),
++      components: z.array(z.object({
++        productId: productIdSchema,
++        productName: z.string(),
++        quantity: z.number().finite().positive(),
++      })),
++    }),
++  }),
++});
++export type ProductEditInput = z.output<typeof productEditSchema>;
++export type ComboComponent = z.infer<typeof componentsSchema>[number];
++export type CatalogDetail = z.infer<typeof productDetailSchema> & {
++  components?: { productId: string; productName: string; quantity: number }[];
++};
++export type ProductActionKind = "detail" | "edit" | "image" | "remove-image" | "status" | "inventory";
++export type ProductMutation =
++  | { kind: "create"; isCombo: boolean; input: ProductEditInput; components?: ComboComponent[]; file?: File }
++  | { kind: "edit"; id: string; isCombo: boolean; input: Partial<ProductEditInput>; components?: ComboComponent[] }
++  | { kind: "status"; id: string; isActive: boolean }
++  | { kind: "image"; id: string; file: File }
++  | { kind: "remove-image"; id: string };
+diff --git a/src/features/products/schemas/product.schema.ts b/src/features/products/schemas/product.schema.ts
+--- a/src/features/products/schemas/product.schema.ts
++++ b/src/features/products/schemas/product.schema.ts
+@@ -1,48 +1,55 @@
+-import { z } from "zod";
+-
+-const idSchema = z.string().regex(/^[1-9]\d*$/);
+-
+-export const productSchema = z.object({
+-  id: idSchema,
+-  businessId: idSchema,
+-  categoryId: idSchema,
+-  preparationAreaId: idSchema,
+-
+-  fulfillmentMode: z.enum(["PREPARE_TO_ORDER", "READY_TO_SERVE"]),
+-
+-  sku: z.string().nullable(),
+-  name: z.string(),
+-  description: z.string().nullable(),
+-  imageUrl: z.string().nullable(),
+-  currentPrice: z.string().regex(/^\d+(?:\.\d{1,2})?$/),
+-  isActive: z.boolean(),
+-
+-  createdAt: z.iso.datetime({ offset: true }),
+-  updatedAt: z.iso.datetime({ offset: true }),
+-
+-  categoryName: z.string(),
+-  categoryIsActive: z.boolean(),
+-  preparationAreaName: z.string(),
+-  preparationAreaIsActive: z.boolean(),
+-
+-  isAvailable: z.boolean(),
+-  isCombo: z.boolean(),
+-  hasInventory: z.boolean(),
+-
+-  inventoryTrackingType: z.enum([
+-    "NONE",
+-    "RESALE",
+-    "PRODUCTION",
+-    "COMBO",
+-    "CUSTOM",
+-  ]),
+-});
+-
+-export const productListSchema = z.object({
+-  status: z.literal("success"),
+-  data: z.object({
+-    products: z.array(productSchema),
+-  }),
+-});
+-
+-export type Product = z.infer<typeof productSchema>;
++import { z } from "zod";
++
++export const productIdSchema = z.string().regex(/^[1-9]\d*$/);
++export const fulfillmentModeSchema = z.enum(["PREPARE_TO_ORDER", "READY_TO_SERVE"]);
++export const inventoryTrackingSchema = z.enum(["NONE", "RESALE", "PRODUCTION", "COMBO", "CUSTOM"]);
++
++export const productDetailSchema = z.object({
++  id: productIdSchema,
++  businessId: productIdSchema,
++  categoryId: productIdSchema,
++  preparationAreaId: productIdSchema,
++  fulfillmentMode: fulfillmentModeSchema,
++  sku: z.string().nullable(),
++  name: z.string(),
++  description: z.string().nullable(),
++  imageUrl: z.string().nullable(),
++  currentPrice: z.string().regex(/^\d+(?:\.\d{1,2})?$/),
++  isActive: z.boolean(),
++  createdAt: z.iso.datetime({ offset: true }).optional(),
++  updatedAt: z.iso.datetime({ offset: true }).optional(),
++});
++
++export const productSchema = productDetailSchema.extend({
++  createdAt: z.iso.datetime({ offset: true }),
++  updatedAt: z.iso.datetime({ offset: true }),
++  categoryName: z.string(),
++  preparationAreaName: z.string(),
++  categoryIsActive: z.boolean().optional(),
++  preparationAreaIsActive: z.boolean().optional(),
++  isAvailable: z.boolean().optional(),
++  isCombo: z.boolean(),
++  hasInventory: z.boolean(),
++  inventoryTrackingType: inventoryTrackingSchema,
++});
++
++export const productListSchema = z.object({
++  status: z.literal("success"),
++  data: z.object({
++    products: z.array(productSchema),
++    pagination: z.object({
++      page: z.number().int().positive(),
++      pageSize: z.number().int().positive(),
++      total: z.number().int().nonnegative(),
++      totalPages: z.number().int().nonnegative(),
++    }).optional(),
++  }),
++});
++
++export const productDetailResponseSchema = z.object({
++  status: z.literal("success"),
++  data: z.object({ product: productDetailSchema }),
++});
++
++export type Product = z.infer<typeof productSchema>;
++export type ProductDetailData = z.infer<typeof productDetailSchema>;
+diff --git a/src/features/products/services/product.service.ts b/src/features/products/services/product.service.ts
+--- a/src/features/products/services/product.service.ts
++++ b/src/features/products/services/product.service.ts
+@@ -1,152 +1,101 @@
+-import { z } from "zod";
+-import { ApiError, request } from "../../../lib/http/client";
+-import { getCategories } from "../../categories/services/category.service";
+-import { getPreparationAreas } from "../../preparation-areas/services/preparation-area.service";
+-import { productListSchema } from "../schemas/product.schema";
+-import { comboDetailSchema } from "../schemas/product-action.schema";
+-import type { ProductMutation } from "../schemas/product-action.schema";
+-
+-const savedSchema = z.object({
+-  status: z.literal("success"),
+-});
+-
+-const idSchema = z.string().regex(/^[1-9]\d*$/);
+-
+-export async function getProductCatalog(
+-  accessToken: string,
+-  signal: AbortSignal
+-) {
+-  const [response, categories, areas] = await Promise.all([
+-    request("/products", productListSchema, {
+-      accessToken,
+-      signal,
+-    }),
+-    getCategories(accessToken, signal),
+-    getPreparationAreas(accessToken, signal),
+-  ]);
+-
+-  return {
+-    products: response.data.products,
+-    categories,
+-    areas,
+-  };
+-}
+-
+-export function validateProductImage(file: File): string | null {
+-  if (
+-    !["image/jpeg", "image/png", "image/webp"].includes(file.type)
+-  ) {
+-    return "Selecciona una imagen JPEG, PNG o WebP.";
+-  }
+-
+-  if (!file.size || file.size > 5 * 1024 * 1024) {
+-    return "La imagen debe contener datos y pesar como máximo 5 MB.";
+-  }
+-
+-  return null;
+-}
+-
+-export async function saveProduct(
+-  action: ProductMutation,
+-  accessToken: string,
+-  signal: AbortSignal
+-) {
+-  if (action.kind === "create") {
+-    let body: unknown = action.input;
+-
+-    if (action.file) {
+-      const error = validateProductImage(action.file);
+-
+-      if (error) {
+-        throw new ApiError(400, "INVALID_IMAGE", error);
+-      }
+-
+-      const form = new FormData();
+-
+-      for (const [key, value] of Object.entries(action.input)) {
+-        if (value !== null) {
+-          form.append(key, value);
+-        }
+-      }
+-
+-      form.append("image", action.file);
+-      body = form;
+-    }
+-
+-    await request("/products", savedSchema, {
+-      method: "POST",
+-      body,
+-      accessToken,
+-      signal,
+-    });
+-
+-    return;
+-  }
+-  const id = idSchema.parse(action.id);
+-
+-  let path = `/products/${id}`;
+-  let method: "PATCH" | "POST" | "PUT" | "DELETE" = "PATCH";
+-  let body: unknown;
+-
+-  switch (action.kind) {
+-    case "edit":
+-      if (action.isCombo) {
+-        path = `/products/combos/${id}`;
+-      }
+-      body = action.input;
+-      break;
+-
+-    case "status":
+-      path += "/status";
+-      body = { isActive: action.isActive };
+-      break;
+-
+-    case "inventory":
+-      path += "/inventory-setup";
+-      method = "POST";
+-      body = action.input;
+-      break;
+-
+-    case "image": {
+-      const error = validateProductImage(action.file);
+-
+-      if (error) {
+-        throw new ApiError(400, "INVALID_IMAGE", error);
+-      }
+-
+-      const form = new FormData();
+-      form.append("image", action.file);
+-
+-      path += "/image";
+-      method = "PUT";
+-      body = form;
+-      break;
+-    }
+-
+-    case "remove-image":
+-      path += "/image";
+-      method = "DELETE";
+-      break;
+-  }
+-
+-  await request(path, savedSchema, {
+-    method,
+-    body,
+-    accessToken,
+-    signal,
+-  });
+-}
+-
+-export async function getComboDetail(
+-  id: string,
+-  accessToken: string,
+-  signal: AbortSignal
+-) {
+-  const response = await request(
+-    `/products/combos/${idSchema.parse(id)}`,
+-    comboDetailSchema,
+-    { accessToken, signal }
+-  );
+-
+-  return response.data.combo;
+-}
++import { z } from "zod";
++import { ApiError, request } from "../../../lib/http/client";
++import { getCategories } from "../../categories/services/category.service";
++import { getPreparationAreas } from "../../preparation-areas/services/preparation-area.service";
++import { productIdSchema, productListSchema, productDetailResponseSchema } from "../schemas/product.schema";
++import { comboResponseSchema, componentsSchema, productEditSchema } from "../schemas/product-action.schema";
++import type { CatalogDetail, ProductMutation } from "../schemas/product-action.schema";
++
++const savedSchema = z.object({ status: z.literal("success") });
++export async function getProductCatalog(accessToken: string, signal: AbortSignal) {
++  const [products, categories, areas] = await Promise.all([
++    getAllProducts(accessToken, signal),
++    getCategories(accessToken, signal),
++    getPreparationAreas(accessToken, signal),
++  ]);
++  return { products, categories, areas };
++}
++async function getAllProducts(accessToken: string, signal: AbortSignal) {
++  const first = await request("/products", productListSchema, { accessToken, signal });
++  const products = [...first.data.products];
++  const pagination = first.data.pagination;
++  if (pagination) {
++    for (let page = pagination.page + 1; page <= pagination.totalPages; page++) {
++      const result = await request(
++        `/products?page=${page}&pageSize=${pagination.pageSize}`,
++        productListSchema, { accessToken, signal }
++      );
++      products.push(...result.data.products);
++    }
++  }
++  return [...new Map(products.map(p => [p.id, p])).values()];
++}
++export function validateProductImage(file: File): string | null {
++  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
++    return "Selecciona una imagen JPEG, PNG o WebP.";
++  }
++  if (!file.size || file.size > 5 * 1024 * 1024) {
++    return "La imagen debe contener datos y pesar como máximo 5 MB.";
++  }
++  return null;
++}
++export async function getProductDetail(
++  id: string, isCombo: boolean, accessToken: string, signal: AbortSignal
++): Promise<CatalogDetail> {
++  const validId = productIdSchema.parse(id);
++  if (isCombo) {
++    const result = await request(`/products/combos/${validId}`, comboResponseSchema, { accessToken, signal });
++    return result.data.product;
++  }
++  const result = await request(`/products/${validId}`, productDetailResponseSchema, { accessToken, signal });
++  return result.data.product;
++}
++export async function saveProduct(action: ProductMutation, accessToken: string, signal: AbortSignal) {
++  const options = { accessToken, signal };
++  if (action.kind === "create") {
++    const input = productEditSchema.parse(action.input);
++    const components = action.isCombo ? componentsSchema.parse(action.components) : undefined;
++    if (action.file) {
++      const error = validateProductImage(action.file);
++      if (error) throw new ApiError(400, "INVALID_IMAGE", error);
++    }
++    // Multipart también sin imagen para combos: no dependemos de la variante JSON opcional.
++    let body: unknown = input;
++    if (action.file || action.isCombo) {
++      const form = new FormData();
++      for (const [key, value] of Object.entries(input)) {
++        if (value !== null) form.append(key, value);
++      }
++      if (components) form.append("components", JSON.stringify(components));
++      if (action.file) form.append("image", action.file);
++      body = form;
++    }
++    await request(action.isCombo ? "/products/combos" : "/products", savedSchema, {
++      ...options, method: "POST", body,
++    });
++    return;
++  }
++  const id = productIdSchema.parse(action.id);
++  if (action.kind === "edit") {
++    const input = productEditSchema.partial().parse(action.input);
++    const body = action.isCombo && action.components !== undefined
++      ? { ...input, components: componentsSchema.parse(action.components) }
++      : input;
++    await request(action.isCombo ? `/products/combos/${id}` : `/products/${id}`,
++      savedSchema, { ...options, method: "PATCH", body });
++  } else if (action.kind === "status") {
++    await request(`/products/${id}/status`, savedSchema, {
++      ...options, method: "PATCH", body: { isActive: action.isActive },
++    });
++  } else if (action.kind === "image") {
++    const error = validateProductImage(action.file);
++    if (error) throw new ApiError(400, "INVALID_IMAGE", error);
++    const form = new FormData();
++    form.append("image", action.file);
++    await request(`/products/${id}/image`, savedSchema, { ...options, method: "PUT", body: form });
++  } else {
++    await request(`/products/${id}/image`, z.union([savedSchema, z.null()]), {
++      ...options, method: "DELETE",
++    });
++  }
++}
+diff --git a/src/features/products/utils/product-inventory.ts b/src/features/products/utils/product-inventory.ts
+new file mode 100644
+--- /dev/null
++++ b/src/features/products/utils/product-inventory.ts
+@@ -0,0 +1,11 @@
++import { getNavigation } from "../../../app/navigation";
++
++export function productInventoryPath(productId: string, hasInventory: boolean): string | null {
++  const route = getNavigation(["ADMIN"]).find(item => item.id === "inventory");
++  if (!route || route.status !== "ready") return null;
++  // El destino recibe el producto; Inventario decidirá cómo abrir su configuración.
++  const params = new URLSearchParams({
++    productId, intent: hasInventory ? "manage" : "configure",
++  });
++  return route.to + (route.to.includes("?") ? "&" : "?") + params.toString();
++}
+diff --git a/src/features/products/components/ProductCreateForm.tsx b/src/features/products/components/ProductCreateForm.tsx
+deleted file mode 100644
+--- a/src/features/products/components/ProductCreateForm.tsx
++++ /dev/null
+@@ -1,369 +0,0 @@
+-import { useEffect, useId, useRef, useState } from "react";
+-import { Link } from "react-router";
+-import { Save } from "lucide-react";
+-import { Alert } from "../../../components/feedback/Alert";
+-import { TextField } from "../../../components/forms/TextField";
+-import { TextAreaField } from "../../../components/forms/TextAreaField";
+-import { SelectField } from "../../../components/forms/SelectField";
+-import { Avatar } from "../../../components/ui/Avatar";
+-import { Button } from "../../../components/ui/Button";
+-import { ApiError } from "../../../lib/http/client";
+-import type { Category } from "../../categories/schemas/category.schema";
+-import type { PreparationArea } from "../../preparation-areas/schemas/preparation-area.schema";
+-import { productEditSchema } from "../schemas/product-action.schema";
+-import type { ProductMutation } from "../schemas/product-action.schema";
+-import { validateProductImage } from "../services/product.service";
+-
+-interface ProductCreateFormProps {
+-  categories: readonly Category[];
+-  areas: readonly PreparationArea[];
+-  busy: boolean;
+-  onSave: (action: ProductMutation) => Promise<void>;
+-  onCancel: () => void;
+-}
+-
+-export function ProductCreateForm({
+-  categories,
+-  areas,
+-  busy,
+-  onSave,
+-  onCancel,
+-}: ProductCreateFormProps) {
+-  const [draft, setDraft] = useState({
+-    name: "",
+-    sku: "",
+-    description: "",
+-    currentPrice: "",
+-    categoryId: "",
+-    preparationAreaId: "",
+-    fulfillmentMode: "PREPARE_TO_ORDER",
+-  });
+-
+-  const [file, setFile] = useState<File | null>(null);
+-  const [preview, setPreview] = useState<string | null>(null);
+-  const [errors, setErrors] = useState<Record<string, string>>({});
+-  const [message, setMessage] = useState("");
+-
+-  const imageId = useId();
+-  const fileInput = useRef<HTMLInputElement>(null);
+-  const objectUrl = useRef<string | null>(null);
+-  const alive = useRef(false);
+-
+-  const activeCategories = categories.filter((item) => item.isActive);
+-
+-  const activeAreas = areas.filter((item) => item.isActive);
+-
+-  const missingSetup =
+-    !activeCategories.length || !activeAreas.length;
+-
+-  const imageError =
+-    (file ? validateProductImage(file) : null) || errors.image;
+-
+-  useEffect(() => {
+-    alive.current = true;
+-
+-    return () => {
+-      alive.current = false;
+-
+-      if (objectUrl.current) {
+-        URL.revokeObjectURL(objectUrl.current);
+-      }
+-    };
+-  }, []);
+-
+-  function change(key: keyof typeof draft, value: string) {
+-    setDraft((previous) => ({ ...previous, [key]: value }));
+-    setErrors((previous) => ({ ...previous, [key]: "" }));
+-    setMessage("");
+-  }
+-
+-  function changeImage(selected: File | null) {
+-    if (objectUrl.current) {
+-      URL.revokeObjectURL(objectUrl.current);
+-    }
+-
+-    objectUrl.current =
+-      selected && !validateProductImage(selected)
+-        ? URL.createObjectURL(selected)
+-        : null;
+-
+-    setFile(selected);
+-    setPreview(objectUrl.current);
+-    setErrors((previous) => ({ ...previous, image: "" }));
+-    setMessage("");
+-  }
+-
+-  async function submit(form: HTMLFormElement) {
+-    if (busy || missingSetup || imageError) return;
+-
+-    const result = productEditSchema.safeParse(draft);
+-
+-    if (!result.success) {
+-      const next: Record<string, string> = {};
+-
+-      for (const issue of result.error.issues) {
+-        next[String(issue.path[0])] ??= issue.message;
+-      }
+-
+-      setErrors(next);
+-
+-      requestAnimationFrame(() => {
+-        if (form.isConnected) {
+-          form
+-            .querySelector<HTMLElement>('[aria-invalid="true"]')
+-            ?.focus();
+-        }
+-      });
+-
+-      return;
+-    }
+-
+-    setErrors({});
+-    setMessage("");
+-
+-    try {
+-      await onSave({
+-        kind: "create",
+-        input: result.data,
+-        ...(file ? { file } : {}),
+-      });
+-    } catch (error) {
+-      if (!alive.current) return;
+-
+-      const next: Record<string, string> = {};
+-
+-      if (error instanceof ApiError) {
+-        for (const issue of error.errors) {
+-          next[issue.field] ??= issue.message;
+-        }
+-
+-        if (error.code === "PRODUCT_SKU_CONFLICT") {
+-          next.sku = error.message;
+-        }
+-      }
+-
+-      setErrors(next);
+-      setMessage(
+-        error instanceof ApiError
+-          ? error.message
+-          : "No pudimos crear el producto."
+-      );
+-    }
+-  }
+-
+-  return (
+-    <form
+-      noValidate
+-      className="space-y-4"
+-      onSubmit={(event) => {
+-        event.preventDefault();
+-        void submit(event.currentTarget);
+-      }}
+-    >
+-      {missingSetup && (
+-        <div className="space-y-2 rounded-xl border border-outline bg-secondary/40 p-3 text-xs text-muted">
+-          <p>
+-            Para crear productos necesitas una categoría y un área de
+-            preparación activas.
+-          </p>
+-
+-          {!activeCategories.length && (
+-            <Link
+-              to="/productos/categorias"
+-              className="block text-accent underline"
+-            >
+-              Ir a categorías
+-            </Link>
+-          )}
+-
+-          {!activeAreas.length && (
+-            <Link
+-              to="/mi-negocio"
+-              className="block text-accent underline"
+-            >
+-              Ir a configuración del negocio
+-            </Link>
+-          )}
+-        </div>
+-      )}
+-
+-      <fieldset disabled={busy} className="min-w-0 space-y-4">
+-        <legend className="sr-only">Nuevo producto</legend>
+-
+-        <TextField
+-          label="Nombre del producto"
+-          name="name"
+-          required
+-          maxLength={150}
+-          data-dialog-initial-focus
+-          autoFocus
+-          value={draft.name}
+-          error={errors.name}
+-          onChange={(event) => change("name", event.target.value)}
+-        />
+-
+-        <div className="grid gap-4 sm:grid-cols-2">
+-          <TextField
+-            label="Código / SKU (opcional)"
+-            name="sku"
+-            maxLength={50}
+-            value={draft.sku}
+-            error={errors.sku}
+-            onChange={(event) => change("sku", event.target.value)}
+-          />
+-
+-          <TextField
+-            label="Precio"
+-            name="currentPrice"
+-            required
+-            inputMode="decimal"
+-            placeholder="Ej. 18000"
+-            value={draft.currentPrice}
+-            error={errors.currentPrice}
+-            onChange={(event) => {
+-              change("currentPrice", event.target.value);
+-            }}
+-          />
+-        </div>
+-
+-        <SelectField
+-          label="Categoría"
+-          required
+-          disabled={busy}
+-          value={draft.categoryId}
+-          error={errors.categoryId}
+-          onValueChange={(value) => change("categoryId", value)}
+-          options={activeCategories.map((item) => ({
+-            value: item.id,
+-            label: item.name,
+-          }))}
+-        />
+-
+-        <SelectField
+-          label="Área de preparación"
+-          required
+-          disabled={busy}
+-          value={draft.preparationAreaId}
+-          error={errors.preparationAreaId}
+-          onValueChange={(value) => {
+-            change("preparationAreaId", value);
+-          }}
+-          options={activeAreas.map((item) => ({
+-            value: item.id,
+-            label: item.name,
+-          }))}
+-        />
+-
+-        <SelectField
+-          label="Preparación"
+-          required
+-          disabled={busy}
+-          value={draft.fulfillmentMode}
+-          error={errors.fulfillmentMode}
+-          onValueChange={(value) => {
+-            change("fulfillmentMode", value);
+-          }}
+-          options={[
+-            {
+-              value: "PREPARE_TO_ORDER",
+-              label: "Preparar al pedir",
+-            },
+-            {
+-              value: "READY_TO_SERVE",
+-              label: "Listo para entregar",
+-            },
+-          ]}
+-        />
+-
+-        <TextAreaField
+-          label="Descripción (opcional)"
+-          name="description"
+-          rows={3}
+-          maxLength={500}
+-          value={draft.description}
+-          error={errors.description}
+-          onChange={(event) => {
+-            change("description", event.target.value);
+-          }}
+-        />
+-
+-        <div className="space-y-2">
+-          <label
+-            htmlFor={imageId}
+-            className="block text-xs font-semibold text-muted"
+-          >
+-            Imagen (opcional)
+-          </label>
+-
+-          {preview && (
+-            <div className="flex justify-center">
+-              <Avatar
+-                name={draft.name || "Producto"}
+-                src={preview}
+-                size="xl"
+-              />
+-            </div>
+-          )}
+-
+-          <input
+-            ref={fileInput}
+-            id={imageId}
+-            type="file"
+-            accept="image/jpeg,image/png,image/webp"
+-            aria-invalid={!!imageError}
+-            aria-describedby={`${imageId}-help`}
+-            className="block w-full min-w-0 rounded-xl border border-outline p-2 text-xs text-heading file:mr-2 file:rounded-lg file:bg-secondary file:p-2 file:text-heading"
+-            onChange={(event) => {
+-              changeImage(event.target.files?.[0] ?? null);
+-            }}
+-          />
+-
+-          <p id={`${imageId}-help`} className="text-xs text-muted">
+-            {imageError || "JPEG, PNG o WebP. Máximo 5 MB."}
+-          </p>
+-
+-          {file && (
+-            <Button
+-              size="sm"
+-              variant="secondary"
+-              disabled={busy}
+-              onClick={() => {
+-                changeImage(null);
+-
+-                if (fileInput.current) {
+-                  fileInput.current.value = "";
+-                }
+-              }}
+-            >
+-              Quitar imagen
+-            </Button>
+-          )}
+-        </div>
+-      </fieldset>
+-
+-      {message && <Alert>{message}</Alert>}
+-
+-      <div className="flex flex-wrap justify-end gap-2">
+-        <Button
+-          size="sm"
+-          variant="secondary"
+-          disabled={busy}
+-          onClick={onCancel}
+-        >
+-          Cancelar
+-        </Button>
+-
+-        <Button
+-          type="submit"
+-          size="sm"
+-          loading={busy}
+-          loadingText="Creando…"
+-          disabled={busy || missingSetup || !!imageError}
+-        >
+-          <Save aria-hidden="true" size={16} />
+-          Crear producto
+-        </Button>
+-      </div>
+-    </form>
+-  );
+-}
+diff --git a/src/features/products/components/ProductDataForm.tsx b/src/features/products/components/ProductDataForm.tsx
+deleted file mode 100644
+--- a/src/features/products/components/ProductDataForm.tsx
++++ /dev/null
+@@ -1,362 +0,0 @@
+-import { useEffect, useRef, useState } from "react";
+-import { Alert } from "../../../components/feedback/Alert";
+-import { TextField } from "../../../components/forms/TextField";
+-import { TextAreaField } from "../../../components/forms/TextAreaField";
+-import { SelectField } from "../../../components/forms/SelectField";
+-import { Button } from "../../../components/ui/Button";
+-import { ApiError } from "../../../lib/http/client";
+-import type { Category } from "../../categories/schemas/category.schema";
+-import type { PreparationArea } from "../../preparation-areas/schemas/preparation-area.schema";
+-import type { Product } from "../schemas/product.schema";
+-import {
+-  productEditSchema,
+-  inventorySetupSchema,
+-} from "../schemas/product-action.schema";
+-import type {
+-  ProductMutation,
+-  ProductEditInput,
+-} from "../schemas/product-action.schema";
+-
+-interface Props {
+-  product: Product;
+-  kind: "edit" | "inventory";
+-  categories: readonly Category[];
+-  areas: readonly PreparationArea[];
+-  busy: boolean;
+-  onSave: (action: ProductMutation) => Promise<void>;
+-  onCancel: () => void;
+-}
+-
+-export function ProductDataForm({
+-  product,
+-  kind,
+-  categories,
+-  areas,
+-  busy,
+-  onSave,
+-  onCancel,
+-}: Props) {
+-  const editing = kind === "edit";
+-
+-  const [draft, setDraft] = useState<Record<string, string>>(() => ({
+-    name: product.name,
+-    sku: product.sku ?? "",
+-    description: product.description ?? "",
+-    currentPrice: product.currentPrice,
+-    categoryId: product.categoryId,
+-    preparationAreaId: product.preparationAreaId,
+-    fulfillmentMode: product.fulfillmentMode,
+-    trackingType: "RESALE",
+-    baseUnit: "UNIT",
+-    openingQuantity: "0",
+-    minimumStock: "0",
+-    quantityPerProduct: "1",
+-  }));
+-  const [errors, setErrors] = useState<Record<string, string>>({});
+-  const [message, setMessage] = useState("");
+-  const alive = useRef(false);
+-
+-  useEffect(() => {
+-    alive.current = true;
+-    return () => {
+-      alive.current = false;
+-    };
+-  }, []);
+-
+-  function change(key: string, value: string) {
+-    setDraft((previous) => ({ ...previous, [key]: value }));
+-    setErrors((previous) => ({ ...previous, [key]: "" }));
+-    setMessage("");
+-  }
+-
+-  async function submit(form: HTMLFormElement) {
+-    if (busy) return;
+-
+-    setMessage("");
+-    setErrors({});
+-
+-    try {
+-      let action: ProductMutation;
+-
+-      if (editing) {
+-        const values = productEditSchema.parse(draft);
+-
+-        const input = Object.fromEntries(
+-          Object.entries(values).filter(
+-            ([key, value]) =>
+-              product[key as keyof ProductEditInput] !== value
+-          )
+-        ) as Partial<ProductEditInput>;
+-
+-        if (!Object.keys(input).length) {
+-          onCancel();
+-          return;
+-        }
+-
+-        action = {
+-          kind: "edit",
+-          id: product.id,
+-          isCombo: product.isCombo,
+-          input,
+-        };
+-      } else {
+-        action = {
+-          kind: "inventory",
+-          id: product.id,
+-          input: inventorySetupSchema.parse(draft),
+-        };
+-      }
+-
+-      await onSave(action);
+-    } catch (error) {
+-      if (!alive.current) return;
+-
+-      const next: Record<string, string> = {};
+-
+-      if (error instanceof ApiError) {
+-        for (const issue of error.errors) {
+-          next[issue.field] ??= issue.message;
+-        }
+-
+-        if (error.code === "PRODUCT_SKU_CONFLICT") {
+-          next.sku = error.message;
+-        }
+-      } else if (
+-        error &&
+-        typeof error === "object" &&
+-        "issues" in error
+-      ) {
+-        const schema = editing
+-          ? productEditSchema
+-          : inventorySetupSchema;
+-
+-        const result = schema.safeParse(draft);
+-
+-        if (!result.success) {
+-          for (const issue of result.error.issues) {
+-            next[String(issue.path[0])] ??= issue.message;
+-          }
+-        }
+-      }
+-
+-      setErrors(next);
+-
+-      setMessage(
+-        error instanceof ApiError
+-          ? error.message
+-          : Object.keys(next).length
+-            ? "Revisa los campos indicados."
+-            : "No pudimos guardar."
+-      );
+-
+-      requestAnimationFrame(() => {
+-        if (form.isConnected) {
+-          form
+-            .querySelector<HTMLElement>('[aria-invalid="true"]')
+-            ?.focus();
+-        }
+-      });
+-    }
+-  }
+-
+-  const fields = editing
+-    ? [
+-        { key: "name", label: "Nombre", maxLength: 150 },
+-        {
+-          key: "sku",
+-          label: "Código / SKU (opcional)",
+-          maxLength: 50,
+-        },
+-        {
+-          key: "currentPrice",
+-          label: "Precio",
+-          maxLength: undefined,
+-        },
+-      ]
+-    : [
+-        {
+-          key: "sku",
+-          label: "SKU de inventario (opcional)",
+-          maxLength: 50,
+-        },
+-        {
+-          key: "openingQuantity",
+-          label: "Existencia inicial",
+-          maxLength: undefined,
+-        },
+-        {
+-          key: "minimumStock",
+-          label: "Stock mínimo",
+-          maxLength: undefined,
+-        },
+-        {
+-          key: "quantityPerProduct",
+-          label: "Cantidad descontada por venta",
+-          maxLength: undefined,
+-        },
+-      ];
+-
+-  return (
+-    <form
+-      noValidate
+-      className="space-y-4"
+-      onSubmit={(event) => {
+-        event.preventDefault();
+-        void submit(event.currentTarget);
+-      }}
+-    >
+-      <fieldset disabled={busy} className="min-w-0 space-y-4">
+-        <legend className="sr-only">
+-          {editing ? "Editar producto" : "Configurar inventario"}
+-        </legend>
+-
+-        {fields.map((field, index) => (
+-          <TextField
+-            key={field.key}
+-            autoFocus={index === 0}
+-            name={field.key}
+-            label={field.label}
+-            maxLength={field.maxLength}
+-            inputMode={
+-              ["name", "sku"].includes(field.key) ? "text" : "decimal"
+-            }
+-            value={draft[field.key]}
+-            error={errors[field.key]}
+-            onChange={(event) => {
+-              change(field.key, event.target.value);
+-            }}
+-          />
+-        ))}
+-
+-        {editing ? (
+-          <>
+-            <TextAreaField
+-              label="Descripción (opcional)"
+-              rows={3}
+-              maxLength={500}
+-              value={draft.description}
+-              error={errors.description}
+-              onChange={(event) => {
+-                change("description", event.target.value);
+-              }}
+-            />
+-
+-            <SelectField
+-              label="Categoría"
+-              value={draft.categoryId}
+-              disabled={busy}
+-              error={errors.categoryId}
+-              onValueChange={(value) => change("categoryId", value)}
+-              options={categories.map((item) => ({
+-                value: item.id,
+-                label:
+-                  item.name + (item.isActive ? "" : " (inactiva)"),
+-                disabled:
+-                  !item.isActive && item.id !== product.categoryId,
+-              }))}
+-            />
+-
+-            <SelectField
+-              label="Área de preparación"
+-              value={draft.preparationAreaId}
+-              disabled={busy}
+-              error={errors.preparationAreaId}
+-              onValueChange={(value) => {
+-                change("preparationAreaId", value);
+-              }}
+-              options={areas.map((item) => ({
+-                value: item.id,
+-                label:
+-                  item.name + (item.isActive ? "" : " (inactiva)"),
+-                disabled:
+-                  !item.isActive &&
+-                  item.id !== product.preparationAreaId,
+-              }))}
+-            />
+-
+-            <SelectField
+-              label="Preparación"
+-              value={draft.fulfillmentMode}
+-              disabled={busy}
+-              error={errors.fulfillmentMode}
+-              onValueChange={(value) => {
+-                change("fulfillmentMode", value);
+-              }}
+-              options={[
+-                {
+-                  value: "PREPARE_TO_ORDER",
+-                  label: "Preparar al pedir",
+-                },
+-                {
+-                  value: "READY_TO_SERVE",
+-                  label: "Listo para entregar",
+-                },
+-              ]}
+-            />
+-          </>
+-        ) : (
+-          <>
+-            <SelectField
+-              label="Tipo de inventario"
+-              value={draft.trackingType}
+-              disabled={busy}
+-              error={errors.trackingType}
+-              onValueChange={(value) => {
+-                change("trackingType", value);
+-              }}
+-              options={[
+-                { value: "RESALE", label: "Reventa" },
+-                { value: "PRODUCTION", label: "Producción" },
+-              ]}
+-            />
+-
+-            <SelectField
+-              label="Unidad"
+-              value={draft.baseUnit}
+-              disabled={busy}
+-              error={errors.baseUnit}
+-              onValueChange={(value) => change("baseUnit", value)}
+-              options={[
+-                { value: "UNIT", label: "Unidad" },
+-                { value: "GRAM", label: "Gramo" },
+-                { value: "KILOGRAM", label: "Kilogramo" },
+-                { value: "MILLILITER", label: "Mililitro" },
+-                { value: "LITER", label: "Litro" },
+-                { value: "PORTION", label: "Porción" },
+-                { value: "PACKAGE", label: "Paquete" },
+-              ]}
+-            />
+-
+-            <p className="text-xs text-muted">
+-              Esta configuración inicial crea el inventario y su
+-              relación con el producto. El descuento se realiza al
+-              confirmar la orden.
+-            </p>
+-          </>
+-        )}
+-      </fieldset>
+-
+-      {message && <Alert>{message}</Alert>}
+-
+-      <div className="flex flex-wrap justify-end gap-2">
+-        <Button
+-          size="sm"
+-          variant="secondary"
+-          disabled={busy}
+-          onClick={onCancel}
+-        >
+-          Cancelar
+-        </Button>
+-
+-        <Button
+-          type="submit"
+-          size="sm"
+-          loading={busy}
+-          disabled={busy}
+-        >
+-          {editing ? "Guardar cambios" : "Configurar inventario"}
+-        </Button>
+-      </div>
+-    </form>
+-  );
+-}
+diff --git a/src/features/products/components/ComboDetails.tsx b/src/features/products/components/ComboDetails.tsx
+deleted file mode 100644
+--- a/src/features/products/components/ComboDetails.tsx
++++ /dev/null
+@@ -1,103 +0,0 @@
+-import { useEffect, useState } from "react";
+-import { Alert } from "../../../components/feedback/Alert";
+-import { LoadingState } from "../../../components/feedback/LoadingState";
+-import { Button } from "../../../components/ui/Button";
+-import { ApiError } from "../../../lib/http/client";
+-import type { Product } from "../schemas/product.schema";
+-import type { ComboDetail } from "../schemas/product-action.schema";
+-import { getComboDetail } from "../services/product.service";
+-
+-export function ComboDetails({
+-  product,
+-  accessToken,
+-}: {
+-  product: Product;
+-  accessToken: string;
+-}) {
+-  const [result, setResult] = useState<{
+-    attempt: number;
+-    data?: ComboDetail;
+-    error?: string;
+-  } | null>(null);
+-
+-  const [attempt, setAttempt] = useState(0);
+-  const { id, businessId } = product;
+-
+-  useEffect(() => {
+-    const controller = new AbortController();
+-
+-    void getComboDetail(id, accessToken, controller.signal)
+-      .then((data) => {
+-        if (
+-          data.product.id !== id ||
+-          data.product.businessId !== businessId
+-        ) {
+-          throw new Error("Respuesta de combo incorrecta.");
+-        }
+-
+-        if (!controller.signal.aborted) {
+-          setResult({ attempt, data });
+-        }
+-      })
+-      .catch((error: unknown) => {
+-        if (!controller.signal.aborted) {
+-          setResult({
+-            attempt,
+-            error:
+-              error instanceof ApiError
+-                ? error.message
+-                : "No pudimos cargar el combo.",
+-          });
+-        }
+-      });
+-
+-    return () => controller.abort();
+-  }, [id, businessId, accessToken, attempt]);
+-
+-  if (!result || result.attempt !== attempt) {
+-    return <LoadingState message="Cargando composición…" />;
+-  }
+-
+-  if (result.error) {
+-    return (
+-      <Alert>
+-        <p>{result.error}</p>
+-
+-        <Button
+-          size="sm"
+-          variant="secondary"
+-          className="mt-3"
+-          onClick={() => setAttempt((value) => value + 1)}
+-        >
+-          Reintentar
+-        </Button>
+-      </Alert>
+-    );
+-  }
+-
+-  return (
+-    <ul className="divide-y divide-outline/40">
+-      {result.data?.components.map((item) => (
+-        <li
+-          key={item.productId}
+-          className="flex items-start justify-between gap-3 py-3 text-sm"
+-        >
+-          <div className="min-w-0">
+-            <p className="font-semibold text-heading [overflow-wrap:anywhere]">
+-              {item.name}
+-            </p>
+-
+-            <p className="mt-1 text-xs text-muted">
+-              {item.sku || "Sin código"}
+-              {!item.isActive && " · Inactivo"}
+-            </p>
+-          </div>
+-
+-          <span className="shrink-0 text-accent">
+-            × {Number(item.quantity)}
+-          </span>
+-        </li>
+-      ))}
+-    </ul>
+-  );
+-}

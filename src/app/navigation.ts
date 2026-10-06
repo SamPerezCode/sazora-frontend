@@ -58,7 +58,8 @@ const navigation: readonly NavigationItem[] = [
     icon: ChefHat,
     roles: ["ADMIN", "WAITER"],
     group: "main",
-    status: "planned",
+    status: "ready",
+    to: "/ventas",
   },
   {
     id: "kitchen",
