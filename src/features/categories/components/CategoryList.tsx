@@ -1,24 +1,20 @@
 import { useId, useState } from "react";
-import {
-  CircleCheck,
-  CircleSlash,
-  ImagePlus,
-  Pencil,
-  Search,
-  ToggleLeft,
-  ToggleRight,
-} from "lucide-react";
+import { Plus, Search, Tags } from "lucide-react";
 import { TextField } from "../../../components/forms/TextField";
-import { ActionMenu } from "../../../components/ui/ActionMenu";
-import { Avatar } from "../../../components/ui/Avatar";
+import { Button } from "../../../components/ui/Button";
 import { Pagination } from "../../../components/ui/Pagination";
-import { resolveFileUrl } from "../../../lib/files";
-import { CategoryTable } from "./CategoryTable";
+import {
+  CategoryActions,
+  CategoryIdentity,
+  CategoryStatus,
+  CategoryTable,
+} from "./CategoryTable";
 import type { Category } from "../schemas/category.schema";
 
 interface CategoryListProps {
   categories: readonly Category[];
   disabled: boolean;
+  onCreate: () => void;
   onEdit: (id: string) => void;
   onImage: (id: string) => void;
   onToggle: (id: string, isActive: boolean) => Promise<void>;
@@ -35,6 +31,7 @@ function normalizeSearch(value: string): string {
 export function CategoryList({
   categories,
   disabled,
+  onCreate,
   onEdit,
   onImage,
   onToggle,
@@ -44,7 +41,7 @@ export function CategoryList({
   const [pageSize, setPageSize] = useState(10);
 
   const listId = useId();
-  const summaryId = useId();
+  const resultId = useId();
 
   const search = normalizeSearch(query);
 
@@ -63,146 +60,121 @@ export function CategoryList({
   const start = (page - 1) * pageSize;
   const visible = filtered.slice(start, start + pageSize);
 
+  function clearSearch() {
+    setQuery("");
+    setRequestedPage(1);
+  }
+
   return (
     <section
-      className="mt-4 space-y-4"
+      className="categories-list"
       aria-label="Listado de categorías"
     >
-      <div className="w-full lg:max-w-[30.5rem]">
-        <TextField
-          type="search"
-          label="Buscar categorías"
-          placeholder="Nombre o descripción"
-          icon={Search}
-          value={query}
-          disabled={disabled}
-          aria-controls={listId}
-          aria-describedby={
-            categories.length > 10 ? summaryId : undefined
-          }
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setRequestedPage(1);
-          }}
-        />
-      </div>
-
-      <div
-        id={listId}
-        className="rounded-xl border border-outline/60 px-3 sm:px-4 lg:px-0"
-      >
-        {visible.length > 0 && (
-          <CategoryTable
-            categories={visible}
+      <div className="categories-toolbar">
+        <div className="categories-toolbar-search">
+          <TextField
+            type="search"
+            label="Buscar categorías"
+            placeholder="Nombre o descripción"
+            icon={Search}
+            value={query}
             disabled={disabled}
-            onEdit={onEdit}
-            onImage={onImage}
-            onToggle={onToggle}
+            aria-controls={listId}
+            aria-describedby={resultId}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setRequestedPage(1);
+            }}
           />
-        )}
+        </div>
 
+        <Button
+          className="categories-toolbar-create"
+          disabled={disabled}
+          onClick={onCreate}
+        >
+          <Plus size={16} aria-hidden="true" />
+          Nueva categoría
+        </Button>
+      </div>
+
+      <p
+        id={resultId}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {filtered.length} de {categories.length} categorías.
+      </p>
+
+      <div id={listId}>
         {visible.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted">
-            {categories.length === 0
-              ? "Todavía no tienes categorías. Crea la primera para organizar tus productos."
-              : "No encontramos categorías con esa búsqueda."}
-          </p>
-        ) : (
-          <ul className="divide-y divide-outline/40 lg:hidden">
-            {" "}
-            {visible.map((category) => (
-              <li
-                key={category.id}
-                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+          <div className="categories-empty">
+            <Tags size={28} aria-hidden="true" />
+
+            <p>
+              {categories.length === 0
+                ? "Todavía no tienes categorías. Crea la primera para organizar tus productos."
+                : "No encontramos categorías con esa búsqueda."}
+            </p>
+
+            {search && (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={disabled}
+                onClick={clearSearch}
               >
-                <div className="col-start-1 row-span-2 row-start-1 sm:row-span-1">
-                  <Avatar
-                    name={category.name}
-                    src={resolveFileUrl(category.imageUrl)}
-                    size="list"
-                  />
-                </div>
+                Limpiar búsqueda
+              </Button>
+            )}
+          </div>
+        ) : (
+          <>
+            <CategoryTable
+              categories={visible}
+              disabled={disabled}
+              onEdit={onEdit}
+              onImage={onImage}
+              onToggle={onToggle}
+            />
 
-                <div className="col-start-2 row-start-1 min-w-0">
-                  <p className="text-sm font-semibold text-heading [overflow-wrap:anywhere]">
-                    {category.name}
+            <ul className="categories-mobile">
+              {visible.map((category) => (
+                <li key={category.id} className="category-card">
+                  <div className="category-card-header">
+                    <CategoryIdentity category={category} />
+
+                    <CategoryActions
+                      category={category}
+                      disabled={disabled}
+                      onEdit={onEdit}
+                      onImage={onImage}
+                      onToggle={onToggle}
+                    />
+                  </div>
+
+                  <p className="category-description">
+                    {category.description || "Sin descripción"}
                   </p>
 
-                  {category.description && (
-                    <p className="mt-1 text-xs text-muted [overflow-wrap:anywhere]">
-                      {category.description}
+                  <div className="category-card-footer">
+                    <p className="category-card-order">
+                      Orden
+                      <strong>{category.displayOrder}</strong>
                     </p>
-                  )}
 
-                  <p className="mt-1 text-xs text-muted">
-                    Orden: {category.displayOrder}
-                  </p>
-                </div>
-
-                <span className="col-start-2 row-start-2 flex items-center gap-1 text-xs text-muted sm:col-start-3 sm:row-start-1">
-                  {category.isActive ? (
-                    <CircleCheck
-                      aria-hidden="true"
-                      size={14}
-                      className="shrink-0 text-accent"
-                    />
-                  ) : (
-                    <CircleSlash
-                      aria-hidden="true"
-                      size={14}
-                      className="shrink-0"
-                    />
-                  )}
-
-                  {category.isActive ? "Activa" : "Inactiva"}
-                </span>
-
-                <div className="col-start-3 row-span-2 row-start-1 sm:col-start-4 sm:row-span-1">
-                  <ActionMenu
-                    label={`Acciones de ${category.name}`}
-                    disabled={disabled}
-                    actions={[
-                      {
-                        id: "edit",
-                        label: "Editar",
-                        icon: <Pencil aria-hidden="true" size={16} />,
-                        onSelect: () => onEdit(category.id),
-                      },
-                      {
-                        id: "image",
-                        label: "Imagen",
-                        icon: (
-                          <ImagePlus aria-hidden="true" size={16} />
-                        ),
-                        onSelect: () => onImage(category.id),
-                      },
-                      {
-                        id: "status",
-                        label: category.isActive
-                          ? "Desactivar"
-                          : "Activar",
-                        icon: category.isActive ? (
-                          <ToggleRight aria-hidden="true" size={20} />
-                        ) : (
-                          <ToggleLeft aria-hidden="true" size={20} />
-                        ),
-                        onSelect: () => {
-                          void onToggle(
-                            category.id,
-                            !category.isActive
-                          );
-                        },
-                      },
-                    ]}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
+                    <CategoryStatus category={category} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
 
-      {categories.length > 10 && (
+      {filtered.length > 10 && (
         <Pagination
           page={page}
           pageSize={pageSize}
@@ -212,14 +184,11 @@ export function CategoryList({
           }
           totalLabel={
             search
-              ? `Total: ${categories.length} ${
-                  categories.length === 1 ? "categoría" : "categorías"
-                }`
+              ? `Total: ${categories.length} categorías`
               : undefined
           }
           disabled={disabled}
           controlsId={listId}
-          summaryId={summaryId}
           onPageChange={setRequestedPage}
           onPageSizeChange={(size) => {
             setPageSize(size);

@@ -1074,3 +1074,8 @@
     font-size: 0.8125rem;
   }
 }
+
+/* Mismo radio que los inputs y botones de Productos */
+.products-page .select-field-trigger {
+  border-radius: 0.625rem;
+}

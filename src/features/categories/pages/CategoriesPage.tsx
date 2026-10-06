@@ -1,12 +1,12 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Plus, Tags } from "lucide-react";
+import { Tags } from "lucide-react";
 import { CategoryList } from "../components/CategoryList";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { Alert } from "../../../components/feedback/Alert";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { BottomSheet } from "../../../components/layout/BottomSheet";
 import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
+
 import { ApiError } from "../../../lib/http/client";
 import type { AuthSession } from "../../auth/types/auth.types";
 import { CategoryForm } from "../components/CategoryForm";
@@ -131,59 +131,35 @@ function CategoriesContent({ session }: { session: AuthSession }) {
 
   return (
     <div className="categories-page">
-      <Card>
-        <h2 className="flex items-center gap-2 text-base font-bold text-heading">
-          <Tags
-            aria-hidden="true"
-            size={18}
-            className="text-accent"
-          />
-          Categorías
-        </h2>
+      <section className="categories-content">
+        <header className="categories-heading">
+          <div className="categories-heading-title">
+            <Tags size={18} aria-hidden="true" />
+            <h2>Categorías</h2>
+          </div>
 
-        <p className="mt-1 text-xs leading-relaxed text-muted">
-          Organiza las secciones de tu catálogo y menú.
-        </p>
+          <p>Organiza las secciones de tu catálogo y menú.</p>
+        </header>
 
-        <div className="mt-4 flex min-h-16 items-center justify-end">
-          {resource.busy && (
-            <span role="status" className="sr-only">
-              Guardando…
-            </span>
-          )}
-
-          <Button
-            size="sm"
-            className="whitespace-nowrap max-sm:gap-1 max-sm:px-2.5 max-sm:text-[11px]"
-            disabled={
-              resource.loading ||
-              !!resource.error ||
-              resource.busy ||
-              !!editor
-            }
-            onClick={() => {
-              setNotice({ message: "", error: false });
-              setEditor({ kind: "form" });
-            }}
-          >
-            <Plus aria-hidden="true" size={14} />
-            Nueva categoría
-          </Button>
-        </div>
+        {resource.busy && (
+          <span role="status" className="sr-only">
+            Guardando…
+          </span>
+        )}
 
         {resource.loading && (
-          <div className="py-8">
-            <LoadingState message="Cargando categorías…" />
-          </div>
+          <LoadingState message="Cargando categorías…" />
         )}
 
         {resource.error && (
-          <Alert className="mt-4">
+          <Alert>
             <p>{resource.error}</p>
+
             <Button
               size="sm"
               variant="secondary"
               className="mt-3"
+              disabled={resource.busy}
               onClick={resource.retry}
             >
               Reintentar
@@ -195,6 +171,10 @@ function CategoriesContent({ session }: { session: AuthSession }) {
           <CategoryList
             categories={resource.categories}
             disabled={resource.busy || !!editor}
+            onCreate={() => {
+              setNotice({ message: "", error: false });
+              setEditor({ kind: "form" });
+            }}
             onEdit={(id) => {
               setNotice({ message: "", error: false });
               setEditor({ kind: "form", id });
@@ -207,12 +187,12 @@ function CategoriesContent({ session }: { session: AuthSession }) {
           />
         )}
 
-        <p className="mt-5 text-xs leading-relaxed text-muted">
+        <p className="categories-footnote">
           Al desactivar una categoría, sus productos dejan de estar
           disponibles para órdenes nuevas y en el menú público. Su
           historial se conserva.
         </p>
-      </Card>
+      </section>
 
       {notice.message && (
         <div className="fixed inset-x-4 bottom-24 z-40 sm:left-auto sm:bottom-6 sm:w-96">
@@ -228,6 +208,11 @@ function CategoriesContent({ session }: { session: AuthSession }) {
           open
           variant="modal"
           busy={resource.busy}
+          className={
+            editor.kind === "image"
+              ? "product-modal product-modal--small"
+              : undefined
+          }
           title={
             editor.kind === "image"
               ? "Imagen de la categoría"
@@ -237,13 +222,31 @@ function CategoriesContent({ session }: { session: AuthSession }) {
           }
           onClose={() => setEditor(null)}
         >
-          {editor.kind === "image" && selected ? (
-            <CategoryImageForm
-              category={selected}
-              busy={resource.busy}
-              onSave={saveAction}
-              onCancel={() => setEditor(null)}
-            />
+          {editor.kind === "image" ? (
+            <>
+              <p className="product-modal-description">
+                {selected?.name ?? "Categoría no disponible"}
+              </p>
+
+              <div className="product-modal-body">
+                {selected ? (
+                  <CategoryImageForm
+                    key={selected.id}
+                    category={selected}
+                    busy={resource.busy}
+                    onSave={saveAction}
+                    onCancel={() => setEditor(null)}
+                  />
+                ) : (
+                  <div className="product-modal-section">
+                    <Alert>
+                      Esta categoría ya no aparece en el listado.
+                      Cierra el modal y actualiza la consulta.
+                    </Alert>
+                  </div>
+                )}
+              </div>
+            </>
           ) : (
             <CategoryForm
               key={selected?.id ?? "new"}
