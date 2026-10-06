@@ -2,44 +2,41 @@ import { CircleCheck, CircleSlash } from "lucide-react";
 import type { Product } from "../schemas/product.schema";
 
 export function ProductStatus({ product }: { product: Product }) {
+  const unavailable =
+    !product.isActive || product.isAvailable === false;
+
   const label = !product.isActive
     ? "Inactivo"
-    : product.isAvailable
-      ? "Disponible"
-      : "No disponible";
+    : product.isAvailable === undefined
+      ? "Activo"
+      : product.isAvailable
+        ? "Disponible"
+        : "No disponible";
 
   const reason = !product.isActive
     ? "Producto desactivado."
     : [
-        !product.categoryIsActive ? "Categoría desactivada." : "",
-        !product.preparationAreaIsActive ? "Área desactivada." : "",
+        product.categoryIsActive === false
+          ? "Categoría desactivada."
+          : "",
+        product.preparationAreaIsActive === false
+          ? "Área desactivada."
+          : "",
       ]
         .filter(Boolean)
         .join(" ");
 
-  const Icon = product.isAvailable ? CircleCheck : CircleSlash;
+  const Icon = unavailable ? CircleSlash : CircleCheck;
 
   return (
     <span
+      className="product-status"
+      data-unavailable={unavailable}
       title={reason || label}
       aria-label={reason ? `${label}. ${reason}` : label}
-      className="inline-flex items-center gap-1.5 rounded-full bg-secondary/70 px-2 py-1 text-[0.6875rem] font-medium"
     >
-      <Icon
-        aria-hidden="true"
-        size={14}
-        className={`shrink-0 ${
-          product.isAvailable ? "text-accent" : "text-muted"
-        }`}
-      />
-
-      <span
-        className={
-          product.isAvailable ? "text-heading" : "text-muted"
-        }
-      >
-        {label}
-      </span>
+      <Icon size={13} aria-hidden="true" />
+      <span>{label}</span>
     </span>
   );
 }

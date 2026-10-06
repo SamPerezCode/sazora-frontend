@@ -4,6 +4,7 @@ import type { AuthSession } from "../../auth/types/auth.types";
 import type { ProductMutation } from "../schemas/product-action.schema";
 import {
   getProductCatalog,
+  getProductDetail,
   saveProduct,
 } from "../services/product.service";
 
@@ -11,9 +12,24 @@ type Catalog = Awaited<ReturnType<typeof getProductCatalog>>;
 
 interface Snapshot {
   scope: string;
-  attempt: number;
   data: Catalog | null;
   error: string | null;
+}
+
+function verify(data: Catalog, businessId: string) {
+  if (
+    [...data.products, ...data.categories, ...data.areas].some(
+      (item) => item.businessId !== businessId
+    )
+  ) {
+    throw new ApiError(
+      502,
+      "BUSINESS_MISMATCH",
+      "No pudimos verificar el catálogo."
+    );
+  }
+
+  return data;
 }
 
 export function useProducts(session: AuthSession) {
@@ -27,23 +43,8 @@ export function useProducts(session: AuthSession) {
   const { accessToken } = session;
   const businessId = session.business.id;
   const allowed = session.authorization.roles.includes("ADMIN");
+
   const scope = `${businessId}:${session.membership.id}:${accessToken}`;
-
-  function verify(data: Catalog) {
-    if (
-      [...data.products, ...data.categories, ...data.areas].some(
-        (item) => item.businessId !== businessId
-      )
-    ) {
-      throw new ApiError(
-        502,
-        "BUSINESS_MISMATCH",
-        "No pudimos verificar el catálogo."
-      );
-    }
-
-    return data;
-  }
 
   useEffect(() => {
     if (!allowed) return;
@@ -53,38 +54,26 @@ export function useProducts(session: AuthSession) {
 
     void getProductCatalog(accessToken, controller.signal)
       .then((data) => {
-        if (
-          [...data.products, ...data.categories, ...data.areas].some(
-            (item) => item.businessId !== businessId
-          )
-        ) {
-          throw new ApiError(
-            502,
-            "BUSINESS_MISMATCH",
-            "No pudimos verificar el catálogo."
-          );
-        }
+        const checked = verify(data, businessId);
 
         if (!controller.signal.aborted) {
           setSnapshot({
             scope,
-            attempt,
-            data,
+            data: checked,
             error: null,
           });
         }
       })
-      .catch((error: unknown) => {
+      .catch((cause) => {
         if (!controller.signal.aborted) {
-          setSnapshot({
+          setSnapshot((previous) => ({
             scope,
-            attempt,
-            data: null,
+            data: previous?.scope === scope ? previous.data : null,
             error:
-              error instanceof ApiError
-                ? error.message
+              cause instanceof Error
+                ? cause.message
                 : "No pudimos cargar los productos.",
-          });
+          }));
         }
       });
 
@@ -99,10 +88,7 @@ export function useProducts(session: AuthSession) {
     [scope]
   );
 
-  const current =
-    snapshot?.scope === scope && snapshot.attempt === attempt
-      ? snapshot
-      : null;
+  const current = snapshot?.scope === scope ? snapshot : null;
 
   async function mutate(
     action: ProductMutation
@@ -120,44 +106,101 @@ export function useProducts(session: AuthSession) {
     }
 
     const controller = new AbortController();
+
     write.current = controller;
     read.current?.abort();
     setBusy(true);
 
     try {
       await saveProduct(action, accessToken, controller.signal);
+
       controller.signal.throwIfAborted();
 
-      try {
-        const data = verify(
-          await getProductCatalog(accessToken, controller.signal)
-        );
+      const existing =
+        action.kind === "create"
+          ? undefined
+          : current.data.products.find(
+              (product) => product.id === action.id
+            );
 
-        controller.signal.throwIfAborted();
+      const [catalog, detail] = await Promise.allSettled([
+        getProductCatalog(accessToken, controller.signal).then(
+          (data) => verify(data, businessId)
+        ),
+        existing
+          ? getProductDetail(
+              existing.id,
+              existing.isCombo,
+              accessToken,
+              controller.signal
+            )
+          : Promise.resolve(null),
+      ]);
 
-        setSnapshot({
-          scope,
-          attempt,
-          data,
-          error: null,
-        });
+      controller.signal.throwIfAborted();
 
-        return null;
-      } catch (error) {
-        if (controller.signal.aborted) throw error;
+      let next =
+        catalog.status === "fulfilled" ? catalog.value : current.data;
 
-        const message =
-          "La acción se guardó, pero no pudimos actualizar el listado. Pulsa Reintentar.";
+      let detailError = "";
 
-        setSnapshot({
-          scope,
-          attempt,
-          data: null,
-          error: message,
-        });
+      if (detail.status === "fulfilled" && detail.value && existing) {
+        if (
+          detail.value.id !== existing.id ||
+          detail.value.businessId !== businessId
+        ) {
+          detailError =
+            "No pudimos verificar el detalle actualizado.";
+        } else {
+          const updated = detail.value;
 
-        return message;
+          next = {
+            ...next,
+            products: next.products.map((product) =>
+              product.id === updated.id
+                ? { ...product, ...updated }
+                : product
+            ),
+          };
+        }
+      } else if (detail.status === "rejected") {
+        detailError =
+          detail.reason instanceof Error
+            ? detail.reason.message
+            : "No pudimos actualizar el detalle.";
       }
+
+      if (action.kind === "remove-image") {
+        next = {
+          ...next,
+          products: next.products.map((product) =>
+            product.id === action.id
+              ? { ...product, imageUrl: null }
+              : product
+          ),
+        };
+      }
+
+      const listError =
+        catalog.status === "rejected"
+          ? catalog.reason instanceof Error
+            ? catalog.reason.message
+            : "No pudimos actualizar el listado."
+          : "";
+
+      const warning = [listError, detailError]
+        .filter(Boolean)
+        .join(" ");
+
+      setSnapshot({
+        scope,
+        data: next,
+        error: warning ? `El cambio se guardó. ${warning}` : null,
+      });
+
+      return warning
+        ? `El cambio se guardó. ${warning} Reintenta la consulta, no el guardado.`
+        : null;
     } finally {
       if (write.current === controller) {
         write.current = null;

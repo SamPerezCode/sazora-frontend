@@ -6,6 +6,8 @@ interface Action {
   id: string;
   label: string;
   icon: ReactNode;
+  danger?: boolean;
+  separatorBefore?: boolean;
   onSelect: (trigger: HTMLButtonElement) => void;
 }
 
@@ -13,6 +15,7 @@ interface ActionMenuProps {
   label: string;
   disabled?: boolean;
   actions: Action[];
+  appearance?: "default" | "compact";
 }
 
 function positionMenu(trigger: HTMLElement, panel: HTMLElement) {
@@ -33,7 +36,13 @@ function positionMenu(trigger: HTMLElement, panel: HTMLElement) {
     return;
   }
 
-  panel.style.width = `${Math.max(0, Math.min(192, right - left))}px`;
+  const preferredWidth =
+    panel.dataset.appearance === "compact" ? 240 : 192;
+
+  panel.style.width = `${Math.max(
+    0,
+    Math.min(preferredWidth, right - left)
+  )}px`;
   panel.style.maxHeight = "none";
 
   const height = panel.getBoundingClientRect().height;
@@ -64,6 +73,7 @@ export function ActionMenu({
   label,
   disabled = false,
   actions,
+  appearance = "default",
 }: ActionMenuProps) {
   const id = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -156,6 +166,8 @@ export function ActionMenu({
         aria-expanded={open}
         aria-controls={id}
         popoverTarget={id}
+        data-action-trigger
+        data-appearance={appearance}
         className="flex size-11 cursor-pointer items-center justify-center rounded-xl text-muted hover:bg-secondary hover:text-heading focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
         onClick={(event) => {
           event.preventDefault();
@@ -178,6 +190,7 @@ export function ActionMenu({
 
       <div
         ref={panelRef}
+        data-appearance={appearance}
         id={id}
         popover="auto"
         role="menu"
@@ -234,6 +247,8 @@ export function ActionMenu({
             type="button"
             role="menuitem"
             tabIndex={-1}
+            data-danger={action.danger || undefined}
+            data-separator={action.separatorBefore || undefined}
             className={[
               "group/action flex min-h-11 w-full cursor-pointer items-center gap-2",
               "rounded-lg bg-transparent px-3 py-2 text-left text-sm text-heading",

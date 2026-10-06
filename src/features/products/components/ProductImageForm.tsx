@@ -83,7 +83,7 @@ export function ProductImageForm({
 
   return (
     <form
-      className="space-y-4"
+      className="product-image-form"
       onSubmit={(event) => {
         event.preventDefault();
 
@@ -96,29 +96,24 @@ export function ProductImageForm({
         }
       }}
     >
-      <div className="flex justify-center">
-        <Avatar
-          name={product.name}
-          src={preview ?? resolveFileUrl(product.imageUrl)}
-          size="xl"
-        />
-      </div>
+      <div className="product-modal-section">
+        <div className="product-image-preview product-detail-image">
+          <Avatar
+            name={product.name}
+            src={preview ?? resolveFileUrl(product.imageUrl)}
+            size="xl"
+          />
+        </div>
 
-      <div className="space-y-2">
-        <label
-          htmlFor={id}
-          className="block text-sm font-medium text-heading"
-        >
-          Imagen de {product.name}
-        </label>
-
-        <div className="relative min-w-0">
+        <div className="product-image-upload">
           <input
             id={id}
             type="file"
             data-dialog-initial-focus
             accept="image/jpeg,image/png,image/webp"
             disabled={locked}
+            aria-label={`Seleccionar imagen para ${product.name}`}
+            aria-invalid={!!error}
             aria-describedby={[
               `${id}-filename`,
               `${id}-help`,
@@ -126,7 +121,6 @@ export function ProductImageForm({
             ]
               .filter(Boolean)
               .join(" ")}
-            className="peer absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
             onChange={(event) => {
               const selected = event.currentTarget.files?.[0];
 
@@ -144,7 +138,6 @@ export function ProductImageForm({
               setError(message ?? "");
 
               if (message) {
-                // Solo limpiamos el input si el archivo es inválido.
                 event.currentTarget.value = "";
                 return;
               }
@@ -157,102 +150,79 @@ export function ProductImageForm({
             }}
           />
 
-          <div
-            className={[
-              "pointer-events-none flex min-h-20 min-w-0 items-center gap-3",
-              "rounded-xl border border-input-border bg-secondary/30 p-3",
-              "transition-colors",
-              "peer-enabled:peer-hover:border-accent",
-              "peer-enabled:peer-hover:bg-accent/5",
-              "peer-focus-visible:outline-2",
-              "peer-focus-visible:outline-offset-2",
-              "peer-focus-visible:outline-accent",
-              "peer-disabled:opacity-60",
-              "motion-reduce:transition-none",
-            ].join(" ")}
-          >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
-              <Upload aria-hidden="true" size={20} />
-            </span>
+          <div className="product-image-upload-content">
+            <Upload size={20} aria-hidden="true" />
 
-            <div className="min-w-0 flex-1">
-              <span className="inline-flex rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-heading">
+            <div>
+              <strong>
                 {file ? "Cambiar archivo" : "Seleccionar archivo"}
-              </span>
+              </strong>
 
               <p
                 id={`${id}-filename`}
                 role="status"
                 aria-live="polite"
                 aria-atomic="true"
-                className="mt-2 text-xs text-muted [overflow-wrap:anywhere]"
               >
-                {file ? file.name : "Ningún archivo seleccionado"}
+                {file?.name ?? "Ningún archivo seleccionado"}
               </p>
             </div>
           </div>
         </div>
 
-        <p id={`${id}-help`} className="text-xs text-muted">
-          JPEG, PNG o WebP. Máximo 5 MB.
+        <p id={`${id}-help`} className="product-modal-help">
+          JPEG, PNG o WebP · Máximo 5 MB.
         </p>
-      </div>
 
-      {error && (
-        <div id={`${id}-error`}>
-          <Alert variant="error">{error}</Alert>
-        </div>
-      )}
-
-      <div className="space-y-3 border-t border-outline/60 pt-4">
-        {product.imageUrl && (
-          <Button
-            size="sm"
-            variant="danger"
-            className="w-full"
-            disabled={locked}
-            loading={operation === "remove-image"}
-            loadingText="Eliminando…"
-            onClick={() => {
-              void save({
-                kind: "remove-image",
-                id: product.id,
-              });
-            }}
-          >
-            <Trash2 aria-hidden="true" size={16} />
-            Eliminar imagen
-          </Button>
+        {error && (
+          <div id={`${id}-error`} className="product-form-feedback">
+            <Alert variant="error">{error}</Alert>
+          </div>
         )}
 
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            className="min-w-0 w-full"
-            disabled={locked}
-            onClick={onCancel}
-          >
-            Cancelar
-          </Button>
-
-          <Button
-            type="submit"
-            size="sm"
-            className="min-w-0 w-full"
-            disabled={!file || locked}
-            loading={operation === "image"}
-            loadingText="Guardando…"
-          >
-            <ImagePlus
-              aria-hidden="true"
-              size={16}
-              className="shrink-0"
-            />
-            Guardar
-          </Button>
-        </div>
+        {product.imageUrl && (
+          <div className="product-image-remove">
+            <Button
+              size="sm"
+              variant="danger"
+              disabled={locked}
+              loading={operation === "remove-image"}
+              loadingText="Retirando…"
+              onClick={() => {
+                void save({
+                  kind: "remove-image",
+                  id: product.id,
+                });
+              }}
+            >
+              <Trash2 size={16} aria-hidden="true" />
+              Retirar imagen actual
+            </Button>
+          </div>
+        )}
       </div>
+
+      <footer className="product-modal-footer">
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={locked}
+          onClick={onCancel}
+        >
+          Cancelar
+        </Button>
+
+        <Button
+          type="submit"
+          size="sm"
+          disabled={!file || locked}
+          loading={operation === "image"}
+          loadingText="Guardando…"
+        >
+          <ImagePlus size={16} aria-hidden="true" />
+          Guardar imagen
+        </Button>
+      </footer>
     </form>
   );
 }

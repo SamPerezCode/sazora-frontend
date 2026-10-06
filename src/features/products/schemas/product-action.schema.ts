@@ -1,17 +1,23 @@
 import { z } from "zod";
-import { productSchema } from "./product.schema";
-
-const id = z.string().regex(/^[1-9]\d*$/, "Selecciona una opción.");
+import {
+  fulfillmentModeSchema,
+  productDetailSchema,
+  productIdSchema,
+} from "./product.schema";
 
 const optionalText = (max: number) =>
   z
     .string()
     .trim()
-    .max(max, `Máximo ${max} caracteres.`)
+    .max(max)
+    .nullable()
     .transform((value) => value || null);
 
-const decimal = (places: number) =>
-  z
+export const productEditSchema = z.object({
+  name: z.string().trim().min(1, "Escribe el nombre.").max(150),
+  sku: optionalText(50),
+  description: optionalText(500),
+  currentPrice: z
     .string()
     .trim()
     .transform((value) => value.replace(",", "."))
@@ -19,85 +25,80 @@ const decimal = (places: number) =>
       z
         .string()
         .regex(
-          new RegExp(`^\\d+(?:\\.\\d{1,${places}})?$`),
-          `Usa un número positivo o cero, con máximo ${places} decimales.`
+          /^\d+(?:\.\d{1,2})?$/,
+          "Usa un importe con máximo dos decimales."
         )
-    );
-
-export const productEditSchema = z.object({
-  name: z.string().trim().min(1, "Escribe el nombre.").max(150),
-  sku: optionalText(50).transform(
-    (value) => value?.toUpperCase() ?? null
-  ),
-  description: optionalText(500),
-  currentPrice: decimal(2),
-  categoryId: id,
-  preparationAreaId: id,
-  fulfillmentMode: z.enum(["PREPARE_TO_ORDER", "READY_TO_SERVE"]),
+    ),
+  categoryId: productIdSchema,
+  preparationAreaId: productIdSchema,
+  fulfillmentMode: fulfillmentModeSchema,
 });
 
-export const inventorySetupSchema = z.object({
-  trackingType: z.enum(["RESALE", "PRODUCTION"]),
-  sku: optionalText(50).transform(
-    (value) => value?.toUpperCase() ?? null
-  ),
-  baseUnit: z.enum([
-    "UNIT",
-    "GRAM",
-    "KILOGRAM",
-    "MILLILITER",
-    "LITER",
-    "PORTION",
-    "PACKAGE",
-  ]),
-  openingQuantity: decimal(3),
-  minimumStock: decimal(3),
-  quantityPerProduct: decimal(3).refine(
-    (value) => /[1-9]/.test(value),
-    "Debe ser mayor que cero."
-  ),
-});
+export const componentsSchema = z
+  .array(
+    z.object({
+      productId: productIdSchema,
+      quantity: z
+        .number()
+        .finite()
+        .positive("La cantidad debe ser mayor que cero."),
+    })
+  )
+  .min(1, "Agrega al menos un componente.")
+  .superRefine((items, context) => {
+    if (
+      new Set(items.map((item) => item.productId)).size !==
+      items.length
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "No repitas componentes.",
+      });
+    }
+  });
 
-export const comboDetailSchema = z.object({
+export const comboResponseSchema = z.object({
   status: z.literal("success"),
   data: z.object({
-    combo: z.object({
-      product: productSchema.pick({
-        id: true,
-        businessId: true,
-      }),
+    product: productDetailSchema.extend({
+      isCombo: z.literal(true),
       components: z.array(
         z.object({
-          productId: id,
-          name: z.string(),
-          sku: z.string().nullable(),
-          quantity: z.string(),
-          isActive: z.boolean(),
+          productId: productIdSchema,
+          productName: z.string(),
+          quantity: z.number().finite().positive(),
         })
       ),
     }),
   }),
 });
 
-export type ProductActionKind =
-  | "edit"
-  | "image"
-  | "status"
-  | "inventory"
-  | "combo";
-
 export type ProductEditInput = z.output<typeof productEditSchema>;
 
-export type InventoryInput = z.output<typeof inventorySetupSchema>;
+export type ComboComponent = z.infer<typeof componentsSchema>[number];
 
-export type ComboDetail = z.infer<
-  typeof comboDetailSchema
->["data"]["combo"];
+export type CatalogDetail = z.infer<typeof productDetailSchema> & {
+  components?: {
+    productId: string;
+    productName: string;
+    quantity: number;
+  }[];
+};
+
+export type ProductActionKind =
+  | "detail"
+  | "edit"
+  | "image"
+  | "remove-image"
+  | "status"
+  | "inventory";
 
 export type ProductMutation =
   | {
       kind: "create";
+      isCombo: boolean;
       input: ProductEditInput;
+      components?: ComboComponent[];
       file?: File;
     }
   | {
@@ -105,8 +106,19 @@ export type ProductMutation =
       id: string;
       isCombo: boolean;
       input: Partial<ProductEditInput>;
+      components?: ComboComponent[];
     }
-  | { kind: "status"; id: string; isActive: boolean }
-  | { kind: "image"; id: string; file: File }
-  | { kind: "remove-image"; id: string }
-  | { kind: "inventory"; id: string; input: InventoryInput };
+  | {
+      kind: "status";
+      id: string;
+      isActive: boolean;
+    }
+  | {
+      kind: "image";
+      id: string;
+      file: File;
+    }
+  | {
+      kind: "remove-image";
+      id: string;
+    };

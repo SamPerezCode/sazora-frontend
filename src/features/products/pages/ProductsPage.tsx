@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { Alert } from "../../../components/feedback/Alert";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { BottomSheet } from "../../../components/layout/BottomSheet";
 import { Button } from "../../../components/ui/Button";
 import { useAppShell } from "../../../app/layout/shell-context";
-import { ApiError } from "../../../lib/http/client";
 import type { AuthSession } from "../../auth/types/auth.types";
 import type { Product } from "../schemas/product.schema";
 import type {
@@ -12,21 +12,26 @@ import type {
   ProductMutation,
 } from "../schemas/product-action.schema";
 import { ProductList } from "../components/ProductList";
-import { ProductCreateForm } from "../components/ProductCreateForm";
-import { ProductDataForm } from "../components/ProductDataForm";
+import { ProductForm } from "../components/ProductForm";
+import { ProductEditor } from "../components/ProductEditor";
 import { ProductImageForm } from "../components/ProductImageForm";
-import { ComboDetails } from "../components/ComboDetails";
+import { ProductStatusConfirmDialog } from "../components/ProductStatusConfirmDialog";
+import { productInventoryPath } from "../utils/product-inventory";
 import { useProducts } from "../hooks/useProducts";
 
 type Editor =
   | { kind: "create" }
   | {
-      kind: Exclude<ProductActionKind, "status">;
-      product: Product;
+      kind: Exclude<ProductActionKind, "inventory">;
+      id: string;
     };
 
 export function ProductsPage() {
   const { session } = useAppShell();
+
+  if (!session.authorization.roles.includes("ADMIN")) {
+    return <Alert>No tienes acceso a Productos.</Alert>;
+  }
 
   return (
     <ProductsContent
@@ -38,15 +43,18 @@ export function ProductsPage() {
 
 function ProductsContent({ session }: { session: AuthSession }) {
   const resource = useProducts(session);
+  const navigate = useNavigate();
 
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [revision, setRevision] = useState(0);
+
   const [notice, setNotice] = useState<{
     message: string;
     error: boolean;
   } | null>(null);
 
-  const modalId = useId();
   const alive = useRef(false);
+  const modalId = useId();
 
   useEffect(() => {
     alive.current = true;
@@ -57,9 +65,10 @@ function ProductsContent({ session }: { session: AuthSession }) {
   }, []);
 
   useEffect(() => {
-    if (!notice) return;
+    if (!notice || notice.error) return;
 
-    const timer = window.setTimeout(() => setNotice(null), 5000);
+    const timer = window.setTimeout(() => setNotice(null), 7000);
+
     return () => window.clearTimeout(timer);
   }, [notice]);
 
@@ -68,53 +77,96 @@ function ProductsContent({ session }: { session: AuthSession }) {
 
     if (!alive.current) return;
 
-    setEditor(null);
+    setRevision((value) => value + 1);
+
+    setEditor(
+      action.kind === "create"
+        ? null
+        : { kind: "detail", id: action.id }
+    );
+
     setNotice({
       error: !!warning,
       message:
         warning ??
         (action.kind === "create"
-          ? "Producto creado."
-          : action.kind === "status"
-            ? action.isActive
-              ? "Producto activado."
-              : "Producto desactivado."
-            : "Cambios guardados."),
+          ? "Producto creado. El control de inventario es opcional y se configura desde Inventario."
+          : "Cambios guardados."),
     });
   }
 
-  function handleAction(kind: ProductActionKind, product: Product) {
+  function onAction(kind: ProductActionKind, product: Product) {
     if (resource.busy) return;
 
     setNotice(null);
 
-    if (kind === "status") {
-      void save({
-        kind: "status",
-        id: product.id,
-        isActive: !product.isActive,
-      }).catch((error: unknown) => {
-        if (alive.current) {
-          setNotice({
-            error: true,
-            message:
-              error instanceof ApiError
-                ? error.message
-                : "No pudimos cambiar el estado.",
-          });
-        }
-      });
-    } else {
-      setEditor({ kind, product });
+    if (kind === "inventory") {
+      setEditor(null);
+
+      const path = productInventoryPath(
+        product.id,
+        product.hasInventory
+      );
+
+      if (path) {
+        navigate(path);
+      } else {
+        setNotice({
+          error: false,
+          message:
+            "Inventario todavía no está disponible. La configuración se realizará en ese módulo.",
+        });
+      }
+
+      return;
     }
+
+    setEditor({ kind, id: product.id });
   }
+
+  const product =
+    editor && editor.kind !== "create"
+      ? resource.data?.products.find(
+          (candidate) => candidate.id === editor.id
+        )
+      : undefined;
+
+  const title = !editor
+    ? ""
+    : editor.kind === "create"
+      ? "Nuevo producto"
+      : editor.kind === "detail"
+        ? "Detalle del producto"
+        : editor.kind === "edit"
+          ? "Editar producto"
+          : editor.kind === "image"
+            ? "Imagen del producto"
+            : editor.kind === "remove-image"
+              ? "Retirar imagen"
+              : product?.isActive
+                ? "Desactivar producto"
+                : "Activar producto";
+
+  const modalSize =
+    editor?.kind === "create" || editor?.kind === "edit"
+      ? "form"
+      : editor?.kind === "detail"
+        ? "detail"
+        : "small";
+
+  const modalDescription =
+    editor?.kind === "create"
+      ? "Define la información comercial y cómo se atiende el producto."
+      : editor?.kind === "edit"
+        ? "Datos comerciales, clasificación y forma de atención."
+        : editor?.kind === "detail"
+          ? "Información comercial y atención del producto."
+          : (product?.name ?? "");
 
   return (
     <div className="products-page">
       {resource.loading && (
-        <div className="py-10">
-          <LoadingState message="Cargando productos…" />
-        </div>
+        <LoadingState message="Cargando productos…" />
       )}
 
       {resource.error && (
@@ -124,10 +176,10 @@ function ProductsContent({ session }: { session: AuthSession }) {
           <Button
             size="sm"
             variant="secondary"
-            className="mt-3"
+            disabled={resource.busy}
             onClick={resource.retry}
           >
-            Reintentar
+            Reintentar consulta
           </Button>
         </Alert>
       )}
@@ -137,7 +189,7 @@ function ProductsContent({ session }: { session: AuthSession }) {
           products={resource.data.products}
           categories={resource.data.categories}
           disabled={resource.busy || !!editor}
-          onAction={handleAction}
+          onAction={onAction}
           onCreate={() => {
             setNotice(null);
             setEditor({ kind: "create" });
@@ -145,8 +197,8 @@ function ProductsContent({ session }: { session: AuthSession }) {
         />
       )}
 
-      {notice && (
-        <div className="fixed inset-x-4 bottom-24 z-40 sm:left-auto sm:bottom-6 sm:w-96">
+      {notice && !editor && (
+        <div className="fixed inset-x-4 bottom-24 z-40 sm:bottom-6 sm:left-auto sm:w-96">
           <Alert variant={notice.error ? "error" : "success"}>
             {notice.message}
           </Alert>
@@ -158,54 +210,74 @@ function ProductsContent({ session }: { session: AuthSession }) {
           id={modalId}
           open
           variant="modal"
+          title={title}
           busy={resource.busy}
-          className="products-page"
-          title={
-            editor.kind === "create"
-              ? "Nuevo producto"
-              : editor.kind === "edit"
-                ? "Editar producto"
-                : editor.kind === "image"
-                  ? "Imagen del producto"
-                  : editor.kind === "inventory"
-                    ? "Configurar inventario"
-                    : "Composición del combo"
-          }
+          className={`products-page product-modal product-modal--${modalSize}`}
           onClose={() => setEditor(null)}
         >
-          {editor.kind === "create" ? (
-            <ProductCreateForm
-              categories={resource.data.categories}
-              areas={resource.data.areas}
-              busy={resource.busy}
-              onSave={save}
-              onCancel={() => setEditor(null)}
-            />
-          ) : editor.kind === "image" ? (
-            <ProductImageForm
-              product={editor.product}
-              busy={resource.busy}
-              onSave={save}
-              onCancel={() => setEditor(null)}
-            />
-          ) : editor.kind === "combo" ? (
-            <ComboDetails
-              key={editor.product.id}
-              product={editor.product}
-              accessToken={session.accessToken}
-            />
-          ) : (
-            <ProductDataForm
-              key={`${editor.kind}:${editor.product.id}`}
-              kind={editor.kind}
-              product={editor.product}
-              categories={resource.data.categories}
-              areas={resource.data.areas}
-              busy={resource.busy}
-              onSave={save}
-              onCancel={() => setEditor(null)}
-            />
-          )}
+          <p className="product-modal-description">
+            {modalDescription}
+          </p>
+
+          <div className="product-modal-body">
+            {notice && (
+              <div className="product-modal-notice">
+                <Alert variant={notice.error ? "error" : "success"}>
+                  {notice.message}
+                </Alert>
+              </div>
+            )}
+
+            {editor.kind === "create" ? (
+              <ProductForm
+                products={resource.data.products}
+                categories={resource.data.categories}
+                areas={resource.data.areas}
+                busy={resource.busy}
+                onSave={save}
+                onCancel={() => setEditor(null)}
+              />
+            ) : !product ? (
+              <div className="product-modal-section">
+                <Alert>
+                  Este producto ya no aparece en el listado. Actualiza
+                  la consulta.
+                </Alert>
+              </div>
+            ) : editor.kind === "image" ? (
+              <ProductImageForm
+                key={product.id}
+                product={product}
+                busy={resource.busy}
+                onSave={save}
+                onCancel={() => setEditor(null)}
+              />
+            ) : editor.kind === "status" ||
+              editor.kind === "remove-image" ? (
+              <ProductStatusConfirmDialog
+                key={`${product.id}:${editor.kind}`}
+                product={product}
+                kind={editor.kind}
+                busy={resource.busy}
+                onSave={save}
+                onCancel={() => setEditor(null)}
+              />
+            ) : (
+              <ProductEditor
+                key={`${product.id}:${editor.kind}:${revision}`}
+                product={product}
+                editing={editor.kind === "edit"}
+                token={session.accessToken}
+                products={resource.data.products}
+                categories={resource.data.categories}
+                areas={resource.data.areas}
+                busy={resource.busy}
+                onSave={save}
+                onCancel={() => setEditor(null)}
+                onAction={onAction}
+              />
+            )}
+          </div>
         </BottomSheet>
       )}
     </div>

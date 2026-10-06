@@ -2,34 +2,71 @@ import { z } from "zod";
 import { ApiError, request } from "../../../lib/http/client";
 import { getCategories } from "../../categories/services/category.service";
 import { getPreparationAreas } from "../../preparation-areas/services/preparation-area.service";
-import { productListSchema } from "../schemas/product.schema";
-import { comboDetailSchema } from "../schemas/product-action.schema";
-import type { ProductMutation } from "../schemas/product-action.schema";
+import {
+  productIdSchema,
+  productListSchema,
+  productDetailResponseSchema,
+} from "../schemas/product.schema";
+import {
+  comboResponseSchema,
+  componentsSchema,
+  productEditSchema,
+} from "../schemas/product-action.schema";
+import type {
+  CatalogDetail,
+  ProductMutation,
+} from "../schemas/product-action.schema";
 
 const savedSchema = z.object({
   status: z.literal("success"),
 });
 
-const idSchema = z.string().regex(/^[1-9]\d*$/);
-
 export async function getProductCatalog(
   accessToken: string,
   signal: AbortSignal
 ) {
-  const [response, categories, areas] = await Promise.all([
-    request("/products", productListSchema, {
-      accessToken,
-      signal,
-    }),
+  const [products, categories, areas] = await Promise.all([
+    getAllProducts(accessToken, signal),
     getCategories(accessToken, signal),
     getPreparationAreas(accessToken, signal),
   ]);
 
-  return {
-    products: response.data.products,
-    categories,
-    areas,
-  };
+  return { products, categories, areas };
+}
+
+async function getAllProducts(
+  accessToken: string,
+  signal: AbortSignal
+) {
+  const first = await request("/products", productListSchema, {
+    accessToken,
+    signal,
+  });
+
+  const products = [...first.data.products];
+  const pagination = first.data.pagination;
+
+  if (pagination) {
+    for (
+      let page = pagination.page + 1;
+      page <= pagination.totalPages;
+      page++
+    ) {
+      const result = await request(
+        `/products?page=${page}&pageSize=${pagination.pageSize}`,
+        productListSchema,
+        { accessToken, signal }
+      );
+
+      products.push(...result.data.products);
+    }
+  }
+
+  return [
+    ...new Map(
+      products.map((product) => [product.id, product])
+    ).values(),
+  ];
 }
 
 export function validateProductImage(file: File): string | null {
@@ -46,13 +83,46 @@ export function validateProductImage(file: File): string | null {
   return null;
 }
 
+export async function getProductDetail(
+  id: string,
+  isCombo: boolean,
+  accessToken: string,
+  signal: AbortSignal
+): Promise<CatalogDetail> {
+  const validId = productIdSchema.parse(id);
+
+  if (isCombo) {
+    const result = await request(
+      `/products/combos/${validId}`,
+      comboResponseSchema,
+      { accessToken, signal }
+    );
+
+    return result.data.product;
+  }
+
+  const result = await request(
+    `/products/${validId}`,
+    productDetailResponseSchema,
+    { accessToken, signal }
+  );
+
+  return result.data.product;
+}
+
 export async function saveProduct(
   action: ProductMutation,
   accessToken: string,
   signal: AbortSignal
 ) {
+  const options = { accessToken, signal };
+
   if (action.kind === "create") {
-    let body: unknown = action.input;
+    const input = productEditSchema.parse(action.input);
+
+    const components = action.isCombo
+      ? componentsSchema.parse(action.components)
+      : undefined;
 
     if (action.file) {
       const error = validateProductImage(action.file);
@@ -60,93 +130,94 @@ export async function saveProduct(
       if (error) {
         throw new ApiError(400, "INVALID_IMAGE", error);
       }
+    }
 
+    let body: unknown = input;
+
+    if (action.file || action.isCombo) {
       const form = new FormData();
 
-      for (const [key, value] of Object.entries(action.input)) {
+      for (const [key, value] of Object.entries(input)) {
         if (value !== null) {
           form.append(key, value);
         }
       }
 
-      form.append("image", action.file);
+      if (components) {
+        form.append("components", JSON.stringify(components));
+      }
+
+      if (action.file) {
+        form.append("image", action.file);
+      }
+
       body = form;
     }
 
-    await request("/products", savedSchema, {
-      method: "POST",
-      body,
-      accessToken,
-      signal,
-    });
+    await request(
+      action.isCombo ? "/products/combos" : "/products",
+      savedSchema,
+      {
+        ...options,
+        method: "POST",
+        body,
+      }
+    );
 
     return;
   }
-  const id = idSchema.parse(action.id);
 
-  let path = `/products/${id}`;
-  let method: "PATCH" | "POST" | "PUT" | "DELETE" = "PATCH";
-  let body: unknown;
+  const id = productIdSchema.parse(action.id);
 
-  switch (action.kind) {
-    case "edit":
-      if (action.isCombo) {
-        path = `/products/combos/${id}`;
+  if (action.kind === "edit") {
+    const input = productEditSchema.partial().parse(action.input);
+
+    const body =
+      action.isCombo && action.components !== undefined
+        ? {
+            ...input,
+            components: componentsSchema.parse(action.components),
+          }
+        : input;
+
+    await request(
+      action.isCombo ? `/products/combos/${id}` : `/products/${id}`,
+      savedSchema,
+      {
+        ...options,
+        method: "PATCH",
+        body,
       }
-      body = action.input;
-      break;
+    );
+  } else if (action.kind === "status") {
+    await request(`/products/${id}/status`, savedSchema, {
+      ...options,
+      method: "PATCH",
+      body: { isActive: action.isActive },
+    });
+  } else if (action.kind === "image") {
+    const error = validateProductImage(action.file);
 
-    case "status":
-      path += "/status";
-      body = { isActive: action.isActive };
-      break;
-
-    case "inventory":
-      path += "/inventory-setup";
-      method = "POST";
-      body = action.input;
-      break;
-
-    case "image": {
-      const error = validateProductImage(action.file);
-
-      if (error) {
-        throw new ApiError(400, "INVALID_IMAGE", error);
-      }
-
-      const form = new FormData();
-      form.append("image", action.file);
-
-      path += "/image";
-      method = "PUT";
-      body = form;
-      break;
+    if (error) {
+      throw new ApiError(400, "INVALID_IMAGE", error);
     }
 
-    case "remove-image":
-      path += "/image";
-      method = "DELETE";
-      break;
+    const form = new FormData();
+    form.append("image", action.file);
+
+    await request(`/products/${id}/image`, savedSchema, {
+      ...options,
+      method: "PUT",
+      body: form,
+    });
+  } else {
+    await request(
+      `/products/${id}/image`,
+      z.union([savedSchema, z.null()]),
+      {
+        ...options,
+        method: "DELETE",
+      }
+    );
   }
-
-  await request(path, savedSchema, {
-    method,
-    body,
-    accessToken,
-    signal,
-  });
-}
-
-export async function getComboDetail(
-  id: string,
-  accessToken: string,
-  signal: AbortSignal
-) {
-  const response = await request(
-    `/products/combos/${idSchema.parse(id)}`,
-    comboDetailSchema,
-    { accessToken, signal }
-  );
-
-  return response.data.combo;
 }
