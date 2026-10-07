@@ -6,6 +6,7 @@ import { AppShell } from "../layout/AppShell";
 import { CategoriesPage } from "../../features/categories/pages/CategoriesPage";
 import { ProductsPage } from "../../features/products/pages/ProductsPage";
 import { SalesPage } from "../../features/sales/pages/SalesPage";
+import { KitchenPage } from "../../features/kitchen/pages/KitchenPage";
 import {
   GuestOnly,
   RequireAuth,
@@ -25,6 +26,8 @@ export function AppRouter() {
           <Route element={<AppShell />}>
             <Route path="/panel" element={<DashboardPage />} />
             <Route path="/ventas" element={<SalesPage />} />
+            <Route path="/cocina" element={<KitchenPage />} />
+            <Route path="/panel" element={<DashboardPage />} />
 
             <Route
               path="/productos/categorias"

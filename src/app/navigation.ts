@@ -1,5 +1,4 @@
 import {
-  Bike,
   BookOpen,
   Boxes,
   ChartNoAxesColumnIncreasing,
@@ -61,6 +60,7 @@ const navigation: readonly NavigationItem[] = [
     status: "ready",
     to: "/ventas",
   },
+
   {
     id: "kitchen",
     label: "Cocina",
@@ -68,16 +68,8 @@ const navigation: readonly NavigationItem[] = [
     icon: Flame,
     roles: ["ADMIN", "KITCHEN"],
     group: "main",
-    status: "planned",
-  },
-  {
-    id: "deliveries",
-    label: "Pedidos y domicilios",
-    description: "Pedidos públicos y entregas.",
-    icon: Bike,
-    roles: ["ADMIN", "PUBLIC_ORDER_MANAGER", "DELIVERY_DRIVER"],
-    group: "main",
-    status: "planned",
+    status: "ready",
+    to: "/cocina",
   },
   {
     id: "inventory",

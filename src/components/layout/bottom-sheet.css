@@ -77,3 +77,65 @@
     cursor: not-allowed;
   }
 }
+
+@layer components {
+  .bottom-sheet-back {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--sazora-accent);
+    cursor: pointer;
+
+    transition: opacity 150ms ease;
+  }
+
+  .bottom-sheet-back::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: auto;
+
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .bottom-sheet-back svg {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  .bottom-sheet-back:focus-visible {
+    outline: 2px solid var(--sazora-accent);
+    outline-offset: -2px;
+  }
+
+  .bottom-sheet-back:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  @media (hover: hover) {
+    .bottom-sheet-back:enabled:hover {
+      opacity: 0.75;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bottom-sheet-back {
+      transition: none;
+    }
+  }
+}

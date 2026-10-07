@@ -87,7 +87,10 @@ export function SelectField({
 
           if (nextOpen) {
             setContainer(
-              trigger.current?.closest("dialog") ?? document.body
+              trigger.current?.closest("dialog") ??
+                (document.fullscreenElement instanceof HTMLElement
+                  ? document.fullscreenElement
+                  : document.body)
             );
           }
 

@@ -80,7 +80,7 @@ function ProductsContent({ session }: { session: AuthSession }) {
     setRevision((value) => value + 1);
 
     setEditor(
-      action.kind === "create"
+      action.kind === "create" || action.kind === "edit"
         ? null
         : { kind: "detail", id: action.id }
     );

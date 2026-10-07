@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
-import { X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 
 interface BottomSheetProps {
   id: string;
@@ -99,22 +99,37 @@ export function BottomSheet({
       }}
     >
       <div className="bottom-sheet-heading">
-        <h2 id={titleId}>{title}</h2>
+        <div className="flex min-w-0 items-center gap-0.5">
+          {" "}
+          {onBack && (
+            <button
+              type="button"
+              className="bottom-sheet-back"
+              aria-label="Volver al menú principal"
+              title="Volver al menú principal"
+              disabled={busy}
+              onClick={() => {
+                if (!busy) onBack();
+              }}
+            >
+              <ArrowLeft
+                aria-hidden="true"
+                size={20}
+                strokeWidth={1.75}
+              />
+            </button>
+          )}
+          <h2 id={titleId} className="min-w-0 break-words">
+            {title}
+          </h2>
+        </div>
 
         <button
           type="button"
-          aria-label={
-            onBack
-              ? "Volver a navegación"
-              : `Cerrar ${title.toLowerCase()}`
-          }
+          aria-label={`Cerrar ${title.toLowerCase()}`}
           className="bottom-sheet-close"
           disabled={busy}
-          onClick={() => {
-            if (!busy) {
-              (onBack ?? onClose)();
-            }
-          }}
+          onClick={requestClose}
         >
           <X aria-hidden="true" size={18} strokeWidth={1.75} />
         </button>
