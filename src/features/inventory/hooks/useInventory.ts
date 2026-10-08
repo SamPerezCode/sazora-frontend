@@ -11,6 +11,7 @@ interface Snapshot<T> {
   attempt: number;
   data: T[] | null;
   error: string | null;
+  errorStatus: number | null;
   updatedAt: number | null;
 }
 
@@ -54,6 +55,7 @@ function useResource<T extends { businessId: string }>(
           attempt,
           data,
           error: null,
+          errorStatus: null,
           updatedAt: Date.now(),
         });
       })
@@ -72,6 +74,8 @@ function useResource<T extends { businessId: string }>(
             attempt,
             data: keep ? previous.data : null,
             updatedAt: keep ? previous.updatedAt : null,
+            errorStatus:
+              cause instanceof ApiError ? cause.status : null,
             error:
               cause instanceof Error
                 ? cause.message
@@ -91,10 +95,18 @@ function useResource<T extends { businessId: string }>(
 
   return {
     data: current?.data ?? null,
+
+    // Durante un reintento ocultamos el error anterior.
     error: allowed
-      ? (current?.error ?? null)
+      ? pending
+        ? null
+        : (current?.error ?? null)
       : "No tienes permiso para consultar inventario.",
+
+    errorStatus: allowed ? (current?.errorStatus ?? null) : 403,
+
     updatedAt: current?.updatedAt ?? null,
+
     loading: pending && !current?.data,
     refreshing: pending && !!current?.data,
     pending,

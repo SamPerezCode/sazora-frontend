@@ -2,11 +2,19 @@ import type { ComponentPropsWithoutRef } from "react";
 import { LoaderCircle } from "lucide-react";
 
 interface ButtonProps extends ComponentPropsWithoutRef<"button"> {
-  variant?: "primary" | "secondary" | "danger";
+  variant?: "primary" | "secondary" | "cancel" | "danger";
   size?: "sm" | "md";
   loading?: boolean;
   loadingText?: string;
 }
+
+const outlinedDanger = [
+  "border border-[var(--sazora-action-danger)]",
+  "bg-transparent text-[var(--sazora-action-danger)]",
+  "shadow-none transition-colors",
+  "enabled:hover:bg-[var(--sazora-action-danger-hover)]",
+  "motion-reduce:transition-none",
+].join(" ");
 
 const variants = {
   primary:
@@ -15,8 +23,9 @@ const variants = {
   secondary:
     "border border-outline bg-surface text-heading enabled:hover:bg-secondary",
 
-  danger:
-    "border border-[#c45b4d] bg-transparent text-[#ae483c] transition-colors enabled:hover:bg-[#c45b4d]/10 dark:border-[#e58c7a] dark:text-[#efa38f] dark:enabled:hover:bg-[#e58c7a]/10 motion-reduce:transition-none",
+  cancel: outlinedDanger,
+
+  danger: outlinedDanger,
 };
 
 const sizes = {

@@ -172,7 +172,7 @@ export function CategoryForm({
       <div className="flex flex-wrap justify-end gap-2">
         <Button
           size="sm"
-          variant="secondary"
+          variant="cancel"
           disabled={busy}
           onClick={onCancel}
         >

@@ -13,6 +13,7 @@
 @import "../features/sales/sales.css";
 @import "../features/sales/sales-board.css";
 @import "../features/inventory/inventory.css";
+@import "../features/inventory/inventory-dialog.css";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
@@ -92,5 +93,81 @@
 
   #root {
     min-height: 100svh;
+  }
+}
+
+/* Colores compartidos de cancelación y acciones destructivas. */
+
+:root {
+  --sazora-action-danger: #b84343;
+  --sazora-action-danger-hover: rgb(184 67 67 / 9%);
+}
+
+:root[data-theme="dark"] {
+  --sazora-action-danger: #f09089;
+  --sazora-action-danger-hover: rgb(240 144 137 / 10%);
+}
+
+/* Cierre de modales y avisos. */
+
+:root button:is(.bottom-sheet-close, .app-close-button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+
+  border: 0;
+  border-radius: 0.75rem;
+
+  color: var(--sazora-accent);
+  background: var(--close-button-background, transparent);
+
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    opacity 150ms ease;
+}
+
+:root button:is(.bottom-sheet-close, .app-close-button) svg {
+  color: inherit;
+}
+
+:root
+  button:is(.bottom-sheet-close, .app-close-button):enabled:hover {
+  color: var(--sazora-accent);
+
+  background: color-mix(
+    in srgb,
+    var(--sazora-accent) 10%,
+    var(--close-button-background, transparent)
+  );
+}
+
+:root
+  button:is(.bottom-sheet-close, .app-close-button):focus-visible {
+  outline: 2px solid var(--sazora-accent);
+  outline-offset: 2px;
+}
+
+:root button:is(.bottom-sheet-close, .app-close-button):disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* En los encabezados naranjas, una base neutra permite
+   distinguir la X sin cambiar su color corporativo. */
+
+:root .sales-workspace .bottom-sheet-close,
+:root .sales-quantity-dialog .bottom-sheet-close {
+  --close-button-background: var(--sazora-surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root button:is(.bottom-sheet-close, .app-close-button) {
+    transition: none;
   }
 }

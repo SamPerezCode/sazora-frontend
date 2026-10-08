@@ -23,6 +23,8 @@ import { InventoryList } from "../components/InventoryList";
 import type { InventoryAction } from "../components/InventoryActions";
 import { useInventory } from "../hooks/useInventory";
 import type { InventoryItem } from "../schemas/inventory.schema";
+import { InventoryDialog } from "../components/InventoryDialog";
+import type { InventoryDialogAction } from "../components/InventoryDialog";
 import {
   dayKey,
   formatQuantity,
@@ -31,6 +33,12 @@ import {
   unitLabels,
   validTimeZone,
 } from "../utils/inventory-format";
+
+import {
+  InventorySkeleton,
+  InventoryLoadError,
+  InventoryEmptyState,
+} from "../components/InventoryStates";
 
 const actionLabels: Record<InventoryAction, string> = {
   detail: "Ver detalle",
@@ -65,6 +73,9 @@ function InventoryScreen() {
   const [pageSize, setPageSize] = useState(10);
 
   const [notice, setNotice] = useState("");
+  const [dialog, setDialog] = useState<InventoryDialogAction | null>(
+    null
+  );
   const [clock, setClock] = useState(Date.now);
 
   useEffect(() => {
@@ -177,14 +188,21 @@ function InventoryScreen() {
   }
 
   function onAction(action: InventoryAction, item: InventoryItem) {
-    const label =
+    if (
+      action === "detail" ||
+      action === "edit" ||
+      action === "movement" ||
       action === "status"
-        ? item.isActive
-          ? "Desactivar"
-          : "Activar"
-        : actionLabels[action];
+    ) {
+      setDialog({
+        kind: action,
+        id: item.id,
+      });
 
-    pendingScreen(label + " · " + item.name);
+      return;
+    }
+
+    pendingScreen(actionLabels[action] + " · " + item.name);
   }
 
   return (
@@ -229,324 +247,298 @@ function InventoryScreen() {
         </button>
       </nav>
 
-      <header className="inventory-heading">
-        <div>
-          <h2>Inventario</h2>
-
-          <p>
-            {items
-              ? active.length + " artículos activos"
-              : "Consulta de existencias"}
-
-            {updatedLabel && " · Actualizado " + updatedLabel}
-
-            {resource.items.refreshing && " · Actualizando…"}
-          </p>
-        </div>
-
-        <div className="inventory-buttons">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={resource.refresh}
-            loading={resource.pending}
-            loadingText="Actualizando…"
-          >
-            <RefreshCw size={16} />
-            Actualizar
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={() => pendingScreen("Nuevo artículo")}
-          >
-            <PackagePlus size={16} />
-            Nuevo artículo
-          </Button>
-        </div>
-      </header>
-
-      {productId && (
-        <p className="inventory-message">
-          Llegaste desde el producto #{productId}. Su configuración de
-          inventario estará disponible en la siguiente etapa.
-        </p>
-      )}
-
-      {notice && (
-        <div className="inventory-message" role="status">
-          <span>{notice}</span>
-
-          <button
-            type="button"
-            onClick={() => setNotice("")}
-            aria-label="Cerrar aviso"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
-      {resource.items.error && (
-        <div
-          className="inventory-message inventory-error"
-          role="alert"
-        >
-          <span>
-            {resource.items.error}
-
-            {items &&
-              " Se conserva la última consulta; los datos pueden estar desactualizados."}
-          </span>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={resource.refresh}
-            disabled={resource.pending}
-          >
-            Reintentar
-          </Button>
-        </div>
-      )}
-
-      <div className="inventory-metrics">
-        {[
-          {
-            label: "Artículos activos",
-            value: items ? active.length : null,
-            Icon: Boxes,
-            tone: "normal",
-          },
-          {
-            label: "Agotados",
-            value: items ? exhausted.length : null,
-            Icon: CircleX,
-            tone: "danger",
-          },
-          {
-            label: "Bajo el mínimo",
-            value: items ? low.length : null,
-            Icon: TriangleAlert,
-            tone: "warning",
-          },
-          {
-            label: "Movimientos hoy",
-            value: todayCount,
-            Icon: History,
-            tone: "normal",
-          },
-        ].map(({ label, value, Icon, tone }) => (
-          <div
-            key={label}
-            className="inventory-metric"
-            data-tone={tone}
-          >
-            <span className="inventory-metric-icon">
-              <Icon size={21} aria-hidden="true" />
-            </span>
-
+      {resource.items.loading ? (
+        <InventorySkeleton />
+      ) : items === null ? (
+        <InventoryLoadError
+          message={resource.items.error}
+          status={resource.items.errorStatus}
+          busy={resource.items.pending}
+          onRetry={resource.refresh}
+        />
+      ) : (
+        <>
+          <header className="inventory-heading">
             <div>
-              <p>{label}</p>
-              <strong>{value ?? "—"}</strong>
+              <h2>Inventario</h2>
+
+              <p>
+                {items
+                  ? active.length + " artículos activos"
+                  : "Consulta de existencias"}
+
+                {updatedLabel && " · Actualizado " + updatedLabel}
+
+                {resource.items.refreshing && " · Actualizando…"}
+              </p>
             </div>
-          </div>
-        ))}
-      </div>
 
-      {(resource.movements.error || !zone) && (
-        <p className="inventory-muted" role="status">
-          {resource.movements.error
-            ? "No se actualizó el contador de movimientos: " +
-              resource.movements.error
-            : "El contador de hoy requiere la zona horaria del negocio."}
-        </p>
-      )}
+            <div className="inventory-buttons">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={resource.refresh}
+                loading={resource.pending}
+                loadingText="Actualizando…"
+              >
+                <RefreshCw size={16} />
+                Actualizar
+              </Button>
 
-      {critical.length > 0 && (
-        <div className="inventory-attention">
-          <details>
-            <summary>
-              <TriangleAlert size={18} />
+              <Button
+                size="sm"
+                onClick={() => pendingScreen("Nuevo artículo")}
+              >
+                <PackagePlus size={16} />
+                Nuevo artículo
+              </Button>
+            </div>
+          </header>
 
+          {productId && (
+            <p className="inventory-message">
+              Llegaste desde el producto #{productId}. Su
+              configuración de inventario estará disponible en la
+              siguiente etapa.
+            </p>
+          )}
+
+          {notice && (
+            <div className="inventory-message" role="status">
+              <span>{notice}</span>
+
+              <button
+                type="button"
+                onClick={() => setNotice("")}
+                aria-label="Cerrar aviso"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
+          {resource.items.error && (
+            <div
+              className="inventory-message inventory-error"
+              role="alert"
+            >
               <span>
-                Hay {critical.length} artículos que requieren
-                atención.
+                {resource.items.error}
+
+                {items &&
+                  " Se conserva la última consulta; los datos pueden estar desactualizados."}
               </span>
 
-              <ChevronDown size={16} />
-            </summary>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={resource.refresh}
+                disabled={resource.pending}
+              >
+                Reintentar
+              </Button>
+            </div>
+          )}
 
-            <ul>
-              {critical.map((item) => (
-                <li key={item.id}>
-                  <strong>{item.name}</strong>
+          <div className="inventory-metrics">
+            {[
+              {
+                label: "Artículos activos",
+                value: items ? active.length : null,
+                Icon: Boxes,
+                tone: "normal",
+              },
+              {
+                label: "Agotados",
+                value: items ? exhausted.length : null,
+                Icon: CircleX,
+                tone: "danger",
+              },
+              {
+                label: "Bajo el mínimo",
+                value: items ? low.length : null,
+                Icon: TriangleAlert,
+                tone: "warning",
+              },
+              {
+                label: "Movimientos hoy",
+                value: todayCount,
+                Icon: History,
+                tone: "normal",
+              },
+            ].map(({ label, value, Icon, tone }) => (
+              <div
+                key={label}
+                className="inventory-metric"
+                data-tone={tone}
+              >
+                <span className="inventory-metric-icon">
+                  <Icon size={21} aria-hidden="true" />
+                </span>
 
-                  <span>
-                    {formatQuantity(item.currentStock)}{" "}
-                    {unitLabels[item.baseUnit]}
-                    {" · Mínimo "}
-                    {formatQuantity(item.minimumStock)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </details>
-
-          <div className="inventory-buttons">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={showCritical}
-            >
-              Ver artículos críticos
-            </Button>
-
-            <Button
-              size="sm"
-              onClick={() => pendingScreen("Registrar entrada")}
-            >
-              <Plus size={16} />
-              Registrar entrada
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <div className="inventory-filters">
-        <div className="inventory-search">
-          <label htmlFor="inventory-search" className="sr-only">
-            Buscar por nombre o SKU
-          </label>
-
-          <Search size={16} aria-hidden="true" />
-
-          <input
-            id="inventory-search"
-            type="search"
-            value={search}
-            placeholder="Buscar por nombre o SKU"
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
-
-        <SelectField
-          label="Tipo de artículo"
-          hideLabel
-          value={type}
-          options={[
-            {
-              value: "ALL",
-              label: "Todos los tipos",
-            },
-            ...Object.entries(itemTypeLabels).map(
-              ([value, label]) => ({ value, label })
-            ),
-          ]}
-          onValueChange={(value) => {
-            setType(value);
-            setPage(1);
-          }}
-        />
-
-        <SelectField
-          label="Existencias"
-          hideLabel
-          value={stock}
-          options={[
-            { value: "ALL", label: "Todo el stock" },
-            {
-              value: "ATTENTION",
-              label: "Requieren atención",
-            },
-            {
-              value: "OUT_OF_STOCK",
-              label: "Agotado",
-            },
-            {
-              value: "LOW_STOCK",
-              label: "Bajo mínimo",
-            },
-            {
-              value: "AVAILABLE",
-              label: "Disponible",
-            },
-          ]}
-          onValueChange={(value) => {
-            setStock(value);
-            setPage(1);
-          }}
-        />
-
-        <SelectField
-          label="Estado del artículo"
-          hideLabel
-          value={activity}
-          options={[
-            {
-              value: "ALL",
-              label: "Activos e inactivos",
-            },
-            {
-              value: "ACTIVE",
-              label: "Solo activos",
-            },
-            {
-              value: "INACTIVE",
-              label: "Solo inactivos",
-            },
-          ]}
-          onValueChange={(value) => {
-            setActivity(value);
-            setPage(1);
-          }}
-        />
-
-        {filteredByUser && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={clearFilters}
-          >
-            <FilterX size={16} />
-            Limpiar filtros
-          </Button>
-        )}
-      </div>
-
-      <div aria-busy={resource.items.pending}>
-        {resource.items.loading ? (
-          <div className="inventory-loading" role="status">
-            <span className="sr-only">Cargando existencias…</span>
-
-            {Array.from({ length: 6 }, (_, index) => (
-              <div key={index} />
+                <div>
+                  <p>{label}</p>
+                  <strong>{value ?? "—"}</strong>
+                </div>
+              </div>
             ))}
           </div>
-        ) : items && visible.length > 0 ? (
-          <InventoryList items={visible} onAction={onAction} />
-        ) : (
-          <div className="inventory-empty">
-            <Boxes size={32} aria-hidden="true" />
 
-            <h3>
-              {resource.items.error && !items
-                ? "No se pudieron cargar las existencias"
-                : items?.length
-                  ? "Sin resultados"
-                  : "Todavía no hay artículos"}
-            </h3>
-
-            <p>
-              {items?.length
-                ? "Prueba con otros filtros o modifica la búsqueda."
-                : resource.items.error
-                  ? "Reintenta la consulta para continuar."
-                  : "Aquí aparecerán los artículos registrados en inventario."}
+          {(resource.movements.error || !zone) && (
+            <p className="inventory-muted" role="status">
+              {resource.movements.error
+                ? "No se actualizó el contador de movimientos: " +
+                  resource.movements.error
+                : "El contador de hoy requiere la zona horaria del negocio."}
             </p>
+          )}
+
+          {critical.length > 0 && (
+            <div className="inventory-attention">
+              <details>
+                <summary>
+                  <TriangleAlert size={18} />
+
+                  <span>
+                    Hay {critical.length} artículos que requieren
+                    atención.
+                  </span>
+
+                  <ChevronDown size={16} />
+                </summary>
+
+                <ul>
+                  {critical.map((item) => (
+                    <li key={item.id}>
+                      <strong>{item.name}</strong>
+
+                      <span>
+                        {formatQuantity(item.currentStock)}{" "}
+                        {unitLabels[item.baseUnit]}
+                        {" · Mínimo "}
+                        {formatQuantity(item.minimumStock)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+
+              <div className="inventory-buttons">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={showCritical}
+                >
+                  Ver artículos críticos
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    setDialog({
+                      kind: "movement",
+                      initialType: "PURCHASE",
+                    })
+                  }
+                >
+                  <Plus size={16} />
+                  Registrar entrada
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="inventory-filters">
+            <div className="inventory-search">
+              <label htmlFor="inventory-search" className="sr-only">
+                Buscar por nombre o SKU
+              </label>
+
+              <Search size={16} aria-hidden="true" />
+
+              <input
+                id="inventory-search"
+                type="search"
+                value={search}
+                placeholder="Buscar por nombre o SKU"
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+
+            <SelectField
+              label="Tipo de artículo"
+              hideLabel
+              value={type}
+              options={[
+                {
+                  value: "ALL",
+                  label: "Todos los tipos",
+                },
+                ...Object.entries(itemTypeLabels).map(
+                  ([value, label]) => ({ value, label })
+                ),
+              ]}
+              onValueChange={(value) => {
+                setType(value);
+                setPage(1);
+              }}
+            />
+
+            <SelectField
+              label="Existencias"
+              hideLabel
+              value={stock}
+              options={[
+                { value: "ALL", label: "Todo el stock" },
+                {
+                  value: "ATTENTION",
+                  label: "Requieren atención",
+                },
+                {
+                  value: "OUT_OF_STOCK",
+                  label: "Agotado",
+                },
+                {
+                  value: "LOW_STOCK",
+                  label: "Bajo mínimo",
+                },
+                {
+                  value: "AVAILABLE",
+                  label: "Disponible",
+                },
+              ]}
+              onValueChange={(value) => {
+                setStock(value);
+                setPage(1);
+              }}
+            />
+
+            <SelectField
+              label="Estado del artículo"
+              hideLabel
+              value={activity}
+              options={[
+                {
+                  value: "ALL",
+                  label: "Activos e inactivos",
+                },
+                {
+                  value: "ACTIVE",
+                  label: "Solo activos",
+                },
+                {
+                  value: "INACTIVE",
+                  label: "Solo inactivos",
+                },
+              ]}
+              onValueChange={(value) => {
+                setActivity(value);
+                setPage(1);
+              }}
+            />
 
             {filteredByUser && (
               <Button
@@ -554,39 +546,64 @@ function InventoryScreen() {
                 size="sm"
                 onClick={clearFilters}
               >
+                <FilterX size={16} />
                 Limpiar filtros
               </Button>
             )}
           </div>
-        )}
-      </div>
 
-      {filtered.length > 10 && (
-        <Pagination
-          page={currentPage}
-          pageSize={pageSize}
-          totalItems={filtered.length}
-          itemLabel="artículos"
-          totalLabel={
-            filteredByUser
-              ? (items?.length ?? 0) + " artículos en total"
-              : undefined
-          }
-          controlsId="inventory-results"
-          onPageChange={setPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setPage(1);
-          }}
-        />
+          <div aria-busy={resource.items.refreshing}>
+            {visible.length > 0 ? (
+              <InventoryList items={visible} onAction={onAction} />
+            ) : (
+              <InventoryEmptyState
+                filtered={items.length > 0}
+                onClear={clearFilters}
+                onCreate={() => pendingScreen("Nuevo artículo")}
+              />
+            )}
+          </div>
+
+          {filtered.length > 10 && (
+            <Pagination
+              page={currentPage}
+              pageSize={pageSize}
+              totalItems={filtered.length}
+              itemLabel="artículos"
+              totalLabel={
+                filteredByUser
+                  ? (items?.length ?? 0) + " artículos en total"
+                  : undefined
+              }
+              controlsId="inventory-results"
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+            />
+          )}
+
+          {items && filtered.length <= 10 && (
+            <p className="inventory-muted" role="status">
+              {filtered.length}{" "}
+              {filtered.length === 1 ? "artículo" : "artículos"}
+              {filteredByUser && " · " + items.length + " en total"}
+            </p>
+          )}
+        </>
       )}
 
-      {items && filtered.length <= 10 && (
-        <p className="inventory-muted" role="status">
-          {filtered.length}{" "}
-          {filtered.length === 1 ? "artículo" : "artículos"}
-          {filteredByUser && " · " + items.length + " en total"}
-        </p>
+      {dialog && (
+        <InventoryDialog
+          key={session.accessToken}
+          action={dialog}
+          onClose={() => setDialog(null)}
+          onChanged={(message) => {
+            setNotice(message);
+            resource.refresh();
+          }}
+        />
       )}
     </section>
   );

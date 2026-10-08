@@ -547,3 +547,163 @@
     }
   }
 }
+
+@layer components {
+  /* Estado vacío y error inicial */
+
+  .inventory-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.125rem;
+
+    min-height: 18rem;
+    padding: 2.5rem 1.25rem;
+
+    border: 1px solid var(--sazora-outline);
+    border-radius: 1rem;
+    background: var(--sazora-surface);
+
+    text-align: center;
+  }
+
+  .inventory-state-icon {
+    display: grid;
+    place-items: center;
+
+    width: 3rem;
+    height: 3rem;
+
+    border-radius: 50%;
+    color: var(--sazora-muted);
+
+    background: color-mix(
+      in srgb,
+      var(--sazora-secondary) 70%,
+      transparent
+    );
+  }
+
+  .inventory-state-copy {
+    display: grid;
+    gap: 0.5rem;
+
+    width: 100%;
+    max-width: 30rem;
+  }
+
+  .inventory-state-copy h3 {
+    margin: 0;
+    color: var(--sazora-heading);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .inventory-state-copy p {
+    margin: 0;
+    color: var(--sazora-muted);
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+  }
+
+  /* Esqueleto de carga inicial */
+
+  .inventory-skeleton {
+    min-width: 0;
+  }
+
+  .inventory-skeleton-layout {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .inventory-skeleton-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .inventory-skeleton-block {
+    background: color-mix(
+      in srgb,
+      var(--sazora-muted) 12%,
+      var(--sazora-surface)
+    );
+  }
+
+  .inventory-skeleton-metric {
+    height: 5rem;
+    border-radius: 1rem;
+  }
+
+  .inventory-skeleton-toolbar {
+    height: 3rem;
+    border-radius: 0.875rem;
+  }
+
+  .inventory-skeleton-table {
+    display: grid;
+    gap: 0.5rem;
+
+    padding: 1rem;
+
+    border: 1px solid var(--sazora-outline);
+    border-radius: 1rem;
+    background: var(--sazora-surface);
+  }
+
+  .inventory-skeleton-row {
+    height: 2.5rem;
+    border-radius: 0.625rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .inventory-skeleton-block {
+      animation: inventory-state-pulse 1.4s ease-in-out infinite
+        alternate;
+    }
+  }
+
+  @keyframes inventory-state-pulse {
+    from {
+      opacity: 0.55;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  @container inventory (min-width: 38rem) {
+    .inventory-skeleton-metrics {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @container inventory (max-width: 37.99rem) {
+    .inventory-state {
+      min-height: 16rem;
+      padding: 2rem 1rem;
+    }
+
+    .inventory-skeleton-table {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      gap: 0.75rem;
+    }
+
+    .inventory-skeleton-row {
+      height: 8rem;
+      border: 1px solid var(--sazora-outline);
+      border-radius: 0.875rem;
+    }
+
+    .inventory-skeleton-row:nth-child(n + 4) {
+      display: none;
+    }
+  }
+}

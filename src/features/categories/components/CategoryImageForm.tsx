@@ -207,7 +207,7 @@ export function CategoryImageForm({
       <footer className="product-modal-footer">
         <Button
           size="sm"
-          variant="secondary"
+          variant="cancel"
           disabled={locked}
           onClick={onCancel}
         >

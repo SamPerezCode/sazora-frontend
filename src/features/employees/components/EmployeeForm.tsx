@@ -329,7 +329,7 @@ export function EmployeeForm({
       <div className="grid grid-cols-2 gap-2">
         <Button
           size="sm"
-          variant="secondary"
+          variant="cancel"
           disabled={busy}
           onClick={onCancel}
         >

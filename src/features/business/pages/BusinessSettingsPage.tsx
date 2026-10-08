@@ -455,7 +455,7 @@ function BusinessSettingsEditor({
 
                                 <Button
                                   size="sm"
-                                  variant="secondary"
+                                  variant="cancel"
                                   onClick={editor.clearSelection}
                                 >
                                   Cancelar selección
