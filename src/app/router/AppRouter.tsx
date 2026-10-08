@@ -7,6 +7,8 @@ import { CategoriesPage } from "../../features/categories/pages/CategoriesPage";
 import { ProductsPage } from "../../features/products/pages/ProductsPage";
 import { SalesPage } from "../../features/sales/pages/SalesPage";
 import { KitchenPage } from "../../features/kitchen/pages/KitchenPage";
+import { InventoryPage } from "../../features/inventory/pages/InventoryPage";
+
 import {
   GuestOnly,
   RequireAuth,
@@ -34,6 +36,14 @@ export function AppRouter() {
               element={
                 <RequireRole role="ADMIN">
                   <CategoriesPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/inventario"
+              element={
+                <RequireRole role="ADMIN">
+                  <InventoryPage />
                 </RequireRole>
               }
             />

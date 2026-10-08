@@ -78,7 +78,8 @@ const navigation: readonly NavigationItem[] = [
     icon: Boxes,
     roles: ["ADMIN"],
     group: "main",
-    status: "planned",
+    status: "ready",
+    to: "/inventario",
   },
   {
     id: "products",

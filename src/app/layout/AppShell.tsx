@@ -30,6 +30,7 @@ export function AppShell() {
 
   const isSettings = location.pathname === "/mi-negocio";
   const isPanel = location.pathname === "/panel";
+  const isInventory = location.pathname === "/inventario";
   const dashboard = useDashboard(session, isPanel);
 
   if (!session || !business) {
@@ -82,14 +83,18 @@ export function AppShell() {
               ? `Buen servicio, ${session.user.fullName.trim().split(/\s+/)[0]}`
               : isSettings
                 ? "Mi negocio"
-                : (current?.label ?? "Panel")
+                : isInventory
+                  ? "Gestión de inventario"
+                  : (current?.label ?? "Panel")
           }
           subtitle={
             isSettings
               ? "Personaliza el perfil, menú y documentos de tu restaurante."
-              : isPanel && dashboard.data
-                ? `${businessDate(dashboard.data.period.today)} · ${business.name}`
-                : business.name
+              : isInventory
+                ? "Controla existencias, movimientos, consumo por producto y producción."
+                : isPanel && dashboard.data
+                  ? `${businessDate(dashboard.data.period.today)} · ${business.name}`
+                  : business.name
           }
           session={session}
           business={business}
