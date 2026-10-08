@@ -25,6 +25,9 @@ import { useInventory } from "../hooks/useInventory";
 import type { InventoryItem } from "../schemas/inventory.schema";
 import { InventoryDialog } from "../components/InventoryDialog";
 import type { InventoryDialogAction } from "../components/InventoryDialog";
+import { InventoryCreateDialog } from "../components/InventoryCreateDialog";
+import { InventoryMovements } from "../components/InventoryMovements";
+import { InventoryConsumption } from "../components/InventoryConsumption";
 import {
   dayKey,
   formatQuantity,
@@ -40,15 +43,6 @@ import {
   InventoryEmptyState,
 } from "../components/InventoryStates";
 
-const actionLabels: Record<InventoryAction, string> = {
-  detail: "Ver detalle",
-  edit: "Editar información",
-  movement: "Registrar movimiento",
-  history: "Ver movimientos",
-  links: "Gestionar consumo por producto",
-  status: "Cambiar estado",
-};
-
 export function InventoryPage() {
   const { session } = useAppShell();
 
@@ -62,7 +56,10 @@ export function InventoryPage() {
 function InventoryScreen() {
   const { session, settings } = useAppShell();
   const resource = useInventory(session);
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+
+  const [creating, setCreating] = useState(false);
+  const [revision, setRevision] = useState(0);
 
   const [search, setSearch] = useState("");
   const [type, setType] = useState("ALL");
@@ -181,10 +178,37 @@ function InventoryScreen() {
     setPage(1);
   }
 
-  function pendingScreen(label: string) {
-    setNotice(
-      label + ": esta pantalla se habilitará en la siguiente etapa."
+  const tab =
+    params.get("tab") === "movements"
+      ? "movements"
+      : params.get("tab") === "consumption" || productId
+        ? "consumption"
+        : "stock";
+
+  function openTab(
+    next: "stock" | "movements" | "consumption",
+    itemId?: string
+  ) {
+    const nextParams = new URLSearchParams(params);
+
+    ["tab", "itemId", "productId", "setupProductId"].forEach((key) =>
+      nextParams.delete(key)
     );
+
+    if (next !== "stock") {
+      nextParams.set("tab", next);
+    }
+
+    if (itemId) {
+      nextParams.set("itemId", itemId);
+    }
+
+    setParams(nextParams);
+  }
+
+  function refreshInventory() {
+    resource.refresh();
+    setRevision((value) => value + 1);
   }
 
   function onAction(action: InventoryAction, item: InventoryItem) {
@@ -202,7 +226,10 @@ function InventoryScreen() {
       return;
     }
 
-    pendingScreen(actionLabels[action] + " · " + item.name);
+    openTab(
+      action === "history" ? "movements" : "consumption",
+      item.id
+    );
   }
 
   return (
@@ -214,15 +241,19 @@ function InventoryScreen() {
         className="inventory-tabs"
         aria-label="Secciones de inventario"
       >
-        <button type="button" aria-current="page">
+        <button
+          type="button"
+          aria-current={tab === "stock" ? "page" : undefined}
+          onClick={() => openTab("stock")}
+        >
           <Boxes size={16} />
           Existencias
         </button>
 
         <button
           type="button"
-          disabled
-          title="Disponible en la siguiente etapa"
+          aria-current={tab === "movements" ? "page" : undefined}
+          onClick={() => openTab("movements")}
         >
           <History size={16} />
           Movimientos
@@ -230,8 +261,8 @@ function InventoryScreen() {
 
         <button
           type="button"
-          disabled
-          title="Disponible en la siguiente etapa"
+          aria-current={tab === "consumption" ? "page" : undefined}
+          onClick={() => openTab("consumption")}
         >
           <Link2 size={16} />
           Consumo por producto
@@ -240,14 +271,46 @@ function InventoryScreen() {
         <button
           type="button"
           disabled
-          title="Disponible en la siguiente etapa"
+          title="Disponible en la última etapa"
         >
           <Factory size={16} />
           Producción
         </button>
       </nav>
 
-      {resource.items.loading ? (
+      {tab === "movements" ? (
+        <InventoryMovements
+          key={"movements:" + (params.get("itemId") ?? "")}
+          items={items ?? []}
+          initialItemId={params.get("itemId") ?? ""}
+          revision={revision}
+          onRegister={() =>
+            setDialog({
+              kind: "movement",
+            })
+          }
+        />
+      ) : tab === "consumption" ? (
+        <InventoryConsumption
+          key={
+            "consumption:" +
+            (params.get("itemId") ?? "") +
+            ":" +
+            (productId ?? "")
+          }
+          items={items ?? []}
+          initialItemId={params.get("itemId") ?? ""}
+          initialProductId={productId ?? ""}
+          revision={revision}
+          onItem={(id) =>
+            setDialog({
+              kind: "detail",
+              id,
+            })
+          }
+          onChanged={refreshInventory}
+        />
+      ) : resource.items.loading ? (
         <InventorySkeleton />
       ) : items === null ? (
         <InventoryLoadError
@@ -285,23 +348,12 @@ function InventoryScreen() {
                 Actualizar
               </Button>
 
-              <Button
-                size="sm"
-                onClick={() => pendingScreen("Nuevo artículo")}
-              >
+              <Button size="sm" onClick={() => setCreating(true)}>
                 <PackagePlus size={16} />
                 Nuevo artículo
               </Button>
             </div>
           </header>
-
-          {productId && (
-            <p className="inventory-message">
-              Llegaste desde el producto #{productId}. Su
-              configuración de inventario estará disponible en la
-              siguiente etapa.
-            </p>
-          )}
 
           {notice && (
             <div className="inventory-message" role="status">
@@ -559,7 +611,7 @@ function InventoryScreen() {
               <InventoryEmptyState
                 filtered={items.length > 0}
                 onClear={clearFilters}
-                onCreate={() => pendingScreen("Nuevo artículo")}
+                onCreate={() => setCreating(true)}
               />
             )}
           </div>
@@ -594,6 +646,21 @@ function InventoryScreen() {
         </>
       )}
 
+      {creating && (
+        <InventoryCreateDialog
+          key={session.accessToken}
+          onClose={() => {
+            setCreating(false);
+            refreshInventory();
+          }}
+          onSaved={() => {
+            setCreating(false);
+            setNotice("Artículo creado.");
+            refreshInventory();
+          }}
+        />
+      )}
+
       {dialog && (
         <InventoryDialog
           key={session.accessToken}
@@ -601,7 +668,7 @@ function InventoryScreen() {
           onClose={() => setDialog(null)}
           onChanged={(message) => {
             setNotice(message);
-            resource.refresh();
+            refreshInventory();
           }}
         />
       )}

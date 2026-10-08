@@ -165,7 +165,7 @@ export type MovementInput = z.output<typeof movementInputSchema>;
 
 const signed = z.string().regex(/^-?\d+(?:\.\d{1,3})?$/);
 
-const movementSchema = z.object({
+export const movementSchema = z.object({
   id: z.string(),
   businessId: z.string(),
   movementType: z.enum([

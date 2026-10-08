@@ -14,6 +14,7 @@
 @import "../features/sales/sales-board.css";
 @import "../features/inventory/inventory.css";
 @import "../features/inventory/inventory-dialog.css";
+@import "../features/inventory/inventory-workspace.css";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 

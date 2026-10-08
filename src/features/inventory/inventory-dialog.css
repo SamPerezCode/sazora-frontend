@@ -30,15 +30,22 @@
   }
 
   .bottom-sheet.bottom-sheet-modal.inv-drawer {
-    inset: 0 0 0 auto;
-    margin: 0;
+    position: fixed;
+    inset: 0;
+    margin: auto;
 
-    width: min(38rem, 100%);
-    max-width: none;
-    height: 100dvh;
-    max-height: 100dvh;
+    width: calc(100% - 2rem);
+    max-width: 38rem;
+    height: fit-content;
+    max-height: calc(100dvh - 2rem);
 
-    border-radius: 1rem 0 0 1rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+
+    border: 1px solid var(--sazora-outline);
+    border-radius: 1rem;
+    background: var(--sazora-surface);
+    box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 25%);
   }
 
   .inv-dialog > .bottom-sheet-heading {
