@@ -26,6 +26,7 @@ import type { SalesData } from "../services/sales.service";
 import type { SalesResource } from "../hooks/useSales";
 
 import { OrderCancellationActions } from "./OrderCancellationActions";
+import { CancelUnitsDialog } from "./CancelUnitsDialog";
 
 const PREPARATION_LABELS = {
   PENDING: "Pendiente",
@@ -51,6 +52,9 @@ export function OrderWorkspace({
   const [showAccount, setShowAccount] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const [partialItemId, setPartialItemId] = useState<string | null>(
+    null
+  );
 
   const accountId = useId();
   const searchId = useId();
@@ -209,6 +213,18 @@ export function OrderWorkspace({
 
   return (
     <div className="sales-order-body">
+      {partialItemId && order.id && (
+        <CancelUnitsDialog
+          key={partialItemId}
+          resource={resource}
+          orderId={order.id}
+          item={order.items.find((item) => item.id === partialItemId)}
+          preparationStatus={
+            ticketItems.get(partialItemId)?.preparationStatus
+          }
+          onClose={() => setPartialItemId(null)}
+        />
+      )}
       <div className="sales-order-meta">
         <span>
           {order.id
@@ -613,22 +629,43 @@ export function OrderWorkspace({
                     )}
 
                     {order.status === "CONFIRMED" &&
+                      item.status === "ACTIVE" &&
                       ticket &&
                       ["PENDING", "IN_PREPARATION", "READY"].includes(
                         ticket.preparationStatus
                       ) && (
-                        <button
-                          type="button"
-                          className="sales-link"
-                          disabled={blocked}
-                          onClick={() =>
-                            setEditing(
-                              editing === item.id ? null : item.id
-                            )
-                          }
-                        >
-                          Cancelar producto
-                        </button>
+                        <>
+                          {item.quantity > 1 && (
+                            <button
+                              type="button"
+                              className="sales-link sales-remove-product"
+                              disabled={blocked}
+                              onClick={() => {
+                                resource.clearNotice();
+                                setEditing(null);
+                                setPartialItemId(item.id);
+                              }}
+                            >
+                              <Minus size={15} aria-hidden="true" />
+                              Cancelar unidades
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            className="sales-link"
+                            disabled={blocked}
+                            onClick={() =>
+                              setEditing(
+                                editing === item.id ? null : item.id
+                              )
+                            }
+                          >
+                            {item.quantity > 1
+                              ? "Cancelar producto completo"
+                              : "Cancelar producto"}
+                          </button>
+                        </>
                       )}
 
                     {ticket?.preparationStatus === "READY" && (

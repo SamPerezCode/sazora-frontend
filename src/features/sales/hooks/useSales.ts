@@ -21,6 +21,26 @@ import type {
   OrderInput,
 } from "../schemas/sales.schema";
 
+import { useAppShell } from "../../../app/layout/shell-context";
+import { useAuth } from "../../auth/hooks/useAuth";
+
+import { acquireSessionSocket } from "../../../lib/realtime/session-socket";
+import type { ConnectionStatus } from "../../../lib/realtime/session-socket";
+
+import {
+  cancelQuantityInputSchema,
+  quantityCancelledEventSchema,
+  quantityChangeKey,
+  quantityRecovery,
+} from "../../../lib/orders/quantity-cancellation";
+
+import type {
+  QuantityCancellationResult,
+  QuantityCancelledEvent,
+} from "../../../lib/orders/quantity-cancellation";
+
+import { cancelOrderItemQuantity } from "../services/sales.service";
+
 class RecoveryError extends Error {}
 
 export type CancellationResult = {
@@ -49,6 +69,14 @@ const confirmationMessages: Record<string, string> = {
 };
 
 export function useSales(token: string) {
+  const { session } = useAppShell();
+  const { logout } = useAuth();
+
+  const businessId = session.business.id;
+  const membershipId = session.membership.id;
+  const userId = session.user.id;
+
+  const ownQuantityChanges = useRef(new Set<string>());
   const [data, setData] = useState<SalesData | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -271,6 +299,133 @@ export function useSales(token: string) {
       window.removeEventListener("focus", update);
     };
   }, [refresh]);
+
+  useEffect(() => {
+    let live = true;
+    let flushing = false;
+    let requested = false;
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const queue = new Map<string, QuantityCancelledEvent>();
+    const seen = new Set<string>();
+
+    const lease = acquireSessionSocket({
+      accessToken: token,
+      businessId,
+      membershipId,
+      userId,
+    });
+
+    function schedule() {
+      clearTimeout(timer);
+
+      timer = setTimeout(() => {
+        void flush();
+      }, 300);
+    }
+
+    async function flush() {
+      if (!live) return;
+
+      if (locked.current || flushing) {
+        schedule();
+        return;
+      }
+
+      if (!requested && !queue.size) return;
+
+      flushing = true;
+      requested = false;
+
+      const events = [...queue.entries()];
+      queue.clear();
+
+      const updated = await refresh();
+
+      if (live) {
+        const external = events.filter(
+          ([key]) => !ownQuantityChanges.current.has(key)
+        );
+
+        if (external.length) {
+          setNotice(
+            external.length === 1
+              ? `Cantidad modificada · Orden #${external[0][1].orderId}.${
+                  updated ? "" : " Falta actualizar la cuenta."
+                }`
+              : `Se modificaron cantidades en ${
+                  external.length
+                } productos.${
+                  updated ? "" : " Falta actualizar la cuenta."
+                }`
+          );
+        }
+
+        flushing = false;
+
+        if (requested || queue.size) {
+          schedule();
+        }
+      }
+    }
+
+    function receive(raw: unknown) {
+      if (!live || lease.getStatus() !== "connected") return;
+
+      const parsed = quantityCancelledEventSchema.safeParse(raw);
+
+      if (!parsed.success || parsed.data.businessId !== businessId) {
+        return;
+      }
+
+      const key = quantityChangeKey(parsed.data);
+
+      if (seen.has(key)) return;
+
+      seen.add(key);
+
+      if (seen.size > 500) {
+        seen.delete(seen.values().next().value!);
+      }
+
+      if (ownQuantityChanges.current.has(key)) return;
+
+      queue.set(key, parsed.data);
+      requested = true;
+
+      if (!locked.current) {
+        reader.current?.abort();
+      }
+
+      schedule();
+    }
+
+    function connectionChanged(status: ConnectionStatus) {
+      if (status === "rejected") {
+        logout();
+      } else if (status === "connected") {
+        requested = true;
+        schedule();
+      }
+    }
+
+    lease.socket.on("order:item-quantity-cancelled", receive);
+
+    const unsubscribe = lease.subscribe(connectionChanged);
+
+    connectionChanged(lease.getStatus());
+
+    return () => {
+      live = false;
+      clearTimeout(timer);
+
+      lease.socket.off("order:item-quantity-cancelled", receive);
+
+      unsubscribe();
+      lease.release();
+    };
+  }, [token, businessId, membershipId, userId, refresh, logout]);
 
   function closeLocal() {
     const key = currentLocal.current;
@@ -974,6 +1129,208 @@ export function useSales(token: string) {
     );
   }
 
+  async function cancelUnits(
+    itemId: string,
+    quantity: number,
+    reason: string
+  ): Promise<QuantityCancellationResult> {
+    const order = data?.order;
+    const id = selected.current;
+
+    const item = order?.items.find((entry) => entry.id === itemId);
+
+    const preparation = data?.tickets
+      .filter((ticket) => ticket.orderId === id)
+      .flatMap((ticket) => ticket.items)
+      .find((entry) => entry.orderItemId === itemId);
+
+    if (
+      locked.current ||
+      uncertain ||
+      error ||
+      !id ||
+      confirmationIds[id] ||
+      cancellationIds[id]
+    ) {
+      return {
+        ok: false,
+        message: "Espera a que la cuenta esté actualizada.",
+      };
+    }
+
+    if (
+      !order ||
+      order.id !== id ||
+      order.status !== "CONFIRMED" ||
+      item?.status !== "ACTIVE" ||
+      !preparation ||
+      !["PENDING", "IN_PREPARATION", "READY"].includes(
+        preparation.preparationStatus
+      )
+    ) {
+      await refresh();
+
+      return {
+        ok: false,
+        close: true,
+        message: "Este producto ya no puede cancelarse.",
+      };
+    }
+
+    const parsed = cancelQuantityInputSchema.safeParse({
+      quantity,
+      reason,
+    });
+
+    if (!parsed.success) {
+      const fields: QuantityCancellationResult["fields"] = {};
+
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0];
+
+        if (field === "quantity" || field === "reason") {
+          fields[field] = issue.message;
+        }
+      }
+
+      return { ok: false, fields };
+    }
+
+    if (quantity >= item.quantity) {
+      return {
+        ok: false,
+        offerFull: quantity === item.quantity,
+        fields: {
+          quantity:
+            "Para retirar todas las unidades, confirma la cancelación completa.",
+        },
+      };
+    }
+
+    const previousQuantity = item.quantity;
+
+    const success = `Se cancel${
+      quantity === 1 ? "ó 1 unidad" : `aron ${quantity} unidades`
+    } de ${item.productName}.`;
+
+    const result: QuantityCancellationResult = {
+      ok: false,
+    };
+
+    const recovery = async (): Promise<string> => {
+      const current = await readOrder(id);
+
+      const currentItem = current.items.find(
+        (entry) => entry.id === itemId
+      );
+
+      const outcome = quantityRecovery(
+        currentItem,
+        previousQuantity,
+        quantity
+      );
+
+      if (outcome === "applied") {
+        return success;
+      }
+
+      if (outcome === "cancelled") {
+        result.close = true;
+
+        return "El producto fue cancelado completamente. La cuenta se actualizó.";
+      }
+
+      result.close =
+        outcome === "missing" || current.status !== "CONFIRMED";
+
+      result.message =
+        outcome === "unchanged"
+          ? "La cantidad continúa igual. Revisa la cuenta antes de volver a intentarlo."
+          : "La cantidad cambió en otro dispositivo. Revisa la cantidad actual antes de continuar.";
+
+      throw new RecoveryError(result.message);
+    };
+
+    const ok = await run(
+      async () => {
+        try {
+          const adjustment = await cancelOrderItemQuantity(
+            token,
+            id,
+            itemId,
+            quantity,
+            parsed.data.reason
+          );
+
+          if (
+            adjustment.orderItemId !== itemId ||
+            adjustment.cancelledQuantity !== quantity
+          ) {
+            throw new ApiError(
+              502,
+              "INVALID_RESPONSE",
+              "No pudimos verificar la cancelación."
+            );
+          }
+
+          ownQuantityChanges.current.add(
+            quantityChangeKey({
+              ...adjustment,
+              orderId: id,
+            })
+          );
+
+          if (ownQuantityChanges.current.size > 500) {
+            ownQuantityChanges.current.delete(
+              ownQuantityChanges.current.values().next().value!
+            );
+          }
+
+          return success;
+        } catch (cause) {
+          result.message = messageOf(cause);
+
+          if (cause instanceof ApiError) {
+            result.fields = {};
+
+            for (const fieldError of cause.errors) {
+              const field = fieldError.field.split(".").at(-1);
+
+              if (field === "quantity" || field === "reason") {
+                result.fields[field] = fieldError.message;
+              }
+            }
+
+            result.offerFull =
+              cause.code === "FULL_CANCELLATION_REQUIRED";
+
+            result.close = [
+              "ORDER_NOT_FOUND",
+              "ORDER_NOT_CONFIRMED",
+              "ORDER_ITEM_NOT_FOUND",
+              "ORDER_ITEM_NOT_CANCELLABLE",
+            ].includes(cause.code);
+
+            if (cause.code === "ORDER_NOT_FOUND") {
+              forgetOrder(id);
+            }
+          }
+
+          throw cause;
+        }
+      },
+      success,
+      false,
+      recovery
+    );
+
+    return {
+      ...result,
+      ok,
+      close: ok || result.close || !!pendingRecovery.current,
+    };
+  }
+
   async function send() {
     if (locked.current || uncertain || error || !data) {
       return false;
@@ -1202,6 +1559,7 @@ export function useSales(token: string) {
     cancelOrder,
     verifyCancellation,
     reconcile,
+    cancelUnits,
     retry: () => {
       if (!locked.current) {
         void refresh();

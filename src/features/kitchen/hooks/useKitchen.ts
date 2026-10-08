@@ -539,6 +539,87 @@ export function useKitchen(
       }
     );
 
+    listen(
+      "order:item-quantity-cancelled",
+      kitchenEvents["order:item-quantity-cancelled"],
+      (payload) => {
+        const known = knownTickets.get(payload.kitchenTicketId);
+
+        const product = known?.items.find(
+          (item) => item.id === payload.kitchenTicketItemId
+        );
+
+        const key =
+          "quantity:" +
+          payload.orderItemId +
+          ":" +
+          payload.kitchenTicketVersion +
+          ":" +
+          payload.adjustedAt;
+
+        if (
+          unique(key) &&
+          (!area || !known || known.preparationAreaId === area)
+        ) {
+          notice({
+            id: key,
+            kind: "quantity-cancelled",
+            orderId: payload.orderId,
+            ticketId: payload.kitchenTicketId,
+            areaId: known?.preparationAreaId,
+            label: known
+              ? serviceLabel(known)
+              : "Cantidad modificada",
+            productName: product?.productName,
+            quantity: payload.cancelledQuantity,
+            remainingQuantity: payload.remainingQuantity,
+            reason: payload.cancellationReason,
+          });
+
+          play("cancel");
+        }
+
+        commit(
+          tickets.map((ticket) => {
+            if (
+              ticket.id !== payload.kitchenTicketId ||
+              ticket.orderId !== payload.orderId ||
+              payload.kitchenTicketVersion < ticket.currentVersion
+            ) {
+              return ticket;
+            }
+
+            const item = ticket.items.find(
+              (value) =>
+                value.id === payload.kitchenTicketItemId &&
+                value.orderItemId === payload.orderItemId
+            );
+
+            if (!item || !isActiveItem(item)) {
+              return ticket;
+            }
+
+            return {
+              ...mergeKitchenItems(ticket, [
+                {
+                  ...item,
+                  quantity: payload.remainingQuantity,
+                  updatedAt: payload.adjustedAt,
+                },
+              ]),
+              currentVersion: Math.max(
+                ticket.currentVersion,
+                payload.kitchenTicketVersion
+              ),
+            };
+          })
+        );
+
+        invalidate();
+        schedule();
+      }
+    );
+
     function onConnection(next: ConnectionStatus) {
       connection = next;
       patch({ connection: next });

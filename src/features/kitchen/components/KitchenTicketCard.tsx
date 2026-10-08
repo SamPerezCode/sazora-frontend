@@ -177,6 +177,11 @@ export function KitchenTicketCard({
           Comanda #{ticket.id} · {ticket.preparationAreaName}
           {" · "}
           {clockTime(ticket.createdAt)}
+          {ticket.currentVersion > 1 && (
+            <span className="block mt-1 text-accent">
+              Comanda modificada · Versión {ticket.currentVersion}
+            </span>
+          )}
         </p>
 
         <KitchenElapsedTime ticket={ticket} now={now} />

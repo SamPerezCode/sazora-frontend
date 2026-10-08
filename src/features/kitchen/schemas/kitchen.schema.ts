@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { quantityCancelledEventSchema } from "../../../lib/orders/quantity-cancellation";
+
 export const kitchenId = z.string().regex(/^[1-9]\d*$/);
 
 const date = z.iso.datetime({ offset: true });
@@ -85,11 +87,13 @@ const orderStatus = z.enum([
 ]);
 
 export const kitchenEvents = {
+  "order:item-quantity-cancelled": quantityCancelledEventSchema,
   "order:confirmed": z.object({
     businessId: kitchenId,
     orderId: kitchenId,
     confirmedAt: date,
     status: z.literal("CONFIRMED"),
+
     kitchenTickets: z.array(
       z.object({
         id: kitchenId,
@@ -155,7 +159,13 @@ export type KitchenMutation = {
 
 export type KitchenNotice = {
   id: string;
-  kind: "addition" | "item-cancelled" | "order-cancelled";
+
+  kind:
+    | "addition"
+    | "item-cancelled"
+    | "order-cancelled"
+    | "quantity-cancelled";
+
   orderId: string;
   ticketId?: string;
   areaId?: string;
@@ -163,4 +173,5 @@ export type KitchenNotice = {
   reason?: string | null;
   productName?: string;
   quantity?: number;
+  remainingQuantity?: number;
 };

@@ -8,6 +8,11 @@ import { productListSchema } from "../../products/schemas/product.schema";
 import { tableListResponseSchema } from "../../restaurant-tables/schemas/restaurant-table.schema";
 
 import {
+  cancelQuantityInputSchema,
+  cancelQuantityResponseSchema,
+} from "../../../lib/orders/quantity-cancellation";
+
+import {
   cancelOrderResponseSchema,
   cancelOrderItemResponseSchema,
   createdResponseSchema,
@@ -209,4 +214,29 @@ export async function cancelOrderItem(
   );
 
   return response.data.cancellation;
+}
+
+export async function cancelOrderItemQuantity(
+  token: string,
+  orderId: string,
+  orderItemId: string,
+  quantity: number,
+  reason: string
+) {
+  const body = cancelQuantityInputSchema.parse({
+    quantity,
+    reason,
+  });
+
+  const response = await request(
+    `/orders/${orderId}/items/${orderItemId}/cancel-quantity`,
+    cancelQuantityResponseSchema,
+    {
+      method: "POST",
+      accessToken: token,
+      body,
+    }
+  );
+
+  return response.data.adjustment;
 }

@@ -1,4 +1,4 @@
-import { Ban, Check, Plus, X } from "lucide-react";
+import { Ban, Check, Minus, Plus, X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import type { KitchenNotice } from "../schemas/kitchen.schema";
 
@@ -33,14 +33,18 @@ export function KitchenCancellationAlert({
   notice: KitchenNotice;
   onDismiss: () => void;
 }) {
+  const partial = notice.kind === "quantity-cancelled";
+
   return (
     <article className="kitchen-cancellation">
       <h3>
-        <Ban size={16} />
+        {partial ? <Minus size={16} /> : <Ban size={16} />}
 
-        {notice.kind === "order-cancelled"
-          ? "Orden cancelada"
-          : "Producto cancelado"}
+        {partial
+          ? "Cantidad modificada"
+          : notice.kind === "order-cancelled"
+            ? "Orden cancelada"
+            : "Producto cancelado"}
       </h3>
 
       <p>
@@ -48,13 +52,24 @@ export function KitchenCancellationAlert({
         {notice.ticketId && ` · Comanda #${notice.ticketId}`}
       </p>
 
-      {notice.productName && (
+      {partial ? (
+        <>
+          <p>
+            {notice.productName ?? "Producto"}:{" "}
+            {notice.quantity === 1
+              ? "se canceló 1 unidad."
+              : `se cancelaron ${notice.quantity} unidades.`}
+          </p>
+
+          <p>Cantidad restante: {notice.remainingQuantity}.</p>
+        </>
+      ) : notice.productName ? (
         <p>
           <s>
             {notice.quantity} × {notice.productName}
           </s>
         </p>
-      )}
+      ) : null}
 
       {notice.reason && <p>Motivo: {notice.reason}</p>}
 
