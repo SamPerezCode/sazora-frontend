@@ -992,3 +992,67 @@
     }
   }
 }
+/* Prueba visual: fondo oscuro y navegación con el mismo acabado. */
+
+@layer components {
+  :root[data-theme="dark"] .app-shell {
+    --shell-glass-opacity: 86%;
+
+    --shell-navigation-background: linear-gradient(
+      160deg,
+      #2a395d 0%,
+      #1c2a4d 100%
+    );
+
+    background-color: var(--sazora-background);
+
+    background-image:
+      radial-gradient(
+        ellipse 70rem 40rem at 5% 0%,
+        rgb(91 126 190 / 15%),
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 55rem 35rem at 100% 25%,
+        rgb(72 125 156 / 9%),
+        transparent 72%
+      ),
+      radial-gradient(
+        ellipse 45rem 30rem at 65% 100%,
+        rgb(241 130 45 / 4%),
+        transparent 75%
+      );
+
+    background-repeat: no-repeat;
+  }
+
+  /* Ambos usan los mismos colores, borde y sombra. */
+  :root[data-theme="dark"] .shell-header,
+  :root[data-theme="dark"] .shell-sidebar {
+    background: var(--shell-navigation-background);
+
+    border-color: rgb(135 154 188 / 30%);
+
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 6%),
+      0 8px 24px rgb(8 15 32 / 12%);
+  }
+
+  /* Transparencia con respaldo opaco en navegadores sin soporte. */
+  @supports (
+    (backdrop-filter: blur(12px)) or
+      (-webkit-backdrop-filter: blur(12px))
+  ) {
+    :root[data-theme="dark"] .shell-header,
+    :root[data-theme="dark"] .shell-sidebar {
+      background: linear-gradient(
+        160deg,
+        rgb(42 57 93 / var(--shell-glass-opacity)) 0%,
+        rgb(28 42 77 / var(--shell-glass-opacity)) 100%
+      );
+
+      -webkit-backdrop-filter: blur(12px) saturate(115%);
+      backdrop-filter: blur(12px) saturate(115%);
+    }
+  }
+}

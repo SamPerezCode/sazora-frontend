@@ -58,11 +58,11 @@
   :root[data-theme="dark"] {
     color-scheme: dark;
 
-    --sazora-background: #101a34;
+    --sazora-background: #162137;
     --sazora-heading: #ebeff4;
     --sazora-muted: #99a6b4;
 
-    --sazora-surface: #182440;
+    --sazora-surface: #1e2c47;
     --sazora-popover: #1b2745;
     --sazora-secondary: #18273c;
     --sazora-subtle: #182334;
