@@ -13,6 +13,7 @@ import { Pagination } from "../../../components/ui/Pagination";
 import type { AuthSession } from "../../auth/types/auth.types";
 import type { InventoryItem } from "../schemas/inventory.schema";
 import { useInventoryQuery } from "../hooks/useInventoryQuery";
+import { DateField } from "../../../components/forms/DateField";
 import {
   InventoryLoadError,
   InventorySkeleton,
@@ -232,31 +233,27 @@ export function InventoryMovements({
           }}
         />
 
-        <label>
-          Desde
-          <input
-            type="date"
-            value={from}
-            max={to || undefined}
-            onChange={(event) => {
-              setFrom(event.target.value);
-              setPage(1);
-            }}
-          />
-        </label>
+        <DateField
+          label="Desde"
+          value={from}
+          max={to || undefined}
+          timeZone={zone}
+          onValueChange={(value) => {
+            setFrom(value);
+            setPage(1);
+          }}
+        />
 
-        <label>
-          Hasta
-          <input
-            type="date"
-            value={to}
-            min={from || undefined}
-            onChange={(event) => {
-              setTo(event.target.value);
-              setPage(1);
-            }}
-          />
-        </label>
+        <DateField
+          label="Hasta"
+          value={to}
+          min={from || undefined}
+          timeZone={zone}
+          onValueChange={(value) => {
+            setTo(value);
+            setPage(1);
+          }}
+        />
 
         <Button size="sm" variant="secondary" onClick={clear}>
           <FilterX size={16} />

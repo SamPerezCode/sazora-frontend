@@ -28,6 +28,7 @@ import type { InventoryDialogAction } from "../components/InventoryDialog";
 import { InventoryCreateDialog } from "../components/InventoryCreateDialog";
 import { InventoryMovements } from "../components/InventoryMovements";
 import { InventoryConsumption } from "../components/InventoryConsumption";
+import { InventoryProduction } from "../components/InventoryProduction";
 import {
   dayKey,
   formatQuantity,
@@ -179,14 +180,16 @@ function InventoryScreen() {
   }
 
   const tab =
-    params.get("tab") === "movements"
-      ? "movements"
-      : params.get("tab") === "consumption" || productId
-        ? "consumption"
-        : "stock";
+    params.get("tab") === "production"
+      ? "production"
+      : params.get("tab") === "movements"
+        ? "movements"
+        : params.get("tab") === "consumption" || productId
+          ? "consumption"
+          : "stock";
 
   function openTab(
-    next: "stock" | "movements" | "consumption",
+    next: "stock" | "movements" | "consumption" | "production",
     itemId?: string
   ) {
     const nextParams = new URLSearchParams(params);
@@ -270,15 +273,20 @@ function InventoryScreen() {
 
         <button
           type="button"
-          disabled
-          title="Disponible en la última etapa"
+          aria-current={tab === "production" ? "page" : undefined}
+          onClick={() => openTab("production")}
         >
           <Factory size={16} />
           Producción
         </button>
       </nav>
 
-      {tab === "movements" ? (
+      {tab === "production" ? (
+        <InventoryProduction
+          revision={revision}
+          onChanged={refreshInventory}
+        />
+      ) : tab === "movements" ? (
         <InventoryMovements
           key={"movements:" + (params.get("itemId") ?? "")}
           items={items ?? []}

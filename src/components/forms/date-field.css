@@ -1,0 +1,192 @@
+@layer components {
+  .date-field {
+    display: grid;
+    gap: 0.375rem;
+    min-width: 0;
+  }
+
+  .date-field-label {
+    font-size: 0.75rem;
+    color: var(--sazora-muted);
+  }
+
+  .date-field-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.75rem;
+
+    border: 1px solid var(--sazora-input-border);
+    border-radius: 0.65rem;
+
+    background: var(--sazora-surface);
+    color: var(--sazora-heading);
+
+    font-size: 0.8125rem;
+    cursor: pointer;
+  }
+
+  .date-field-trigger svg {
+    color: var(--sazora-accent);
+    flex-shrink: 0;
+  }
+
+  .date-field-trigger [data-placeholder] {
+    color: var(--sazora-muted);
+  }
+
+  .date-field-error {
+    color: var(--sazora-action-danger);
+    font-size: 0.75rem;
+  }
+
+  .date-field-trigger[aria-invalid="true"] {
+    border-color: var(--sazora-action-danger);
+  }
+
+  .date-field-trigger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .date-field-trigger:focus-visible,
+  .date-calendar button:focus-visible {
+    outline: 2px solid var(--sazora-accent);
+    outline-offset: 2px;
+  }
+
+  .date-calendar {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 0.75rem;
+
+    box-sizing: border-box;
+    width: min(20rem, calc(100vw - 1rem));
+
+    overflow-y: auto;
+    overscroll-behavior: contain;
+
+    color: var(--sazora-heading);
+    background: var(--sazora-surface);
+
+    border: 1px solid var(--sazora-outline);
+    border-radius: 1rem;
+
+    box-shadow: 0 1rem 3rem rgb(0 0 0 / 24%);
+    font-size: 0.8125rem;
+  }
+
+  .date-calendar-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    margin-bottom: 0.65rem;
+  }
+
+  .date-calendar-heading strong {
+    flex: 1;
+    text-align: center;
+    text-transform: capitalize;
+    font-size: 0.8125rem;
+  }
+
+  .date-calendar button {
+    cursor: pointer;
+    border-radius: 0.6rem;
+  }
+
+  .date-calendar-heading button {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+  }
+
+  .date-calendar .date-calendar-close {
+    color: var(--sazora-accent);
+  }
+
+  .date-calendar button:hover:not(:disabled) {
+    background: color-mix(
+      in srgb,
+      var(--sazora-accent) 12%,
+      transparent
+    );
+  }
+
+  .date-calendar button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .date-calendar table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 2px;
+  }
+
+  .date-calendar th {
+    padding: 0.35rem 0;
+    color: var(--sazora-muted);
+    font-weight: 500;
+    text-align: center;
+  }
+
+  .date-calendar td {
+    padding: 0;
+    text-align: center;
+  }
+
+  .date-calendar td button {
+    width: 100%;
+    min-height: 2.25rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .date-calendar [data-outside] {
+    color: var(--sazora-muted);
+  }
+
+  .date-calendar [aria-current="date"] {
+    box-shadow: inset 0 0 0 1px var(--sazora-accent);
+  }
+
+  .date-calendar button[data-selected],
+  .date-calendar button[data-selected]:hover {
+    background: var(--sazora-accent);
+    color: var(--sazora-on-accent);
+    font-weight: 700;
+  }
+
+  .date-calendar-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+
+    border-top: 1px solid var(--sazora-outline);
+
+    margin-top: 0.65rem;
+    padding-top: 0.5rem;
+  }
+
+  .date-calendar-footer button {
+    min-height: 2.25rem;
+    padding: 0.25rem 0.65rem;
+    color: var(--sazora-accent);
+  }
+
+  .date-calendar-footer button:first-child:not(:last-child) {
+    color: var(--sazora-action-danger);
+  }
+
+  .inv-workspace-filters > .date-field {
+    flex: 1 1 9rem;
+  }
+}

@@ -8,6 +8,9 @@ import {
 } from "../services/inventory-operations";
 
 export function InventoryWriteDialog({
+  className = "",
+  onBeforeSave,
+  onBack,
   title,
   description,
   submitLabel,
@@ -24,6 +27,9 @@ export function InventoryWriteDialog({
   dirty: boolean;
   valid?: boolean;
   children: ReactNode;
+  className?: string;
+  onBeforeSave?: () => boolean;
+  onBack?: () => void;
   onSave: (signal: AbortSignal) => Promise<unknown>;
   onSaved: () => void;
   onClose: () => void;
@@ -63,6 +69,8 @@ export function InventoryWriteDialog({
 
   async function submit() {
     if (locked.current || unknown || !valid) return;
+
+    if (onBeforeSave && !onBeforeSave()) return;
 
     locked.current = true;
 
@@ -106,7 +114,7 @@ export function InventoryWriteDialog({
       open
       variant="modal"
       title={title}
-      className="inv-dialog inv-centered"
+      className={"inv-dialog inv-centered " + className}
       busy={busy}
       onClose={close}
     >
@@ -156,6 +164,16 @@ export function InventoryWriteDialog({
           )}
 
           <footer className="inv-dialog-footer">
+            {onBack && (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy || unknown}
+                onClick={onBack}
+              >
+                Volver a editar
+              </Button>
+            )}
             <Button
               size="sm"
               variant="cancel"
