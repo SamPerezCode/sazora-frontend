@@ -138,11 +138,20 @@ export function InventoryCreateDialog({
         </label>
       </div>
 
-      {dirty && !validation.success && (
-        <p className="inv-error">
-          {validation.error.issues[0]?.message}
-        </p>
-      )}
+      {dirty &&
+        (!draft.itemType || !draft.baseUnit ? (
+          <p className="inv-muted">
+            {!draft.itemType && !draft.baseUnit
+              ? "Selecciona el tipo de artículo y la unidad base para continuar."
+              : !draft.itemType
+                ? "Selecciona el tipo de artículo para continuar."
+                : "Selecciona la unidad base para continuar."}
+          </p>
+        ) : !validation.success ? (
+          <p className="inv-error" role="alert">
+            {validation.error.issues[0]?.message}
+          </p>
+        ) : null)}
 
       <p className="inv-note">
         <Info size={17} />

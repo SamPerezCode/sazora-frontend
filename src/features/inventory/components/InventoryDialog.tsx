@@ -83,7 +83,10 @@ export function InventoryDialog({
 
     void (async () => {
       if (view === "movement") {
-        const items = await readItems(session, controller.signal);
+        const items =
+          id === undefined
+            ? await readItems(session, controller.signal)
+            : [await readItem(id, session, controller.signal)];
 
         controller.signal.throwIfAborted();
 
@@ -276,7 +279,9 @@ export function InventoryDialog({
         className={[
           "inv-dialog",
           view === "detail" && !receipt ? "inv-drawer" : "",
-          view === "movement" || receipt ? "inv-dialog-wide" : "",
+          (view === "movement" && id === undefined) || receipt
+            ? "inv-dialog-wide"
+            : "",
         ].join(" ")}
       >
         {error && (
@@ -337,6 +342,8 @@ export function InventoryDialog({
 
             {view === "movement" && (
               <InventoryMovementForm
+                key={id ?? "general"}
+                mode={id === undefined ? "general" : "individual"}
                 items={data.items}
                 initialItemId={id}
                 initialType={
@@ -347,11 +354,23 @@ export function InventoryDialog({
                 busy={busy}
                 onDirty={setDirty}
                 onCancel={close}
-                onSave={(body: MovementInput) =>
+                onSave={(body: MovementInput) => {
+                  if (
+                    id !== undefined &&
+                    (body.lines.length !== 1 ||
+                      body.lines[0].inventoryItemId !== id)
+                  ) {
+                    setError(
+                      "Este movimiento debe contener únicamente el artículo seleccionado."
+                    );
+
+                    return;
+                  }
+
                   void run((signal) =>
                     saveMovement(body, session, signal)
-                  )
-                }
+                  );
+                }}
               />
             )}
 

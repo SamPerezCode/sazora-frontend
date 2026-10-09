@@ -39,7 +39,7 @@ export const consumptionInputSchema = z.object({
   autoDeduct: z.boolean(),
 });
 
-const linkSchema = z.object({
+export const linkSchema = z.object({
   id: z.string(),
   businessId: z.string(),
   productId: z.string(),

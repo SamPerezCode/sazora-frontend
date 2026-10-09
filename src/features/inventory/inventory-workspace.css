@@ -205,3 +205,23 @@
     }
   }
 }
+
+@layer components {
+  .inv-movement-articles {
+    display: grid;
+    gap: 0.3rem;
+
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+
+    list-style: none;
+    color: var(--sazora-heading);
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .inv-movement-articles li {
+    overflow-wrap: anywhere;
+  }
+}

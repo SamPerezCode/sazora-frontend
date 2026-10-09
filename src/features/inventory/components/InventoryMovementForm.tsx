@@ -57,6 +57,7 @@ interface Line {
 
 export function InventoryMovementForm({
   items,
+  mode,
   initialItemId,
   initialType,
   busy,
@@ -65,6 +66,7 @@ export function InventoryMovementForm({
   onSave,
 }: {
   items: InventoryItem[];
+  mode: "individual" | "general";
   initialItemId?: string;
   initialType?: ManualType;
   busy: boolean;
@@ -72,55 +74,129 @@ export function InventoryMovementForm({
   onCancel: () => void;
   onSave: (body: MovementInput) => void;
 }) {
+  const individual = mode === "individual";
+
+  const fixedItem = items.find((item) => item.id === initialItemId);
+
   const nextKey = useRef(1);
 
   const [step, setStep] = useState(initialType ? 2 : 1);
+
   const [type, setType] = useState<ManualType>(
     initialType ?? "PURCHASE"
   );
+
   const [notes, setNotes] = useState("");
   const [validation, setValidation] = useState("");
 
-  const [lines, setLines] = useState<Line[]>([
+  const [lines, setLines] = useState<Line[]>(() => [
     {
       key: 0,
-      inventoryItemId: items.some(
-        (item) => item.id === initialItemId && item.isActive
-      )
-        ? initialItemId!
-        : "",
+      inventoryItemId: individual
+        ? (initialItemId ?? "")
+        : (items.find(
+            (item) => item.id === initialItemId && item.isActive
+          )?.id ?? ""),
       quantity: "",
-      direction: "IN",
+      direction: initialType === "WASTE" ? "OUT" : "IN",
       notes: "",
     },
   ]);
 
   const active = items.filter((item) => item.isActive);
 
-  const parsed = movementInputSchema.safeParse({
-    movementType: type,
-    notes,
-    lines,
-  });
+  const scopeValid =
+    !individual ||
+    (!!initialItemId &&
+      lines.length === 1 &&
+      lines[0].inventoryItemId === initialItemId);
 
   const available = lines.every((line) =>
     active.some((item) => item.id === line.inventoryItemId)
   );
 
-  const valid = parsed.success && available;
+  const parsed = movementInputSchema.safeParse({
+    movementType: type,
+    notes,
 
-  function changeLine(key: number, patch: Partial<Line>) {
+    // En modo individual se utiliza únicamente la nota general.
+    lines: individual
+      ? lines.map((line) => ({
+          ...line,
+          notes: "",
+        }))
+      : lines,
+  });
+
+  const valid = parsed.success && available && scopeValid;
+
+  const fixedUnavailable =
+    individual && (!fixedItem || !fixedItem.isActive);
+
+  function touch() {
+    onDirty(true);
+    setValidation("");
+  }
+
+  function changeLine(
+    key: number,
+    patch: Partial<Omit<Line, "key">>
+  ) {
+    if (busy) return;
+
+    if (
+      individual &&
+      patch.inventoryItemId !== undefined &&
+      patch.inventoryItemId !== initialItemId
+    ) {
+      return;
+    }
+
     setLines((previous) =>
       previous.map((line) =>
         line.key === key ? { ...line, ...patch } : line
       )
     );
 
-    onDirty(true);
-    setValidation("");
+    touch();
+  }
+
+  function addLine() {
+    if (busy || individual || lines.length >= 100) {
+      return;
+    }
+
+    const key = nextKey.current++;
+
+    setLines((previous) => [
+      ...previous,
+      {
+        key,
+        inventoryItemId: "",
+        quantity: "",
+        notes: "",
+        direction: type === "WASTE" ? "OUT" : "IN",
+      },
+    ]);
+
+    touch();
+  }
+
+  function removeLine(key: number) {
+    if (busy || individual || lines.length <= 1) {
+      return;
+    }
+
+    setLines((previous) =>
+      previous.filter((line) => line.key !== key)
+    );
+
+    touch();
   }
 
   function selectType(value: ManualType) {
+    if (busy) return;
+
     setType(value);
 
     setLines((previous) =>
@@ -135,24 +211,28 @@ export function InventoryMovementForm({
       }))
     );
 
-    onDirty(true);
+    touch();
     setStep(2);
-    setValidation("");
   }
 
-  function review() {
-    if (!valid) {
-      setValidation(
-        !parsed.success
-          ? (parsed.error.issues[0]?.message ?? "Revisa las líneas.")
-          : "Selecciona artículos activos."
-      );
-
-      return;
+  function validationMessage() {
+    if (!scopeValid) {
+      return "Este movimiento debe contener únicamente el artículo seleccionado.";
     }
 
-    setValidation("");
-    setStep(3);
+    if (fixedUnavailable) {
+      return "El artículo no está disponible o está inactivo.";
+    }
+
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Revisa las líneas.";
+    }
+
+    if (!available) {
+      return "Selecciona artículos activos.";
+    }
+
+    return "";
   }
 
   return (
@@ -160,11 +240,18 @@ export function InventoryMovementForm({
       onSubmit={(event) => {
         event.preventDefault();
 
-        if (busy) return;
+        if (busy || step === 1) return;
+
+        if (!valid || !parsed.success) {
+          setValidation(validationMessage());
+          return;
+        }
+
+        setValidation("");
 
         if (step === 2) {
-          review();
-        } else if (step === 3 && valid && parsed.success) {
+          setStep(3);
+        } else {
           onSave(parsed.data);
         }
       }}
@@ -174,10 +261,23 @@ export function InventoryMovementForm({
         {step === 1
           ? "Elige el tipo de movimiento."
           : movementLabels[type]}
+        {individual && fixedItem && (
+          <p>
+            Artículo: <strong>{fixedItem.name}</strong>
+          </p>
+        )}
       </div>
 
-      <fieldset disabled={busy} className="inv-dialog-body">
-        {step === 1 ? (
+      <fieldset
+        disabled={busy || fixedUnavailable}
+        className="inv-dialog-body"
+      >
+        {fixedUnavailable ? (
+          <p className="inv-error" role="alert">
+            El artículo no está disponible o está inactivo. Cierra el
+            modal y actualiza el listado.
+          </p>
+        ) : step === 1 ? (
           <div className="inv-movement-types">
             {manualTypes.map((value) => {
               const { Icon, description } = choices[value];
@@ -205,8 +305,10 @@ export function InventoryMovementForm({
             {type === "ADJUSTMENT" && (
               <p className="inv-note">
                 <TriangleAlert size={17} />
-                Indica si cada línea es entrada o salida y explica el
-                motivo en las notas.
+
+                {individual
+                  ? "Indica si el ajuste es una entrada o una salida y explica el motivo."
+                  : "Indica si cada línea es entrada o salida y explica el motivo en las notas."}
               </p>
             )}
 
@@ -243,31 +345,45 @@ export function InventoryMovementForm({
                     <section
                       className="inv-line"
                       key={line.key}
-                      aria-label={`Línea ${index + 1}`}
+                      aria-label={
+                        individual
+                          ? "Artículo del movimiento"
+                          : `Línea ${index + 1}`
+                      }
                     >
                       <div className="inv-line-fields">
-                        <SelectField
-                          label={`Artículo de la línea ${index + 1}`}
-                          hideLabel
-                          value={line.inventoryItemId}
-                          placeholder="Selecciona un artículo"
-                          options={active.map((value) => ({
-                            value: value.id,
-                            label:
-                              value.name +
-                              (value.sku ? " · " + value.sku : ""),
-                            disabled: duplicateIds.has(value.id),
-                          }))}
-                          onValueChange={(value) =>
-                            changeLine(line.key, {
-                              inventoryItemId: value,
-                            })
-                          }
-                        />
+                        {individual ? (
+                          <div className="inv-fixed-item">
+                            <strong>{fixedItem?.name}</strong>
+
+                            <span>{fixedItem?.sku || "Sin SKU"}</span>
+                          </div>
+                        ) : (
+                          <SelectField
+                            label={`Artículo de la línea ${index + 1}`}
+                            hideLabel
+                            value={line.inventoryItemId}
+                            placeholder="Selecciona un artículo"
+                            options={active.map((value) => ({
+                              value: value.id,
+                              label:
+                                value.name +
+                                (value.sku ? " · " + value.sku : ""),
+                              disabled: duplicateIds.has(value.id),
+                            }))}
+                            onValueChange={(value) =>
+                              changeLine(line.key, {
+                                inventoryItemId: value,
+                              })
+                            }
+                          />
+                        )}
 
                         <label className="inv-quantity">
                           <span className="sr-only">
-                            Cantidad de la línea {index + 1}
+                            {individual
+                              ? "Cantidad"
+                              : `Cantidad de la línea ${index + 1}`}
                           </span>
 
                           <input
@@ -284,7 +400,11 @@ export function InventoryMovementForm({
 
                         {type === "ADJUSTMENT" && (
                           <SelectField
-                            label={`Dirección de la línea ${index + 1}`}
+                            label={
+                              individual
+                                ? "Dirección"
+                                : `Dirección de la línea ${index + 1}`
+                            }
                             hideLabel
                             value={line.direction}
                             options={[
@@ -305,21 +425,17 @@ export function InventoryMovementForm({
                           />
                         )}
 
-                        <button
-                          type="button"
-                          className="inv-remove"
-                          aria-label={`Retirar línea ${index + 1}`}
-                          onClick={() => {
-                            setLines((previous) =>
-                              previous.filter(
-                                (value) => value.key !== line.key
-                              )
-                            );
-                            onDirty(true);
-                          }}
-                        >
-                          <Trash2 size={17} />
-                        </button>
+                        {!individual && (
+                          <button
+                            type="button"
+                            className="inv-remove"
+                            aria-label={`Retirar línea ${index + 1}`}
+                            disabled={lines.length <= 1}
+                            onClick={() => removeLine(line.key)}
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                        )}
                       </div>
 
                       <p className="inv-line-summary">
@@ -357,68 +473,59 @@ export function InventoryMovementForm({
                         </p>
                       )}
 
-                      <label>
-                        <span className="sr-only">
-                          Nota de la línea {index + 1}
-                        </span>
+                      {!individual && (
+                        <label>
+                          <span className="sr-only">
+                            Nota de la línea {index + 1}
+                          </span>
 
-                        <input
-                          placeholder="Nota de la línea (opcional)"
-                          value={line.notes}
-                          maxLength={500}
-                          onChange={(event) =>
-                            changeLine(line.key, {
-                              notes: event.target.value,
-                            })
-                          }
-                        />
-                      </label>
+                          <input
+                            placeholder="Nota de la línea (opcional)"
+                            value={line.notes}
+                            maxLength={500}
+                            onChange={(event) =>
+                              changeLine(line.key, {
+                                notes: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                      )}
                     </section>
                   );
                 })}
 
-                <div className="inv-inline">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={lines.length >= 100}
-                    onClick={() => {
-                      const key = nextKey.current++;
+                {!individual && (
+                  <div className="inv-inline">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={lines.length >= 100}
+                      onClick={addLine}
+                    >
+                      <Plus size={16} />
+                      Agregar línea
+                    </Button>
 
-                      setLines((previous) => [
-                        ...previous,
-                        {
-                          key,
-                          inventoryItemId: "",
-                          quantity: "",
-                          notes: "",
-                          direction: type === "WASTE" ? "OUT" : "IN",
-                        },
-                      ]);
+                    <span className="inv-muted">
+                      {lines.length} de 100 líneas
+                    </span>
+                  </div>
+                )}
 
-                      onDirty(true);
-                    }}
-                  >
-                    <Plus size={16} />
-                    Agregar línea
-                  </Button>
-
-                  <span className="inv-muted">
-                    {lines.length} de 100 líneas
-                  </span>
-                </div>
-
-                {!active.length && (
+                {!individual && !active.length && (
                   <p className="inv-warning">
                     No hay artículos activos disponibles.
                   </p>
                 )}
 
                 <label>
-                  Notas generales{" "}
                   {type === "ADJUSTMENT"
-                    ? "* (motivo del ajuste)"
-                    : ""}
+                    ? "Motivo del ajuste *"
+                    : individual
+                      ? "Notas (opcional)"
+                      : "Notas generales"}
+
                   <textarea
                     value={notes}
                     maxLength={500}
@@ -429,16 +536,10 @@ export function InventoryMovementForm({
                     }
                     onChange={(event) => {
                       setNotes(event.target.value);
-                      onDirty(true);
+                      touch();
                     }}
                   />
                 </label>
-
-                {validation && (
-                  <p className="inv-error" role="alert">
-                    {validation}
-                  </p>
-                )}
               </>
             ) : (
               <>
@@ -452,18 +553,26 @@ export function InventoryMovementForm({
                 {lines.map((line) => {
                   const item = items.find(
                     (value) => value.id === line.inventoryItemId
-                  )!;
+                  );
+
+                  if (!item) {
+                    return (
+                      <p className="inv-error" key={line.key}>
+                        El artículo ya no está disponible.
+                      </p>
+                    );
+                  }
 
                   const after = estimate(
                     item.currentStock,
                     line.quantity,
                     line.direction
-                  )!;
+                  );
 
                   const quantity = parsed.success
-                    ? parsed.data.lines.find(
+                    ? (parsed.data.lines.find(
                         (value) => value.inventoryItemId === item.id
-                      )!.quantity
+                      )?.quantity ?? line.quantity)
                     : line.quantity;
 
                   return (
@@ -483,16 +592,16 @@ export function InventoryMovementForm({
                         Stock anterior:{" "}
                         {formatQuantity(item.currentStock)}
                         {" → Estimado: "}
-                        {formatQuantity(after)}
+                        {after ? formatQuantity(after) : "—"}
                       </p>
 
-                      {units(after)! < 0n && (
+                      {after && units(after)! < 0n && (
                         <p className="inv-warning">
                           El saldo estimado es negativo.
                         </p>
                       )}
 
-                      {line.notes.trim() && (
+                      {!individual && line.notes.trim() && (
                         <p className="inv-muted">{line.notes}</p>
                       )}
                     </div>
@@ -500,12 +609,20 @@ export function InventoryMovementForm({
                 })}
 
                 <p>
-                  <strong>Notas:</strong>{" "}
+                  <strong>
+                    {type === "ADJUSTMENT" ? "Motivo:" : "Notas:"}
+                  </strong>{" "}
                   {notes.trim() || "Sin notas"}
                 </p>
               </>
             )}
           </>
+        )}
+
+        {validation && (
+          <p className="inv-error" role="alert">
+            {validation}
+          </p>
         )}
       </fieldset>
 
@@ -515,7 +632,10 @@ export function InventoryMovementForm({
             size="sm"
             variant="secondary"
             disabled={busy}
-            onClick={() => setStep(step === 3 ? 2 : 1)}
+            onClick={() => {
+              setValidation("");
+              setStep(step === 3 ? 2 : 1);
+            }}
           >
             {step === 3 ? "Volver a editar" : "Cambiar tipo"}
           </Button>
@@ -531,7 +651,11 @@ export function InventoryMovementForm({
         </Button>
 
         {step === 2 && (
-          <Button type="submit" size="sm">
+          <Button
+            type="submit"
+            size="sm"
+            disabled={busy || fixedUnavailable}
+          >
             Revisar movimiento
           </Button>
         )}

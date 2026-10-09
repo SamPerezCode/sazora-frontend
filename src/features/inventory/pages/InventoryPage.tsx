@@ -29,6 +29,7 @@ import { InventoryCreateDialog } from "../components/InventoryCreateDialog";
 import { InventoryMovements } from "../components/InventoryMovements";
 import { InventoryConsumption } from "../components/InventoryConsumption";
 import { InventoryProduction } from "../components/InventoryProduction";
+import { ProductInventorySetupDialog } from "../components/ProductInventorySetupDialog";
 import {
   dayKey,
   formatQuantity,
@@ -163,6 +164,32 @@ function InventoryScreen() {
   const productId =
     params.get("setupProductId") ?? params.get("productId");
 
+  const configureProductId =
+    productId &&
+    (params.get("intent") === "configure" ||
+      params.has("setupProductId"))
+      ? productId
+      : "";
+
+  function finishConfiguration() {
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+
+        next.delete("intent");
+        next.delete("setupProductId");
+        next.set("tab", "consumption");
+
+        if (productId) {
+          next.set("productId", productId);
+        }
+
+        return next;
+      },
+      { replace: true }
+    );
+  }
+
   function clearFilters() {
     setSearch("");
     setType("ALL");
@@ -194,9 +221,13 @@ function InventoryScreen() {
   ) {
     const nextParams = new URLSearchParams(params);
 
-    ["tab", "itemId", "productId", "setupProductId"].forEach((key) =>
-      nextParams.delete(key)
-    );
+    [
+      "tab",
+      "itemId",
+      "productId",
+      "setupProductId",
+      "intent",
+    ].forEach((key) => nextParams.delete(key));
 
     if (next !== "stock") {
       nextParams.set("tab", next);
@@ -281,6 +312,12 @@ function InventoryScreen() {
         </button>
       </nav>
 
+      {notice && tab === "consumption" && (
+        <p className="inventory-message" role="status">
+          {notice}
+        </p>
+      )}
+
       {tab === "production" ? (
         <InventoryProduction
           revision={revision}
@@ -304,9 +341,17 @@ function InventoryScreen() {
             "consumption:" +
             (params.get("itemId") ?? "") +
             ":" +
-            (productId ?? "")
+            (productId ?? "") +
+            ":" +
+            (configureProductId ? "configure" : "list")
           }
           items={items ?? []}
+          itemsReady={
+            items !== null &&
+            !resource.items.pending &&
+            !resource.items.error
+          }
+          itemsError={resource.items.error}
           initialItemId={params.get("itemId") ?? ""}
           initialProductId={productId ?? ""}
           revision={revision}
@@ -654,6 +699,28 @@ function InventoryScreen() {
         </>
       )}
 
+      {configureProductId && (
+        <ProductInventorySetupDialog
+          key={session.accessToken + ":" + configureProductId}
+          productId={configureProductId}
+          onClose={() => {
+            finishConfiguration();
+            refreshInventory();
+          }}
+          onResolved={(alreadyConfigured) => {
+            finishConfiguration();
+
+            setNotice(
+              alreadyConfigured
+                ? "El producto ya tenía inventario. Se muestran sus relaciones existentes."
+                : "Inventario configurado. El descuento automático por venta está activo."
+            );
+
+            refreshInventory();
+          }}
+        />
+      )}
+
       {creating && (
         <InventoryCreateDialog
           key={session.accessToken}
@@ -671,7 +738,13 @@ function InventoryScreen() {
 
       {dialog && (
         <InventoryDialog
-          key={session.accessToken}
+          key={
+            session.accessToken +
+            ":" +
+            dialog.kind +
+            ":" +
+            (dialog.id ?? "general")
+          }
           action={dialog}
           onClose={() => setDialog(null)}
           onChanged={(message) => {

@@ -14,6 +14,7 @@ import type { AuthSession } from "../../auth/types/auth.types";
 import type { InventoryItem } from "../schemas/inventory.schema";
 import { useInventoryQuery } from "../hooks/useInventoryQuery";
 import { DateField } from "../../../components/forms/DateField";
+import type { MovementDetail } from "../services/inventory-workspace";
 import {
   InventoryLoadError,
   InventorySkeleton,
@@ -64,6 +65,7 @@ export function InventoryMovements({
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
+  const [detailsRevision, setDetailsRevision] = useState(0);
 
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -119,6 +121,26 @@ export function InventoryMovements({
     current * size
   );
 
+  const missingIdsKey = JSON.stringify(
+    visible
+      .filter((row) => row.lines === undefined)
+      .map((row) => row.id)
+  );
+
+  const details = useMovementArticles(
+    missingIdsKey,
+    revision + detailsRevision
+  );
+
+  const detailsById = new Map(
+    (details.data ?? []).map((movement) => [movement.id, movement])
+  );
+
+  function refreshMovements() {
+    resource.refresh();
+    setDetailsRevision((value) => value + 1);
+  }
+
   const users = [
     ...new Map(
       rows.map((row) => [
@@ -158,7 +180,7 @@ export function InventoryMovements({
             size="sm"
             variant="secondary"
             loading={resource.pending}
-            onClick={resource.refresh}
+            onClick={refreshMovements}
           >
             <RefreshCw size={16} />
             Actualizar
@@ -278,7 +300,7 @@ export function InventoryMovements({
           message={resource.error}
           status={resource.status}
           busy={resource.pending}
-          onRetry={resource.refresh}
+          onRetry={refreshMovements}
         />
       ) : (
         <>
@@ -291,6 +313,29 @@ export function InventoryMovements({
             </p>
           )}
 
+          {details.error && (
+            <div
+              className="inventory-message inventory-error"
+              role="alert"
+            >
+              <p>
+                No pudimos actualizar los nombres de los artículos.
+                {details.data !== null &&
+                  " Se conservan los últimos datos disponibles."}
+              </p>
+
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={details.refresh}
+                loading={details.pending}
+              >
+                <RefreshCw size={16} />
+                Reintentar artículos
+              </Button>
+            </div>
+          )}
+
           {visible.length ? (
             <div
               className="inv-data-table"
@@ -301,6 +346,7 @@ export function InventoryMovements({
                   <tr>
                     <th>Fecha y hora</th>
                     <th>Tipo</th>
+                    <th>Artículos</th>
                     <th>Referencia</th>
                     <th>Notas</th>
                     <th>Responsable</th>
@@ -320,6 +366,16 @@ export function InventoryMovements({
 
                       <td data-label="Tipo">
                         {movementLabels[row.movementType]}
+                      </td>
+
+                      <td data-label="Artículos">
+                        <MovementArticles
+                          lines={
+                            row.lines ??
+                            detailsById.get(row.id)?.lines
+                          }
+                          pending={details.pending}
+                        />
                       </td>
 
                       <td data-label="Referencia">
@@ -392,6 +448,80 @@ export function InventoryMovements({
         />
       )}
     </>
+  );
+}
+
+async function loadMovementArticles(
+  idsKey: string,
+  session: AuthSession,
+  signal: AbortSignal
+): Promise<MovementDetail[]> {
+  const ids = JSON.parse(idsKey) as string[];
+  const result: MovementDetail[] = [];
+
+  for (let offset = 0; offset < ids.length; offset += 4) {
+    signal.throwIfAborted();
+
+    const batch = await Promise.all(
+      ids
+        .slice(offset, offset + 4)
+        .map((id) => loadMovement(id, session, signal))
+    );
+
+    result.push(...batch);
+  }
+
+  return result;
+}
+
+function useMovementArticles(idsKey: string, revision: number) {
+  const loader = useCallback(
+    (session: AuthSession, signal: AbortSignal) =>
+      loadMovementArticles(idsKey, session, signal),
+    [idsKey]
+  );
+
+  return useInventoryQuery(
+    "movement-page-articles:" + idsKey,
+    loader,
+    revision
+  );
+}
+
+function MovementArticles({
+  lines,
+  pending,
+}: {
+  lines: MovementDetail["lines"] | undefined;
+  pending: boolean;
+}) {
+  if (!lines) {
+    return (
+      <span>{pending ? "Cargando artículos…" : "No disponible"}</span>
+    );
+  }
+
+  // Un artículo puede aparecer en varias líneas:
+  // mostramos su nombre una sola vez.
+  const articles = [
+    ...new Map(
+      lines.map((line) => [
+        line.inventoryItemId,
+        line.inventoryItemName,
+      ])
+    ).entries(),
+  ];
+
+  if (!articles.length) {
+    return <span>Sin artículos</span>;
+  }
+
+  return (
+    <ul className="inv-movement-articles">
+      {articles.map(([id, name]) => (
+        <li key={id}>{name}</li>
+      ))}
+    </ul>
   );
 }
 

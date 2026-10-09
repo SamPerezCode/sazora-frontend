@@ -43,7 +43,10 @@ import {
 import { InventoryWriteDialog } from "./InventoryWriteDialog";
 
 type Editor =
-  | { kind: "create" }
+  | {
+      kind: "create";
+      productId?: string;
+    }
   | {
       kind: "edit" | "status";
       link: ConsumptionLink;
@@ -51,6 +54,8 @@ type Editor =
 
 export function InventoryConsumption({
   items,
+  itemsReady,
+  itemsError,
   initialItemId = "",
   initialProductId = "",
   revision,
@@ -58,6 +63,8 @@ export function InventoryConsumption({
   onChanged,
 }: {
   items: InventoryItem[];
+  itemsReady: boolean;
+  itemsError: string | null;
   initialItemId?: string;
   initialProductId?: string;
   revision: number;
@@ -79,7 +86,6 @@ export function InventoryConsumption({
   );
 
   const [editor, setEditor] = useState<Editor | null>(null);
-
   const [preview, setPreview] = useState<Product | null>(null);
 
   const [itemFilter, setItemFilter] = useState(initialItemId);
@@ -120,6 +126,11 @@ export function InventoryConsumption({
 
   function closeEditor() {
     setEditor(null);
+    refreshed();
+  }
+
+  function retryEditor() {
+    catalog.refresh();
     refreshed();
   }
 
@@ -200,10 +211,15 @@ export function InventoryConsumption({
           <Button
             size="sm"
             disabled={disabled || !catalog.data}
-            onClick={() => setEditor({ kind: "create" })}
+            onClick={() =>
+              setEditor({
+                kind: "create",
+                productId: productFilter || undefined,
+              })
+            }
           >
             <Plus size={16} />
-            Crear relación
+            Crear relación de consumo
           </Button>
         </div>
       </header>
@@ -494,7 +510,25 @@ export function InventoryConsumption({
             items={items}
             links={rows}
             initialItemId={itemFilter}
-            initialProductId={productFilter}
+            initialProductId={
+              editor.kind === "create"
+                ? (editor.productId ?? productFilter)
+                : editor.link.productId
+            }
+            lockProduct={
+              editor.kind === "create" && !!editor.productId
+            }
+            ready={
+              itemsReady &&
+              resource.data !== null &&
+              catalog.data !== null &&
+              !resource.pending &&
+              !catalog.pending &&
+              !resource.error &&
+              !catalog.error
+            }
+            loadError={itemsError || resource.error || catalog.error}
+            onRetry={retryEditor}
             onClose={closeEditor}
             onSaved={closeEditor}
           />
@@ -518,6 +552,10 @@ function ConsumptionForm({
   links,
   initialItemId,
   initialProductId,
+  lockProduct,
+  ready,
+  loadError,
+  onRetry,
   onClose,
   onSaved,
 }: {
@@ -527,6 +565,10 @@ function ConsumptionForm({
   links: ConsumptionLink[];
   initialItemId: string;
   initialProductId: string;
+  lockProduct: boolean;
+  ready: boolean;
+  loadError: string | null;
+  onRetry: () => void;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -568,21 +610,54 @@ function ConsumptionForm({
   const available =
     !!link || (!!item?.isActive && !!product?.isActive);
 
+  const valid =
+    ready &&
+    !loadError &&
+    validation.success &&
+    available &&
+    !duplicate &&
+    (!lockProduct || draft.productId === initialProductId);
+
   const dirty = JSON.stringify(initial) !== JSON.stringify(draft);
 
   return (
     <InventoryWriteDialog
-      title={link ? "Editar relación" : "Crear relación"}
+      title={
+        link
+          ? "Editar relación de consumo"
+          : "Crear relación de consumo"
+      }
       description="Define cuánto inventario consume cada unidad vendida."
       submitLabel={link ? "Guardar cambios" : "Crear relación"}
       dirty={dirty}
-      valid={validation.success && available && !duplicate}
+      valid={valid}
       onClose={onClose}
       onSaved={onSaved}
-      onSave={(signal) =>
-        saveLink(link?.id ?? null, draft, session, signal)
-      }
+      onSave={(signal) => {
+        if (!valid) {
+          throw new Error(
+            "Espera la carga y revisa los datos de la relación."
+          );
+        }
+
+        return saveLink(link?.id ?? null, draft, session, signal);
+      }}
     >
+      {loadError ? (
+        <div className="inv-error" role="alert">
+          <p>No pudimos cargar la configuración: {loadError}</p>
+
+          <Button size="sm" variant="secondary" onClick={onRetry}>
+            <RefreshCw size={16} />
+            Reintentar
+          </Button>
+        </div>
+      ) : !ready ? (
+        <p className="inv-muted" role="status">
+          Cargando los datos de inventario…
+        </p>
+      ) : null}
+
       {link ? (
         <p>
           <strong>{link.productName}</strong>
@@ -591,19 +666,35 @@ function ConsumptionForm({
         </p>
       ) : (
         <>
-          <SelectField
-            label="Producto *"
-            required
-            value={draft.productId}
-            options={products
-              .filter((value) => value.isActive)
-              .map((value) => ({
-                value: value.id,
-                label:
-                  value.name + (value.sku ? " · " + value.sku : ""),
-              }))}
-            onValueChange={(productId) => update({ productId })}
-          />
+          {lockProduct ? (
+            <div className="inv-note">
+              <div>
+                <span className="inv-muted">Producto</span>
+
+                <p>
+                  <strong>
+                    {product?.name ?? "Producto #" + initialProductId}
+                  </strong>
+
+                  {product?.sku && <span> · {product.sku}</span>}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <SelectField
+              label="Producto *"
+              required
+              value={draft.productId}
+              options={products
+                .filter((value) => value.isActive)
+                .map((value) => ({
+                  value: value.id,
+                  label:
+                    value.name + (value.sku ? " · " + value.sku : ""),
+                }))}
+              onValueChange={(productId) => update({ productId })}
+            />
+          )}
 
           <SelectField
             label="Artículo de inventario *"
@@ -671,11 +762,18 @@ function ConsumptionForm({
         </p>
       )}
 
-      {!available && (
-        <p className="inv-muted">
-          Selecciona un producto y un artículo activos.
+      {ready && lockProduct && !product?.isActive ? (
+        <p className="inv-error" role="alert">
+          Este producto no existe o está inactivo. No se puede crear
+          la relación.
         </p>
-      )}
+      ) : ready && !available ? (
+        <p className="inv-muted">
+          {lockProduct
+            ? "Selecciona un artículo de inventario activo."
+            : "Selecciona un producto y un artículo activos."}
+        </p>
+      ) : null}
     </InventoryWriteDialog>
   );
 }
