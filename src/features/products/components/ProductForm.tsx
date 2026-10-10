@@ -82,7 +82,9 @@ export function ProductForm({
         (component) =>
           component.productId !== original?.id &&
           products.some(
-            (product) => product.id === component.productId
+            (product) =>
+              product.id === component.productId &&
+              product.canBeComboComponent === true
           )
       ));
 
@@ -362,8 +364,9 @@ export function ProductForm({
 
             {!compositionValid && (
               <p className="text-xs text-danger">
-                Agrega componentes existentes con cantidades mayores
-                que cero. El combo no puede incluirse a sí mismo.
+                Selecciona entre 2 y 100 productos habilitados, sin
+                repetir. Usa cantidades enteras entre 1 y 10.000. El
+                combo no puede incluirse a sí mismo.
               </p>
             )}
           </section>
@@ -396,12 +399,14 @@ export function ProductForm({
 
             {summary && (
               <p className="product-modal-help">
-                Su configuración se administra desde Inventario.
+                {isCombo
+                  ? "Este combo consume el inventario de sus componentes."
+                  : "Su configuración se administra desde Inventario."}{" "}
               </p>
             )}
           </div>
 
-          {onInventory && (
+          {onInventory && !isCombo && (
             <button
               type="button"
               className="product-modal-link"

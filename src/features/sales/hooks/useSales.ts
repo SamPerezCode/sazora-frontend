@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiError } from "../../../lib/http/client";
 import { isOperationalOrder } from "../utils/sales-board";
+import { getInventoryItems } from "../../inventory/services/inventory.service";
 
 import {
   cancelOrder as cancelOrderRequest,
@@ -75,6 +76,10 @@ export function useSales(token: string) {
   const businessId = session.business.id;
   const membershipId = session.membership.id;
   const userId = session.user.id;
+  const canReadInventory =
+    session.authorization.roles.includes("ADMIN");
+
+  const inventoryRefreshRequired = useRef(false);
 
   const ownQuantityChanges = useRef(new Set<string>());
   const [data, setData] = useState<SalesData | null>(null);
@@ -207,15 +212,19 @@ export function useSales(token: string) {
     reader.current = controller;
 
     try {
-      const next = await getSales(
-        token,
-        selected.current,
-        controller.signal
-      );
+      const [next] = await Promise.all([
+        getSales(token, selected.current, controller.signal),
+
+        inventoryRefreshRequired.current && canReadInventory
+          ? getInventoryItems(token, controller.signal)
+          : Promise.resolve(null),
+      ]);
 
       if (!alive.current || controller.signal.aborted) {
         return false;
       }
+
+      inventoryRefreshRequired.current = false;
 
       const detail = next.order;
 
@@ -274,7 +283,7 @@ export function useSales(token: string) {
         setLoading(false);
       }
     }
-  }, [token, forgetOrder]);
+  }, [token, forgetOrder, canReadInventory]);
 
   useEffect(() => {
     alive.current = true;
@@ -1449,6 +1458,20 @@ export function useSales(token: string) {
               { items }
             );
           } catch (cause) {
+            if (
+              cause instanceof ApiError &&
+              cause.status === 409 &&
+              cause.code === "INVENTORY_ITEM_NOT_AVAILABLE"
+            ) {
+              inventoryRefreshRequired.current = true;
+
+              throw new RecoveryError(
+                cause.message +
+                  " Las adiciones no se guardaron y continúan pendientes. " +
+                  "Debes actualizar los datos antes de reintentar."
+              );
+            }
+
             if (isUnknown(cause)) {
               uncertainBatch.current = order.id;
             }

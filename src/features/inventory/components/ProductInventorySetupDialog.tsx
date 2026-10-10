@@ -7,6 +7,8 @@ import { ApiError } from "../../../lib/http/client";
 import type { AuthSession } from "../../auth/types/auth.types";
 import type { ProductDetailData } from "../../products/schemas/product.schema";
 import { useInventoryQuery } from "../hooks/useInventoryQuery";
+import { useNavigate } from "react-router";
+import { productCompositionPath } from "../../products/utils/product-inventory";
 import {
   configureInventory,
   inventorySetupSchema,
@@ -26,6 +28,8 @@ export function ProductInventorySetupDialog({
   onResolved: (alreadyConfigured: boolean) => void;
 }) {
   const id = useId();
+  const navigate = useNavigate();
+  const [comboError, setComboError] = useState("");
 
   const loader = useCallback(
     (session: AuthSession, signal: AbortSignal) =>
@@ -39,6 +43,57 @@ export function ProductInventorySetupDialog({
   );
 
   const data = resource.data;
+
+  if (data?.product.isCombo || comboError) {
+    return (
+      <BottomSheet
+        id={id}
+        open
+        variant="modal"
+        title="Inventario del combo"
+        className="inv-dialog inv-centered"
+        onClose={onClose}
+      >
+        <div className="inv-dialog-body">
+          <p>Este combo consume el inventario de sus componentes.</p>
+
+          {comboError && (
+            <p role="alert" className="inv-error">
+              {comboError}
+            </p>
+          )}
+
+          {resource.pending && (
+            <p role="status">Actualizando producto…</p>
+          )}
+
+          {resource.error && (
+            <div role="alert">
+              <p className="inv-error">{resource.error}</p>
+
+              <Button variant="secondary" onClick={resource.refresh}>
+                Reintentar consulta
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <footer className="inv-dialog-footer">
+          <Button variant="cancel" onClick={onClose}>
+            Cerrar
+          </Button>
+
+          <Button
+            onClick={() =>
+              navigate(productCompositionPath(productId))
+            }
+          >
+            Editar composición
+          </Button>
+        </footer>
+      </BottomSheet>
+    );
+  }
 
   if (
     !data ||
@@ -103,6 +158,10 @@ export function ProductInventorySetupDialog({
       product={data.product}
       onClose={onClose}
       onResolved={onResolved}
+      onComboBlocked={(message) => {
+        setComboError(message);
+        resource.refresh();
+      }}
     />
   );
 }
@@ -111,10 +170,12 @@ function SetupForm({
   product,
   onClose,
   onResolved,
+  onComboBlocked,
 }: {
   product: ProductDetailData;
   onClose: () => void;
   onResolved: (alreadyConfigured: boolean) => void;
+  onComboBlocked: (message: string) => void;
 }) {
   const { session } = useAppShell();
 
@@ -130,6 +191,7 @@ function SetupForm({
   const [draft, setDraft] = useState(initial);
 
   const alreadyConfigured = useRef(false);
+  const blockedCombo = useRef<string | null>(null);
 
   const validation = inventorySetupSchema.safeParse(draft);
 
@@ -150,9 +212,16 @@ function SetupForm({
       dirty={dirty}
       valid={validation.success && product.isActive}
       onClose={onClose}
-      onSaved={() => onResolved(alreadyConfigured.current)}
+      onSaved={() => {
+        if (blockedCombo.current !== null) {
+          onComboBlocked(blockedCombo.current);
+        } else {
+          onResolved(alreadyConfigured.current);
+        }
+      }}
       onSave={async (signal) => {
         alreadyConfigured.current = false;
+        blockedCombo.current = null;
 
         try {
           await configureInventory(
@@ -164,10 +233,20 @@ function SetupForm({
         } catch (error) {
           if (
             error instanceof ApiError &&
+            error.status === 409 &&
+            error.code === "COMBO_INVENTORY_SETUP_NOT_ALLOWED"
+          ) {
+            blockedCombo.current =
+              error.message ||
+              "Este combo consume el inventario de sus componentes.";
+
+            return;
+          }
+
+          if (
+            error instanceof ApiError &&
             error.code === "PRODUCT_INVENTORY_ALREADY_CONFIGURED"
           ) {
-            // Puede haberse configurado desde otra pestaña
-            // después de nuestra consulta inicial.
             alreadyConfigured.current = true;
             return;
           }

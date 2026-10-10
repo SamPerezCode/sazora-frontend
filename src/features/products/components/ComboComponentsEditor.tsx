@@ -25,13 +25,26 @@ export function ComboComponentsEditor({
   const [selected, setSelected] = useState("");
 
   const available = products.filter(
-    (product) => product.id !== ownId
+    (product) =>
+      product.canBeComboComponent === true && product.id !== ownId
   );
 
   const chosen = available.find((product) => product.id === selected);
 
+  const selectedComponent = value.find(
+    (item) => item.productId === selected
+  );
+
+  const canAdd =
+    !!chosen &&
+    (selectedComponent
+      ? Number.isInteger(selectedComponent.quantity) &&
+        selectedComponent.quantity >= 1 &&
+        selectedComponent.quantity < 10_000
+      : value.length < 100);
+
   function addComponent() {
-    if (!chosen) return;
+    if (disabled || !chosen || !canAdd) return;
 
     const previous = value.find(
       (item) => item.productId === chosen.id
@@ -64,24 +77,29 @@ export function ComboComponentsEditor({
         onValueChange={setSelected}
         options={available.map((product) => ({
           value: product.id,
-          label:
-            product.name + (product.isActive ? "" : " · Inactivo"),
+          label: product.name,
         }))}
       />
 
       <Button
         size="sm"
         variant="secondary"
-        disabled={disabled || !chosen}
+        disabled={disabled || !canAdd}
         onClick={addComponent}
       >
         <Plus size={16} />
         Agregar componente
       </Button>
 
-      {!value.length && (
-        <p className="text-xs text-muted">
-          Selecciona al menos un producto.
+      <p className="text-xs text-muted">
+        Este combo consume el inventario de sus componentes.
+        Selecciona entre 2 y 100 productos diferentes.
+      </p>
+
+      {!available.length && (
+        <p role="status" className="text-xs text-muted">
+          No hay productos habilitados como componentes. Revisa su
+          estado y configuración de inventario.
         </p>
       )}
 
@@ -89,6 +107,15 @@ export function ComboComponentsEditor({
         const product = products.find(
           (candidate) => candidate.id === item.productId
         );
+
+        const eligible =
+          product?.canBeComboComponent === true &&
+          item.productId !== ownId;
+
+        const validQuantity =
+          Number.isInteger(item.quantity) &&
+          item.quantity >= 1 &&
+          item.quantity <= 10_000;
 
         return (
           <div
@@ -114,9 +141,7 @@ export function ComboComponentsEditor({
                 size="sm"
                 variant="danger"
                 disabled={disabled}
-                aria-label={`Quitar ${
-                  product?.name ?? item.productId
-                }`}
+                aria-label={`Quitar ${product?.name ?? item.productId}`}
                 onClick={() =>
                   onChange(
                     value.filter(
@@ -130,18 +155,26 @@ export function ComboComponentsEditor({
               </Button>
             </div>
 
+            {!eligible && (
+              <p role="alert" className="text-xs text-danger">
+                Este producto ya no puede ser componente. Retíralo o
+                corrige su configuración antes de guardar.
+              </p>
+            )}
+
             <TextField
               label="Cantidad"
               type="number"
-              min="0"
-              step="any"
+              min="1"
+              max="10000"
+              step="1"
               value={item.quantity || ""}
               disabled={disabled}
               required
               error={
-                item.quantity > 0
+                validQuantity
                   ? undefined
-                  : "Debe ser mayor que cero."
+                  : "Usa un entero entre 1 y 10.000."
               }
               onChange={(event) =>
                 onChange(

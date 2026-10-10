@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+
 import { Alert } from "../../../components/feedback/Alert";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { BottomSheet } from "../../../components/layout/BottomSheet";
@@ -18,6 +18,8 @@ import { ProductImageForm } from "../components/ProductImageForm";
 import { ProductStatusConfirmDialog } from "../components/ProductStatusConfirmDialog";
 import { productInventoryPath } from "../utils/product-inventory";
 import { useProducts } from "../hooks/useProducts";
+import { useNavigate, useSearchParams } from "react-router";
+import { useInventoryRealtime } from "../../../hooks/useInventoryRealtime";
 
 type Editor =
   | { kind: "create" }
@@ -45,7 +47,38 @@ function ProductsContent({ session }: { session: AuthSession }) {
   const resource = useProducts(session);
   const navigate = useNavigate();
 
-  const [editor, setEditor] = useState<Editor | null>(null);
+  const [params, setParams] = useSearchParams();
+
+  const [localEditor, setLocalEditor] = useState<Editor | null>(null);
+
+  const linkedCombo = resource.data?.products.find(
+    (product) =>
+      product.id === params.get("editComboId") && product.isCombo
+  );
+
+  const editor: Editor | null =
+    localEditor ??
+    (linkedCombo ? { kind: "edit", id: linkedCombo.id } : null);
+
+  function setEditor(next: Editor | null) {
+    setLocalEditor(next);
+
+    if (params.has("editComboId")) {
+      const nextParams = new URLSearchParams(params);
+
+      nextParams.delete("editComboId");
+
+      setParams(nextParams, { replace: true });
+    }
+  }
+
+  useInventoryRealtime(session, () => {
+    if (resource.busy || resource.pending) return false;
+
+    resource.retry();
+
+    return true;
+  });
   const [revision, setRevision] = useState(0);
 
   const [notice, setNotice] = useState<{
@@ -101,12 +134,14 @@ function ProductsContent({ session }: { session: AuthSession }) {
     setNotice(null);
 
     if (kind === "inventory") {
+      if (product.isCombo) {
+        setEditor({ kind: "edit", id: product.id });
+        return;
+      }
+
       setEditor(null);
 
-      const path = productInventoryPath(
-        product.id,
-        product.hasInventory
-      );
+      const path = productInventoryPath(product);
 
       if (path) {
         navigate(path);

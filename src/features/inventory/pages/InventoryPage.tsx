@@ -30,6 +30,8 @@ import { InventoryMovements } from "../components/InventoryMovements";
 import { InventoryConsumption } from "../components/InventoryConsumption";
 import { InventoryProduction } from "../components/InventoryProduction";
 import { ProductInventorySetupDialog } from "../components/ProductInventorySetupDialog";
+import { useInventoryRealtime } from "../../../hooks/useInventoryRealtime";
+
 import {
   dayKey,
   formatQuantity,
@@ -244,6 +246,14 @@ function InventoryScreen() {
     resource.refresh();
     setRevision((value) => value + 1);
   }
+
+  useInventoryRealtime(session, () => {
+    if (resource.pending) return false;
+
+    refreshInventory();
+
+    return true;
+  });
 
   function onAction(action: InventoryAction, item: InventoryItem) {
     if (

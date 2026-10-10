@@ -1,0 +1,1170 @@
+diff --git a/src/features/inventory/hooks/useInventoryRealtime.ts b/src/features/inventory/hooks/useInventoryRealtime.ts
+new file mode 100644
+--- /dev/null
++++ b/src/features/inventory/hooks/useInventoryRealtime.ts
+@@ -0,0 +1,95 @@
++import { useEffect, useEffectEvent } from "react";
++import { z } from "zod";
++import type { AuthSession } from "../../auth/types/auth.types";
++import { acquireSessionSocket } from "../../../lib/realtime/session-socket";
++
++const eventSchema = z.object({
++  eventId: z.string().uuid(),
++  businessId: z.string(),
++  occurredAt: z.iso.datetime({ offset: true }),
++});
++
++export function useInventoryRealtime(
++  session: AuthSession,
++  onInvalidate: () => void
++) {
++  const invalidate = useEffectEvent(onInvalidate);
++  const accessToken = session.accessToken;
++  const businessId = session.business.id;
++  const membershipId = session.membership.id;
++  const userId = session.user.id;
++  const allowed = session.authorization.roles.includes("ADMIN");
++
++  useEffect(() => {
++    if (!allowed) return;
++
++    const lease = acquireSessionSocket({
++      accessToken, businessId, membershipId, userId,
++    });
++    let timer: ReturnType<typeof setTimeout> | undefined;
++    let pending = false;
++    const seen = new Set<string>();
++
++    function schedule() {
++      pending = true;
++      if (timer === undefined) timer = setTimeout(flush, 500);
++    }
++
++    function flush() {
++      timer = undefined;
++      if (!pending || document.visibilityState !== "visible") return;
++
++      // Conserva los formularios y sus borradores hasta cerrar el modal.
++      if (document.querySelector("dialog[open]")) {
++        timer = setTimeout(flush, 500);
++        return;
++      }
++
++      pending = false;
++      invalidate();
++    }
++
++    function receive(raw: unknown) {
++      if (lease.getStatus() !== "connected") return;
++      const result = eventSchema.safeParse(raw);
++      if (!result.success || result.data.businessId !== businessId) return;
++      if (seen.has(result.data.eventId)) return;
++
++      seen.add(result.data.eventId);
++      if (seen.size > 200) seen.delete(seen.values().next().value!);
++      schedule();
++    }
++
++    function connectionChanged(status: string) {
++      if (status === "connected") schedule();
++    }
++
++    function visible() {
++      if (document.visibilityState === "visible") schedule();
++    }
++
++    lease.socket.on("inventory:changed", receive);
++    const unsubscribe = lease.subscribe(connectionChanged);
++    // También cubre un socket compartido que ya estaba conectado.
++    timer = setTimeout(() => {
++      timer = undefined;
++      connectionChanged(lease.getStatus());
++    }, 0);
++
++    document.addEventListener("visibilitychange", visible);
++    window.addEventListener("focus", visible);
++
++    // Recupera eventos perdidos. No exige una entrega durable del socket.
++    const interval = setInterval(visible, 60_000);
++
++    return () => {
++      clearTimeout(timer);
++      clearInterval(interval);
++      document.removeEventListener("visibilitychange", visible);
++      window.removeEventListener("focus", visible);
++      lease.socket.off("inventory:changed", receive);
++      unsubscribe();
++      lease.release();
++    };
++  }, [accessToken, businessId, membershipId, userId, allowed]);
++}
+diff --git a/src/features/products/schemas/product.schema.ts b/src/features/products/schemas/product.schema.ts
+--- a/src/features/products/schemas/product.schema.ts
++++ b/src/features/products/schemas/product.schema.ts
+@@ -27,20 +27,22 @@
+   imageUrl: z.string().nullable(),
+   currentPrice: z.string().regex(/^\d+(?:\.\d{1,2})?$/),
+   isActive: z.boolean(),
+-  createdAt: z.iso.datetime({ offset: true }).optional(),
+-  updatedAt: z.iso.datetime({ offset: true }).optional(),
+-});
+-
+-export const productSchema = productDetailSchema.extend({
+-  createdAt: z.iso.datetime({ offset: true }),
+-  updatedAt: z.iso.datetime({ offset: true }),
+-  categoryName: z.string(),
+-  preparationAreaName: z.string(),
+-  categoryIsActive: z.boolean().optional(),
+-  preparationAreaIsActive: z.boolean().optional(),
+-  isAvailable: z.boolean().optional(),
+-  isCombo: z.boolean(),
+-  hasInventory: z.boolean(),
++  isCombo: z.boolean().optional(),
++  createdAt: z.iso.datetime({ offset: true }).optional(),
++  updatedAt: z.iso.datetime({ offset: true }).optional(),
++});
++
++export const productSchema = productDetailSchema.extend({
++  createdAt: z.iso.datetime({ offset: true }),
++  updatedAt: z.iso.datetime({ offset: true }),
++  categoryName: z.string(),
++  preparationAreaName: z.string(),
++  categoryIsActive: z.boolean().optional(),
++  preparationAreaIsActive: z.boolean().optional(),
++  isAvailable: z.boolean().optional(),
++  isCombo: z.boolean(),
++  hasInventory: z.boolean(),
++  canBeComboComponent: z.boolean().default(false),
+   inventoryTrackingType: inventoryTrackingSchema,
+ });
+ 
+diff --git a/src/features/products/schemas/product-action.schema.ts b/src/features/products/schemas/product-action.schema.ts
+--- a/src/features/products/schemas/product-action.schema.ts
++++ b/src/features/products/schemas/product-action.schema.ts
+@@ -41,10 +41,13 @@
+       quantity: z
+         .number()
+         .finite()
+-        .positive("La cantidad debe ser mayor que cero."),
+-    })
+-  )
+-  .min(1, "Agrega al menos un componente.")
++        .int("Usa cantidades enteras.")
++        .positive("La cantidad debe ser mayor que cero.")
++        .max(10000, "Máximo 10.000 unidades por componente."),
++    })
++  )
++  .min(2, "Agrega al menos dos productos diferentes.")
++  .max(100, "Máximo 100 componentes.")
+   .superRefine((items, context) => {
+     if (
+       new Set(items.map((item) => item.productId)).size !==
+diff --git a/src/features/products/components/ProductForm.tsx b/src/features/products/components/ProductForm.tsx
+--- a/src/features/products/components/ProductForm.tsx
++++ b/src/features/products/components/ProductForm.tsx
+@@ -82,7 +82,10 @@
+         (component) =>
+           component.productId !== original?.id &&
+           products.some(
+-            (product) => product.id === component.productId
++            (product) =>
++              product.id === component.productId &&
++              product.isActive &&
++              product.canBeComboComponent
+           )
+       ));
+ 
+diff --git a/src/features/products/components/ComboComponentsEditor.tsx b/src/features/products/components/ComboComponentsEditor.tsx
+--- a/src/features/products/components/ComboComponentsEditor.tsx
++++ b/src/features/products/components/ComboComponentsEditor.tsx
+@@ -25,123 +25,145 @@
+   const [selected, setSelected] = useState("");
+ 
+   const available = products.filter(
+-    (product) => product.id !== ownId
+-  );
+-
+-  const chosen = available.find((product) => product.id === selected);
+-
+-  function addComponent() {
+-    if (!chosen) return;
+-
+-    const previous = value.find(
+-      (item) => item.productId === chosen.id
+-    );
+-
+-    onChange(
+-      previous
+-        ? value.map((item) =>
+-            item.productId === chosen.id
+-              ? { ...item, quantity: item.quantity + 1 }
+-              : item
+-          )
+-        : [...value, { productId: chosen.id, quantity: 1 }]
+-    );
+-  }
+-
+-  return (
+-    <section
+-      className="space-y-3 rounded-xl border border-outline/60 p-3"
+-      aria-label="Componentes del combo"
+-    >
+-      <p className="text-sm font-semibold text-heading">
+-        Componentes del combo
+-      </p>
+-
+-      <SelectField
+-        label="Producto"
+-        value={selected}
+-        disabled={disabled}
+-        onValueChange={setSelected}
+-        options={available.map((product) => ({
+-          value: product.id,
+-          label:
+-            product.name + (product.isActive ? "" : " · Inactivo"),
+-        }))}
+-      />
+-
+-      <Button
+-        size="sm"
+-        variant="secondary"
+-        disabled={disabled || !chosen}
+-        onClick={addComponent}
+-      >
+-        <Plus size={16} />
+-        Agregar componente
+-      </Button>
+-
+-      {!value.length && (
+-        <p className="text-xs text-muted">
+-          Selecciona al menos un producto.
+-        </p>
+-      )}
+-
+-      {value.map((item) => {
+-        const product = products.find(
+-          (candidate) => candidate.id === item.productId
+-        );
+-
+-        return (
+-          <div
+-            key={item.productId}
+-            className="space-y-2 border-t border-outline/60 pt-3"
+-          >
+-            <div className="flex items-start justify-between gap-2">
+-              <div className="min-w-0 text-sm">
+-                <p className="font-semibold text-heading">
+-                  {product?.name ??
+-                    "Producto no disponible en el catálogo"}
+-                </p>
+-
+-                {product && (
+-                  <p className="text-xs text-muted">
+-                    {formatProductPrice(product.currentPrice)} por
+-                    unidad
+-                  </p>
+-                )}
+-              </div>
+-
+-              <Button
+-                size="sm"
+-                variant="danger"
+-                disabled={disabled}
+-                aria-label={`Quitar ${
+-                  product?.name ?? item.productId
+-                }`}
+-                onClick={() =>
+-                  onChange(
+-                    value.filter(
+-                      (candidate) =>
+-                        candidate.productId !== item.productId
+-                    )
+-                  )
+-                }
+-              >
+-                <Trash2 size={16} />
+-              </Button>
+-            </div>
+-
+-            <TextField
+-              label="Cantidad"
+-              type="number"
+-              min="0"
+-              step="any"
+-              value={item.quantity || ""}
+-              disabled={disabled}
+-              required
+-              error={
+-                item.quantity > 0
+-                  ? undefined
+-                  : "Debe ser mayor que cero."
++    (product) =>
++      product.id !== ownId &&
++      product.isActive &&
++      product.canBeComboComponent
++  );
++
++  const chosen = available.find((product) => product.id === selected);
++
++  function addComponent() {
++    if (disabled || !chosen) return;
++
++    const previous = value.find(
++      (item) => item.productId === chosen.id
++    );
++
++    if (previous ? previous.quantity >= 10000 : value.length >= 100) return;
++
++    onChange(
++      previous
++        ? value.map((item) =>
++            item.productId === chosen.id
++              ? { ...item, quantity: item.quantity + 1 }
++              : item
++          )
++        : [...value, { productId: chosen.id, quantity: 1 }]
++    );
++  }
++
++  return (
++    <section
++      className="space-y-3 rounded-xl border border-outline/60 p-3"
++      aria-label="Componentes del combo"
++    >
++      <p className="text-sm font-semibold text-heading">
++        Componentes del combo
++      </p>
++
++      <SelectField
++        label="Producto"
++        value={selected}
++        disabled={disabled}
++        onValueChange={setSelected}
++        options={available.map((product) => ({
++          value: product.id,
++          label:
++            product.name + (product.isActive ? "" : " · Inactivo"),
++        }))}
++      />
++
++      <Button
++        size="sm"
++        variant="secondary"
++        disabled={disabled || !chosen}
++        onClick={addComponent}
++      >
++        <Plus size={16} />
++        Agregar componente
++      </Button>
++
++      {!available.length && (
++        <p className="text-xs text-muted">
++          No hay productos elegibles. Configura su inventario y activa
++          el descuento automático antes de agregarlos al combo.
++        </p>
++      )}
++
++      {!value.length && (
++        <p className="text-xs text-muted">
++          Selecciona al menos dos productos diferentes con inventario activo.
++        </p>
++      )}
++
++      {value.map((item) => {
++        const product = products.find(
++          (candidate) => candidate.id === item.productId
++        );
++
++        return (
++          <div
++            key={item.productId}
++            className="space-y-2 border-t border-outline/60 pt-3"
++          >
++            <div className="flex items-start justify-between gap-2">
++              <div className="min-w-0 text-sm">
++                <p className="font-semibold text-heading">
++                  {product?.name ??
++                    "Producto no disponible en el catálogo"}
++                </p>
++
++                {(!product?.isActive || !product?.canBeComboComponent) && (
++                  <p className="text-xs text-red-500" role="alert">
++                    Este componente ya no tiene inventario utilizable.
++                    Corrígelo o retíralo antes de guardar.
++                  </p>
++                )}
++
++                {product && (
++                  <p className="text-xs text-muted">
++                    {formatProductPrice(product.currentPrice)} por
++                    unidad
++                  </p>
++                )}
++              </div>
++
++              <Button
++                size="sm"
++                variant="danger"
++                disabled={disabled}
++                aria-label={`Quitar ${
++                  product?.name ?? item.productId
++                }`}
++                onClick={() =>
++                  onChange(
++                    value.filter(
++                      (candidate) =>
++                        candidate.productId !== item.productId
++                    )
++                  )
++                }
++              >
++                <Trash2 size={16} />
++              </Button>
++            </div>
++
++            <TextField
++              label="Cantidad"
++              type="number"
++              min="1"
++              max="10000"
++              step="1"
++              value={item.quantity || ""}
++              disabled={disabled}
++              required
++              error={
++                Number.isInteger(item.quantity) &&
++                item.quantity >= 1 &&
++                item.quantity <= 10000
++                  ? undefined
++                  : "Usa un entero entre 1 y 10.000."
+               }
+               onChange={(event) =>
+                 onChange(
+diff --git a/src/features/products/utils/product-inventory.ts b/src/features/products/utils/product-inventory.ts
+--- a/src/features/products/utils/product-inventory.ts
++++ b/src/features/products/utils/product-inventory.ts
+@@ -2,19 +2,20 @@
+ 
+ export function productInventoryPath(
+   productId: string,
+-  hasInventory: boolean
+-): string | null {
+-  const route = getNavigation(["ADMIN"]).find(
+-    (item) => item.id === "inventory"
+-  );
+-
+-  if (!route || route.status !== "ready") {
+-    return null;
+-  }
+-
+-  const params = new URLSearchParams({
+-    productId,
+-    intent: hasInventory ? "manage" : "configure",
++  hasInventory: boolean,
++  isCombo: boolean
++): string | null {
++  const route = getNavigation(["ADMIN"]).find(
++    (item) => item.id === "inventory"
++  );
++
++  if (!route || route.status !== "ready") {
++    return null;
++  }
++
++  const params = new URLSearchParams({
++    productId,
++    intent: isCombo || hasInventory ? "manage" : "configure",
+   });
+ 
+   const separator = route.to.includes("?") ? "&" : "?";
+diff --git a/src/features/products/pages/ProductsPage.tsx b/src/features/products/pages/ProductsPage.tsx
+--- a/src/features/products/pages/ProductsPage.tsx
++++ b/src/features/products/pages/ProductsPage.tsx
+@@ -18,94 +18,97 @@
+ import { ProductStatusConfirmDialog } from "../components/ProductStatusConfirmDialog";
+ import { productInventoryPath } from "../utils/product-inventory";
+ import { useProducts } from "../hooks/useProducts";
+-
+-type Editor =
+-  | { kind: "create" }
+-  | {
+-      kind: Exclude<ProductActionKind, "inventory">;
+-      id: string;
+-    };
+-
+-export function ProductsPage() {
+-  const { session } = useAppShell();
+-
+-  if (!session.authorization.roles.includes("ADMIN")) {
+-    return <Alert>No tienes acceso a Productos.</Alert>;
+-  }
+-
+-  return (
+-    <ProductsContent
+-      key={`${session.business.id}:${session.membership.id}:${session.accessToken}`}
+-      session={session}
+-    />
+-  );
+-}
+-
+-function ProductsContent({ session }: { session: AuthSession }) {
+-  const resource = useProducts(session);
+-  const navigate = useNavigate();
+-
+-  const [editor, setEditor] = useState<Editor | null>(null);
+-  const [revision, setRevision] = useState(0);
+-
+-  const [notice, setNotice] = useState<{
+-    message: string;
+-    error: boolean;
+-  } | null>(null);
+-
+-  const alive = useRef(false);
+-  const modalId = useId();
+-
+-  useEffect(() => {
+-    alive.current = true;
+-
+-    return () => {
+-      alive.current = false;
+-    };
+-  }, []);
+-
+-  useEffect(() => {
+-    if (!notice || notice.error) return;
+-
+-    const timer = window.setTimeout(() => setNotice(null), 7000);
+-
+-    return () => window.clearTimeout(timer);
+-  }, [notice]);
+-
+-  async function save(action: ProductMutation) {
+-    const warning = await resource.mutate(action);
+-
+-    if (!alive.current) return;
+-
+-    setRevision((value) => value + 1);
+-
+-    setEditor(
+-      action.kind === "create" || action.kind === "edit"
+-        ? null
+-        : { kind: "detail", id: action.id }
+-    );
+-
+-    setNotice({
+-      error: !!warning,
+-      message:
+-        warning ??
+-        (action.kind === "create"
+-          ? "Producto creado. El control de inventario es opcional y se configura desde Inventario."
+-          : "Cambios guardados."),
+-    });
+-  }
+-
+-  function onAction(kind: ProductActionKind, product: Product) {
+-    if (resource.busy) return;
+-
+-    setNotice(null);
+-
+-    if (kind === "inventory") {
+-      setEditor(null);
+-
+-      const path = productInventoryPath(
+-        product.id,
+-        product.hasInventory
++import { useInventoryRealtime } from "../../inventory/hooks/useInventoryRealtime";
++
++type Editor =
++  | { kind: "create" }
++  | {
++      kind: Exclude<ProductActionKind, "inventory">;
++      id: string;
++    };
++
++export function ProductsPage() {
++  const { session } = useAppShell();
++
++  if (!session.authorization.roles.includes("ADMIN")) {
++    return <Alert>No tienes acceso a Productos.</Alert>;
++  }
++
++  return (
++    <ProductsContent
++      key={`${session.business.id}:${session.membership.id}:${session.accessToken}`}
++      session={session}
++    />
++  );
++}
++
++function ProductsContent({ session }: { session: AuthSession }) {
++  const resource = useProducts(session);
++  useInventoryRealtime(session, resource.retry);
++  const navigate = useNavigate();
++
++  const [editor, setEditor] = useState<Editor | null>(null);
++  const [revision, setRevision] = useState(0);
++
++  const [notice, setNotice] = useState<{
++    message: string;
++    error: boolean;
++  } | null>(null);
++
++  const alive = useRef(false);
++  const modalId = useId();
++
++  useEffect(() => {
++    alive.current = true;
++
++    return () => {
++      alive.current = false;
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!notice || notice.error) return;
++
++    const timer = window.setTimeout(() => setNotice(null), 7000);
++
++    return () => window.clearTimeout(timer);
++  }, [notice]);
++
++  async function save(action: ProductMutation) {
++    const warning = await resource.mutate(action);
++
++    if (!alive.current) return;
++
++    setRevision((value) => value + 1);
++
++    setEditor(
++      action.kind === "create" || action.kind === "edit"
++        ? null
++        : { kind: "detail", id: action.id }
++    );
++
++    setNotice({
++      error: !!warning,
++      message:
++        warning ??
++        (action.kind === "create"
++          ? "Producto creado. El control de inventario es opcional y se configura desde Inventario."
++          : "Cambios guardados."),
++    });
++  }
++
++  function onAction(kind: ProductActionKind, product: Product) {
++    if (resource.busy) return;
++
++    setNotice(null);
++
++    if (kind === "inventory") {
++      setEditor(null);
++
++      const path = productInventoryPath(
++        product.id,
++        product.hasInventory,
++        product.isCombo
+       );
+ 
+       if (path) {
+diff --git a/src/features/products/components/ProductActions.tsx b/src/features/products/components/ProductActions.tsx
+--- a/src/features/products/components/ProductActions.tsx
++++ b/src/features/products/components/ProductActions.tsx
+@@ -54,9 +54,11 @@
+       : []),
+     {
+       id: "inventory",
+-      label: product.hasInventory
+-        ? "Gestionar en Inventario"
+-        : "Configurar en Inventario",
++      label: product.isCombo
++        ? "Ver consumo del combo"
++        : product.hasInventory
++          ? "Gestionar en Inventario"
++          : "Configurar en Inventario",
+       icon: <Boxes size={16} />,
+       onSelect: () => onAction("inventory", product),
+     },
+diff --git a/src/features/inventory/pages/InventoryPage.tsx b/src/features/inventory/pages/InventoryPage.tsx
+--- a/src/features/inventory/pages/InventoryPage.tsx
++++ b/src/features/inventory/pages/InventoryPage.tsx
+@@ -22,228 +22,231 @@
+ import { InventoryList } from "../components/InventoryList";
+ import type { InventoryAction } from "../components/InventoryActions";
+ import { useInventory } from "../hooks/useInventory";
+-import type { InventoryItem } from "../schemas/inventory.schema";
+-import { InventoryDialog } from "../components/InventoryDialog";
+-import type { InventoryDialogAction } from "../components/InventoryDialog";
+-import { InventoryCreateDialog } from "../components/InventoryCreateDialog";
+-import { InventoryMovements } from "../components/InventoryMovements";
+-import { InventoryConsumption } from "../components/InventoryConsumption";
+-import { InventoryProduction } from "../components/InventoryProduction";
+-import { ProductInventorySetupDialog } from "../components/ProductInventorySetupDialog";
+-import {
+-  dayKey,
+-  formatQuantity,
+-  itemTypeLabels,
+-  searchKey,
+-  unitLabels,
+-  validTimeZone,
+-} from "../utils/inventory-format";
+-
+-import {
+-  InventorySkeleton,
+-  InventoryLoadError,
+-  InventoryEmptyState,
+-} from "../components/InventoryStates";
+-
+-export function InventoryPage() {
+-  const { session } = useAppShell();
+-
+-  return (
+-    <InventoryScreen
+-      key={session.business.id + ":" + session.membership.id}
+-    />
+-  );
+-}
+-
+-function InventoryScreen() {
+-  const { session, settings } = useAppShell();
+-  const resource = useInventory(session);
+-  const [params, setParams] = useSearchParams();
+-
+-  const [creating, setCreating] = useState(false);
+-  const [revision, setRevision] = useState(0);
+-
+-  const [search, setSearch] = useState("");
+-  const [type, setType] = useState("ALL");
+-  const [stock, setStock] = useState("ALL");
+-  const [activity, setActivity] = useState("ALL");
+-
+-  const [page, setPage] = useState(1);
+-  const [pageSize, setPageSize] = useState(10);
+-
+-  const [notice, setNotice] = useState("");
+-  const [dialog, setDialog] = useState<InventoryDialogAction | null>(
+-    null
+-  );
+-  const [clock, setClock] = useState(Date.now);
+-
+-  useEffect(() => {
+-    const timer = window.setInterval(
+-      () => setClock(Date.now()),
+-      60_000
+-    );
+-
+-    return () => window.clearInterval(timer);
+-  }, []);
+-
+-  const items = resource.items.data;
+-
+-  const active = items?.filter((item) => item.isActive) ?? [];
+-
+-  const critical = active.filter(
+-    (item) => item.stockStatus !== "AVAILABLE"
+-  );
+-
+-  const exhausted = active.filter(
+-    (item) => item.stockStatus === "OUT_OF_STOCK"
+-  );
+-
+-  const low = active.filter(
+-    (item) => item.stockStatus === "LOW_STOCK"
+-  );
+-
+-  const query = searchKey(search);
+-
+-  const filtered = (items ?? []).filter((item) => {
+-    const matchesStock =
+-      stock === "ALL" ||
+-      (stock === "ATTENTION"
+-        ? item.isActive && item.stockStatus !== "AVAILABLE"
+-        : item.stockStatus === stock);
+-
+-    return (
+-      searchKey(item.name + " " + (item.sku ?? "")).includes(query) &&
+-      (type === "ALL" || item.itemType === type) &&
+-      matchesStock &&
+-      (activity === "ALL" ||
+-        item.isActive === (activity === "ACTIVE"))
+-    );
+-  });
+-
+-  const currentPage = Math.min(
+-    page,
+-    Math.max(1, Math.ceil(filtered.length / pageSize))
+-  );
+-
+-  const visible = filtered.slice(
+-    (currentPage - 1) * pageSize,
+-    currentPage * pageSize
+-  );
+-
+-  const filteredByUser =
+-    !!search ||
+-    type !== "ALL" ||
+-    stock !== "ALL" ||
+-    activity !== "ALL";
+-
+-  const zone = validTimeZone(settings.data?.timezone);
+-  const today = zone ? dayKey(clock, zone) : null;
+-
+-  const todayCount =
+-    zone && today && resource.movements.data
+-      ? resource.movements.data.filter(
+-          (movement) => dayKey(movement.createdAt, zone) === today
+-        ).length
+-      : null;
+-
+-  const updated = resource.items.updatedAt;
+-
+-  const updatedLabel =
+-    updated && zone
+-      ? new Intl.DateTimeFormat("es-CO", {
+-          timeZone: zone,
+-          day: "numeric",
+-          month: "short",
+-          hour: "numeric",
+-          minute: "2-digit",
+-        }).format(updated)
+-      : null;
+-
+-  // Compatible con la navegación actual desde Productos
+-  // y con el parámetro propuesto por el backend.
+-  const productId =
+-    params.get("setupProductId") ?? params.get("productId");
+-
+-  const configureProductId =
+-    productId &&
+-    (params.get("intent") === "configure" ||
+-      params.has("setupProductId"))
+-      ? productId
+-      : "";
+-
+-  function finishConfiguration() {
+-    setParams(
+-      (previous) => {
+-        const next = new URLSearchParams(previous);
+-
+-        next.delete("intent");
+-        next.delete("setupProductId");
+-        next.set("tab", "consumption");
+-
+-        if (productId) {
+-          next.set("productId", productId);
+-        }
+-
+-        return next;
+-      },
+-      { replace: true }
+-    );
+-  }
+-
+-  function clearFilters() {
+-    setSearch("");
+-    setType("ALL");
+-    setStock("ALL");
+-    setActivity("ALL");
+-    setPage(1);
+-  }
+-
+-  function showCritical() {
+-    setSearch("");
+-    setType("ALL");
+-    setStock("ATTENTION");
+-    setActivity("ACTIVE");
+-    setPage(1);
+-  }
+-
+-  const tab =
+-    params.get("tab") === "production"
+-      ? "production"
+-      : params.get("tab") === "movements"
+-        ? "movements"
+-        : params.get("tab") === "consumption" || productId
+-          ? "consumption"
+-          : "stock";
+-
+-  function openTab(
+-    next: "stock" | "movements" | "consumption" | "production",
+-    itemId?: string
+-  ) {
+-    const nextParams = new URLSearchParams(params);
+-
+-    [
+-      "tab",
+-      "itemId",
+-      "productId",
+-      "setupProductId",
+-      "intent",
+-    ].forEach((key) => nextParams.delete(key));
+-
+-    if (next !== "stock") {
+-      nextParams.set("tab", next);
+-    }
+-
+-    if (itemId) {
+-      nextParams.set("itemId", itemId);
+-    }
+-
+-    setParams(nextParams);
+-  }
+-
+-  function refreshInventory() {
+-    resource.refresh();
+-    setRevision((value) => value + 1);
+-  }
++import { useInventoryRealtime } from "../hooks/useInventoryRealtime";
++import type { InventoryItem } from "../schemas/inventory.schema";
++import { InventoryDialog } from "../components/InventoryDialog";
++import type { InventoryDialogAction } from "../components/InventoryDialog";
++import { InventoryCreateDialog } from "../components/InventoryCreateDialog";
++import { InventoryMovements } from "../components/InventoryMovements";
++import { InventoryConsumption } from "../components/InventoryConsumption";
++import { InventoryProduction } from "../components/InventoryProduction";
++import { ProductInventorySetupDialog } from "../components/ProductInventorySetupDialog";
++import {
++  dayKey,
++  formatQuantity,
++  itemTypeLabels,
++  searchKey,
++  unitLabels,
++  validTimeZone,
++} from "../utils/inventory-format";
++
++import {
++  InventorySkeleton,
++  InventoryLoadError,
++  InventoryEmptyState,
++} from "../components/InventoryStates";
++
++export function InventoryPage() {
++  const { session } = useAppShell();
++
++  return (
++    <InventoryScreen
++      key={session.business.id + ":" + session.membership.id}
++    />
++  );
++}
++
++function InventoryScreen() {
++  const { session, settings } = useAppShell();
++  const resource = useInventory(session);
++  const [params, setParams] = useSearchParams();
++
++  const [creating, setCreating] = useState(false);
++  const [revision, setRevision] = useState(0);
++
++  const [search, setSearch] = useState("");
++  const [type, setType] = useState("ALL");
++  const [stock, setStock] = useState("ALL");
++  const [activity, setActivity] = useState("ALL");
++
++  const [page, setPage] = useState(1);
++  const [pageSize, setPageSize] = useState(10);
++
++  const [notice, setNotice] = useState("");
++  const [dialog, setDialog] = useState<InventoryDialogAction | null>(
++    null
++  );
++  const [clock, setClock] = useState(Date.now);
++
++  useEffect(() => {
++    const timer = window.setInterval(
++      () => setClock(Date.now()),
++      60_000
++    );
++
++    return () => window.clearInterval(timer);
++  }, []);
++
++  const items = resource.items.data;
++
++  const active = items?.filter((item) => item.isActive) ?? [];
++
++  const critical = active.filter(
++    (item) => item.stockStatus !== "AVAILABLE"
++  );
++
++  const exhausted = active.filter(
++    (item) => item.stockStatus === "OUT_OF_STOCK"
++  );
++
++  const low = active.filter(
++    (item) => item.stockStatus === "LOW_STOCK"
++  );
++
++  const query = searchKey(search);
++
++  const filtered = (items ?? []).filter((item) => {
++    const matchesStock =
++      stock === "ALL" ||
++      (stock === "ATTENTION"
++        ? item.isActive && item.stockStatus !== "AVAILABLE"
++        : item.stockStatus === stock);
++
++    return (
++      searchKey(item.name + " " + (item.sku ?? "")).includes(query) &&
++      (type === "ALL" || item.itemType === type) &&
++      matchesStock &&
++      (activity === "ALL" ||
++        item.isActive === (activity === "ACTIVE"))
++    );
++  });
++
++  const currentPage = Math.min(
++    page,
++    Math.max(1, Math.ceil(filtered.length / pageSize))
++  );
++
++  const visible = filtered.slice(
++    (currentPage - 1) * pageSize,
++    currentPage * pageSize
++  );
++
++  const filteredByUser =
++    !!search ||
++    type !== "ALL" ||
++    stock !== "ALL" ||
++    activity !== "ALL";
++
++  const zone = validTimeZone(settings.data?.timezone);
++  const today = zone ? dayKey(clock, zone) : null;
++
++  const todayCount =
++    zone && today && resource.movements.data
++      ? resource.movements.data.filter(
++          (movement) => dayKey(movement.createdAt, zone) === today
++        ).length
++      : null;
++
++  const updated = resource.items.updatedAt;
++
++  const updatedLabel =
++    updated && zone
++      ? new Intl.DateTimeFormat("es-CO", {
++          timeZone: zone,
++          day: "numeric",
++          month: "short",
++          hour: "numeric",
++          minute: "2-digit",
++        }).format(updated)
++      : null;
++
++  // Compatible con la navegación actual desde Productos
++  // y con el parámetro propuesto por el backend.
++  const productId =
++    params.get("setupProductId") ?? params.get("productId");
++
++  const configureProductId =
++    productId &&
++    (params.get("intent") === "configure" ||
++      params.has("setupProductId"))
++      ? productId
++      : "";
++
++  function finishConfiguration() {
++    setParams(
++      (previous) => {
++        const next = new URLSearchParams(previous);
++
++        next.delete("intent");
++        next.delete("setupProductId");
++        next.set("tab", "consumption");
++
++        if (productId) {
++          next.set("productId", productId);
++        }
++
++        return next;
++      },
++      { replace: true }
++    );
++  }
++
++  function clearFilters() {
++    setSearch("");
++    setType("ALL");
++    setStock("ALL");
++    setActivity("ALL");
++    setPage(1);
++  }
++
++  function showCritical() {
++    setSearch("");
++    setType("ALL");
++    setStock("ATTENTION");
++    setActivity("ACTIVE");
++    setPage(1);
++  }
++
++  const tab =
++    params.get("tab") === "production"
++      ? "production"
++      : params.get("tab") === "movements"
++        ? "movements"
++        : params.get("tab") === "consumption" || productId
++          ? "consumption"
++          : "stock";
++
++  function openTab(
++    next: "stock" | "movements" | "consumption" | "production",
++    itemId?: string
++  ) {
++    const nextParams = new URLSearchParams(params);
++
++    [
++      "tab",
++      "itemId",
++      "productId",
++      "setupProductId",
++      "intent",
++    ].forEach((key) => nextParams.delete(key));
++
++    if (next !== "stock") {
++      nextParams.set("tab", next);
++    }
++
++    if (itemId) {
++      nextParams.set("itemId", itemId);
++    }
++
++    setParams(nextParams);
++  }
++
++  function refreshInventory() {
++    resource.refresh();
++    setRevision((value) => value + 1);
++  }
++
++  useInventoryRealtime(session, refreshInventory);
+ 
+   function onAction(action: InventoryAction, item: InventoryItem) {
+     if (
+diff --git a/src/features/inventory/services/inventory-setup.ts b/src/features/inventory/services/inventory-setup.ts
+--- a/src/features/inventory/services/inventory-setup.ts
++++ b/src/features/inventory/services/inventory-setup.ts
+@@ -96,7 +96,7 @@
+     product,
+ 
+     // El backend también considera las relaciones inactivas.
+-    configured: links.some((link) => link.productId === productId),
++    configured: product.isCombo === true || links.some((link) => link.productId === productId),
+   };
+ }
+ 
+diff --git a/src/features/inventory/components/ProductInventorySetupDialog.tsx b/src/features/inventory/components/ProductInventorySetupDialog.tsx
+--- a/src/features/inventory/components/ProductInventorySetupDialog.tsx
++++ b/src/features/inventory/components/ProductInventorySetupDialog.tsx
+@@ -164,7 +164,10 @@
+         } catch (error) {
+           if (
+             error instanceof ApiError &&
+-            error.code === "PRODUCT_INVENTORY_ALREADY_CONFIGURED"
++            [
++                "PRODUCT_INVENTORY_ALREADY_CONFIGURED",
++                "COMBO_INVENTORY_SETUP_NOT_ALLOWED",
++              ].includes(error.code)
+           ) {
+             // Puede haberse configurado desde otra pestaña
+             // después de nuestra consulta inicial.

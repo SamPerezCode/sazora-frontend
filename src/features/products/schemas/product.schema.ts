@@ -27,6 +27,9 @@ export const productDetailSchema = z.object({
   imageUrl: z.string().nullable(),
   currentPrice: z.string().regex(/^\d+(?:\.\d{1,2})?$/),
   isActive: z.boolean(),
+  isCombo: z.boolean().optional(),
+  hasInventory: z.boolean().optional(),
+  canBeComboComponent: z.boolean().optional(),
   createdAt: z.iso.datetime({ offset: true }).optional(),
   updatedAt: z.iso.datetime({ offset: true }).optional(),
 });
@@ -41,6 +44,7 @@ export const productSchema = productDetailSchema.extend({
   isAvailable: z.boolean().optional(),
   isCombo: z.boolean(),
   hasInventory: z.boolean(),
+  canBeComboComponent: z.boolean(),
   inventoryTrackingType: inventoryTrackingSchema,
 });
 
@@ -62,7 +66,11 @@ export const productListSchema = z.object({
 export const productDetailResponseSchema = z.object({
   status: z.literal("success"),
   data: z.object({
-    product: productDetailSchema,
+    product: productDetailSchema.extend({
+      isCombo: z.boolean(),
+      hasInventory: z.boolean(),
+      canBeComboComponent: z.boolean(),
+    }),
   }),
 });
 

@@ -40,11 +40,13 @@ export const componentsSchema = z
       productId: productIdSchema,
       quantity: z
         .number()
-        .finite()
-        .positive("La cantidad debe ser mayor que cero."),
+        .int("Usa una cantidad entera.")
+        .min(1, "La cantidad mínima es 1.")
+        .max(10_000, "La cantidad máxima es 10.000."),
     })
   )
-  .min(1, "Agrega al menos un componente.")
+  .min(2, "Agrega al menos dos productos diferentes.")
+  .max(100, "Máximo 100 productos diferentes.")
   .superRefine((items, context) => {
     if (
       new Set(items.map((item) => item.productId)).size !==

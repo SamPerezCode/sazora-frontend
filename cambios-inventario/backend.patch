@@ -1,0 +1,448 @@
+diff --git a/src/middlewares/notify-inventory-changes.ts b/src/middlewares/notify-inventory-changes.ts
+new file mode 100644
+--- /dev/null
++++ b/src/middlewares/notify-inventory-changes.ts
+@@ -0,0 +1,46 @@
++import { randomUUID } from "node:crypto";
++import type { RequestHandler } from "express";
++import { getRealtimeServer } from "../realtime/realtime.server";
++import { getBusinessRoleRoom } from "../realtime/realtime.rooms";
++
++const writes = new Set(["POST", "PUT", "PATCH", "DELETE"]);
++const resources = new Set([
++  "inventory-items",
++  "inventory-movements",
++  "product-inventory-links",
++  "production",
++  "products",
++  "orders",
++  "public-order-requests",
++]);
++
++// Evento de invalidación: no representa un movimiento ni una cantidad.
++export const notifyInventoryChanges: RequestHandler = (request, response, next) => {
++  const resource = request.path.split("/")[1];
++
++  if (!writes.has(request.method) || !resource || !resources.has(resource)) {
++    next();
++    return;
++  }
++
++  response.once("finish", () => {
++    const auth = request.auth;
++    if (!auth || response.statusCode < 200 || response.statusCode >= 300) return;
++
++    // Los controladores responden después de terminar sus transacciones.
++    // Un fallo de Socket.IO no convierte un guardado exitoso en un error.
++    try {
++      getRealtimeServer()
++        .to(getBusinessRoleRoom(auth.businessId, "ADMIN"))
++        .emit("inventory:changed", {
++          eventId: randomUUID(),
++          businessId: auth.businessId,
++          occurredAt: new Date().toISOString(),
++        });
++    } catch (error) {
++      console.error("No se pudo emitir inventory:changed", error);
++    }
++  });
++
++  next();
++};
+diff --git a/src/modules/products/product.types.ts b/src/modules/products/product.types.ts
+--- a/src/modules/products/product.types.ts
++++ b/src/modules/products/product.types.ts
+@@ -28,6 +28,7 @@
+     isAvailable: boolean;
+     isCombo: boolean;
+     hasInventory: boolean;
++    canBeComboComponent: boolean;
+     inventoryTrackingType: ProductInventoryTrackingType;
+   }>;
+ 
+diff --git a/src/modules/products/repositories/product.repository.ts b/src/modules/products/repositories/product.repository.ts
+--- a/src/modules/products/repositories/product.repository.ts
++++ b/src/modules/products/repositories/product.repository.ts
+@@ -34,83 +34,101 @@
+   isAvailable: number;
+   isCombo: number;
+   hasInventory: number;
+-  inventoryTrackingType: ProductInventoryTrackingType;
+-};
+-
+-const mapProductRow = (row: ProductRow): Product => ({
+-  id: row.id,
+-  businessId: row.businessId,
+-  categoryId: row.categoryId,
+-  preparationAreaId: row.preparationAreaId,
+-  fulfillmentMode: row.fulfillmentMode,
+-  sku: row.sku,
+-  name: row.name,
+-  description: row.description,
+-  imageUrl: row.imageUrl,
+-  currentPrice: row.currentPrice,
+-  isActive: Boolean(row.isActive),
+-  createdAt: row.createdAt,
+-  updatedAt: row.updatedAt,
+-});
+-
+-const mapProductListRow = (row: ProductListRow): ProductListItem => ({
+-  ...mapProductRow(row),
+-  categoryName: row.categoryName,
+-  categoryIsActive: Boolean(row.categoryIsActive),
+-  preparationAreaName: row.preparationAreaName,
+-  preparationAreaIsActive: Boolean(row.preparationAreaIsActive),
+-  isAvailable: Boolean(row.isAvailable),
+-  isCombo: Boolean(row.isCombo),
+-  hasInventory: Boolean(row.hasInventory),
+-  inventoryTrackingType: row.inventoryTrackingType,
+-});
+-
+-const productListSelect = `
+-  SELECT
+-    CAST(p.id AS CHAR) AS id,
+-    CAST(p.business_id AS CHAR)
+-      AS businessId,
+-    CAST(p.category_id AS CHAR)
+-      AS categoryId,
+-    CAST(p.preparation_area_id AS CHAR)
+-      AS preparationAreaId,
+-    p.fulfillment_mode AS fulfillmentMode,
+-    p.sku,
+-    p.name,
+-    p.description,
+-    p.image_url AS imageUrl,
+-    CAST(p.current_price AS CHAR)
+-      AS currentPrice,
+-    p.is_active AS isActive,
+-    p.created_at AS createdAt,
+-    p.updated_at AS updatedAt,
+-    c.name AS categoryName,
+-    c.is_active AS categoryIsActive,
+-    pa.name AS preparationAreaName,
+-    pa.is_active AS preparationAreaIsActive,
+-
+-    (
+-      p.is_active = TRUE
+-      AND c.is_active = TRUE
+-      AND pa.is_active = TRUE
+-    ) AS isAvailable,
+-
+-    EXISTS (
+-      SELECT 1
+-      FROM product_combo_components AS pcc
+-      WHERE
+-        pcc.business_id = p.business_id
+-        AND pcc.combo_product_id = p.id
+-    ) AS isCombo,
+-
+-    EXISTS (
+-      SELECT 1
+-      FROM product_inventory_links AS pil
+-      WHERE
+-        pil.business_id = p.business_id
+-        AND pil.product_id = p.id
+-        AND pil.is_active = TRUE
+-    ) AS hasInventory,
++  canBeComboComponent: number;
++  inventoryTrackingType: ProductInventoryTrackingType;
++};
++
++const mapProductRow = (row: ProductRow): Product => ({
++  id: row.id,
++  businessId: row.businessId,
++  categoryId: row.categoryId,
++  preparationAreaId: row.preparationAreaId,
++  fulfillmentMode: row.fulfillmentMode,
++  sku: row.sku,
++  name: row.name,
++  description: row.description,
++  imageUrl: row.imageUrl,
++  currentPrice: row.currentPrice,
++  isActive: Boolean(row.isActive),
++  createdAt: row.createdAt,
++  updatedAt: row.updatedAt,
++});
++
++const mapProductListRow = (row: ProductListRow): ProductListItem => ({
++  ...mapProductRow(row),
++  categoryName: row.categoryName,
++  categoryIsActive: Boolean(row.categoryIsActive),
++  preparationAreaName: row.preparationAreaName,
++  preparationAreaIsActive: Boolean(row.preparationAreaIsActive),
++  isAvailable: Boolean(row.isAvailable),
++  isCombo: Boolean(row.isCombo),
++  hasInventory: Boolean(row.hasInventory),
++  canBeComboComponent: Boolean(row.canBeComboComponent),
++  inventoryTrackingType: row.inventoryTrackingType,
++});
++
++const productListSelect = `
++  SELECT
++    CAST(p.id AS CHAR) AS id,
++    CAST(p.business_id AS CHAR)
++      AS businessId,
++    CAST(p.category_id AS CHAR)
++      AS categoryId,
++    CAST(p.preparation_area_id AS CHAR)
++      AS preparationAreaId,
++    p.fulfillment_mode AS fulfillmentMode,
++    p.sku,
++    p.name,
++    p.description,
++    p.image_url AS imageUrl,
++    CAST(p.current_price AS CHAR)
++      AS currentPrice,
++    p.is_active AS isActive,
++    p.created_at AS createdAt,
++    p.updated_at AS updatedAt,
++    c.name AS categoryName,
++    c.is_active AS categoryIsActive,
++    pa.name AS preparationAreaName,
++    pa.is_active AS preparationAreaIsActive,
++
++    (
++      p.is_active = TRUE
++      AND c.is_active = TRUE
++      AND pa.is_active = TRUE
++    ) AS isAvailable,
++
++    EXISTS (
++      SELECT 1
++      FROM product_combo_components AS pcc
++      WHERE
++        pcc.business_id = p.business_id
++        AND pcc.combo_product_id = p.id
++    ) AS isCombo,
++
++    EXISTS (
++      SELECT 1
++      FROM product_inventory_links AS pil
++      WHERE
++        pil.business_id = p.business_id
++        AND pil.product_id = p.id
++        AND pil.is_active = TRUE
++    ) AS hasInventory,
++
++    (
++      p.is_active = TRUE
++      AND EXISTS (
++        SELECT 1
++        FROM product_inventory_links AS pil
++        INNER JOIN inventory_items AS ii
++          ON ii.business_id = pil.business_id
++          AND ii.id = pil.inventory_item_id
++          AND ii.is_active = TRUE
++        WHERE pil.business_id = p.business_id
++          AND pil.product_id = p.id
++          AND pil.is_active = TRUE
++          AND pil.auto_deduct = TRUE
++      )
++    ) AS canBeComboComponent,
+ 
+     CASE
+       WHEN EXISTS (
+diff --git a/src/modules/product-inventory-links/repositories/configure-product-inventory.repository.ts b/src/modules/product-inventory-links/repositories/configure-product-inventory.repository.ts
+--- a/src/modules/product-inventory-links/repositories/configure-product-inventory.repository.ts
++++ b/src/modules/product-inventory-links/repositories/configure-product-inventory.repository.ts
+@@ -14,54 +14,68 @@
+ };
+ 
+ type ConfigureProductInventoryResult =
+-  | Readonly<{
+-      kind: "CONFIGURED";
+-      inventoryItemId: string;
+-      productInventoryLinkId: string;
+-    }>
+-  | Readonly<{
+-      kind: "PRODUCT_NOT_AVAILABLE";
+-    }>
+-  | Readonly<{
+-      kind: "ALREADY_CONFIGURED";
+-      productInventoryLinkId: string;
+-    }>;
+-
+-const configureProductInventoryRecord = async (
+-  businessId: string,
+-  membershipId: string,
+-  productId: string,
+-  data: ConfigureProductInventoryInput,
+-): Promise<ConfigureProductInventoryResult> => {
+-  const connection = await databasePool.getConnection();
+-
+-  try {
+-    await connection.beginTransaction();
+-
+-    const [productRows] = await connection.execute<ProductSetupRow[]>(
+-      `
+-          SELECT
+-            CAST(id AS CHAR) AS id,
+-            name,
+-            is_active AS isActive
+-          FROM products
+-          WHERE
+-            business_id = ?
+-            AND id = ?
+-          LIMIT 1
+-          FOR UPDATE
+-        `,
+-      [businessId, productId],
+-    );
+-
+-    const product = productRows[0];
+-
+-    if (product?.isActive !== 1) {
+-      await connection.rollback();
+-
+-      return {
+-        kind: "PRODUCT_NOT_AVAILABLE",
+-      };
++  | Readonly<{ kind: "COMBO_NOT_ALLOWED" }>
++  | Readonly<{
++      kind: "CONFIGURED";
++      inventoryItemId: string;
++      productInventoryLinkId: string;
++    }>
++  | Readonly<{
++      kind: "PRODUCT_NOT_AVAILABLE";
++    }>
++  | Readonly<{
++      kind: "ALREADY_CONFIGURED";
++      productInventoryLinkId: string;
++    }>;
++
++const configureProductInventoryRecord = async (
++  businessId: string,
++  membershipId: string,
++  productId: string,
++  data: ConfigureProductInventoryInput,
++): Promise<ConfigureProductInventoryResult> => {
++  const connection = await databasePool.getConnection();
++
++  try {
++    await connection.beginTransaction();
++
++    const [productRows] = await connection.execute<ProductSetupRow[]>(
++      `
++          SELECT
++            CAST(id AS CHAR) AS id,
++            name,
++            is_active AS isActive
++          FROM products
++          WHERE
++            business_id = ?
++            AND id = ?
++          LIMIT 1
++          FOR UPDATE
++        `,
++      [businessId, productId],
++    );
++
++    const product = productRows[0];
++
++    if (product?.isActive !== 1) {
++      await connection.rollback();
++
++      return {
++        kind: "PRODUCT_NOT_AVAILABLE",
++      };
++    }
++
++    const [comboRows] = await connection.execute<RowDataPacket[]>(
++      `SELECT combo_product_id
++       FROM product_combo_components
++       WHERE business_id = ? AND combo_product_id = ?
++       LIMIT 1 FOR UPDATE`,
++      [businessId, productId],
++    );
++
++    if (comboRows.length > 0) {
++      await connection.rollback();
++      return { kind: "COMBO_NOT_ALLOWED" };
+     }
+ 
+     const [existingLinkRows] = await connection.execute<ExistingLinkRow[]>(
+diff --git a/src/modules/product-inventory-links/services/configure-product-inventory.service.ts b/src/modules/product-inventory-links/services/configure-product-inventory.service.ts
+--- a/src/modules/product-inventory-links/services/configure-product-inventory.service.ts
++++ b/src/modules/product-inventory-links/services/configure-product-inventory.service.ts
+@@ -36,6 +36,14 @@
+     );
+   }
+ 
++  if (result.kind === "COMBO_NOT_ALLOWED") {
++    throw new AppError(
++      "Los combos consumen el inventario de sus componentes. Edita su composición.",
++      409,
++      "COMBO_INVENTORY_SETUP_NOT_ALLOWED",
++    );
++  }
++
+   if (result.kind === "ALREADY_CONFIGURED") {
+     throw new AppError(
+       `El producto ya administra inventario mediante la relación ${result.productInventoryLinkId}`,
+diff --git a/src/realtime/realtime.types.ts b/src/realtime/realtime.types.ts
+--- a/src/realtime/realtime.types.ts
++++ b/src/realtime/realtime.types.ts
+@@ -208,7 +208,14 @@
+   changedAt: string;
+ }
+ 
+-interface ServerToClientEvents {
++export interface InventoryChangedPayload {
++  eventId: string;
++  businessId: string;
++  occurredAt: string;
++}
++
++interface ServerToClientEvents {
++  "inventory:changed": (payload: InventoryChangedPayload) => void;
+   "public-order-request:created": (
+     payload: PublicOrderRequestCreatedPayload,
+   ) => void;
+diff --git a/src/app.ts b/src/app.ts
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -7,24 +7,25 @@
+ import { errorHandler } from "./middlewares/error-handler";
+ import { notFound } from "./middlewares/not-found";
+ import { apiRouter } from "./routes";
+-
+-const app = express();
+-
+-app.use(
+-  cors({
+-    origin: environment.CLIENT_ORIGIN,
+-
+-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+-
+-    allowedHeaders: ["Authorization", "Content-Type"],
+-  }),
+-);
+-
+-app.use(express.json());
+-
+-app.use("/uploads", express.static(resolve(process.cwd(), "uploads")));
+-
+-app.use("/api", apiRouter);
++import { notifyInventoryChanges } from "./middlewares/notify-inventory-changes";
++
++const app = express();
++
++app.use(
++  cors({
++    origin: environment.CLIENT_ORIGIN,
++
++    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
++
++    allowedHeaders: ["Authorization", "Content-Type"],
++  }),
++);
++
++app.use(express.json());
++
++app.use("/uploads", express.static(resolve(process.cwd(), "uploads")));
++
++app.use("/api", notifyInventoryChanges, apiRouter);
+ 
+ app.use(notFound);
+ app.use(errorHandler);

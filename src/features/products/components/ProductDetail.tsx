@@ -132,19 +132,29 @@ export function ProductDetail({
 
         <div className="product-inventory-note">
           <p>
-            La configuración de inventario se administra por separado.
+            {product.isCombo
+              ? "Este combo consume el inventario de sus componentes."
+              : "La configuración de inventario se administra por separado."}
           </p>
 
           <button
             type="button"
             className="product-modal-link"
             disabled={busy}
-            onClick={() => onAction("inventory", product)}
+            onClick={() =>
+              onAction(
+                product.isCombo ? "edit" : "inventory",
+                product
+              )
+            }
           >
             <Boxes size={16} aria-hidden="true" />
-            {summary.hasInventory
-              ? "Gestionar en Inventario"
-              : "Configurar en Inventario"}
+
+            {product.isCombo
+              ? "Editar composición"
+              : product.hasInventory
+                ? "Gestionar en Inventario"
+                : "Configurar en Inventario"}
           </button>
         </div>
       </div>

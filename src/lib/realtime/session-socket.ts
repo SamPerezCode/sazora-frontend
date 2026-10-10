@@ -24,6 +24,12 @@ const readySchema = z.object({
   connectedAt: z.iso.datetime({ offset: true }),
 });
 
+const inventoryChangedSchema = z.object({
+  eventId: z.string().min(1).max(128),
+  businessId: z.string().min(1),
+  occurredAt: z.iso.datetime({ offset: true }),
+});
+
 function createEntry(credentials: Credentials) {
   const origin = new URL(API_BASE_URL, window.location.origin).origin;
 
@@ -37,6 +43,44 @@ function createEntry(credentials: Credentials) {
   let handshake: ReturnType<typeof setTimeout> | undefined;
 
   const listeners = new Set<(status: ConnectionStatus) => void>();
+
+  const inventoryListeners = new Set<() => void>();
+  const processedInventoryEvents = new Set<string>();
+
+  let inventoryTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function inventoryChanged(payload: unknown) {
+    const result = inventoryChangedSchema.safeParse(payload);
+
+    if (
+      !result.success ||
+      result.data.businessId !== credentials.businessId ||
+      state !== "connected" ||
+      processedInventoryEvents.has(result.data.eventId)
+    ) {
+      return;
+    }
+
+    processedInventoryEvents.add(result.data.eventId);
+
+    if (processedInventoryEvents.size > 200) {
+      const oldest = processedInventoryEvents.values().next().value;
+
+      if (oldest !== undefined) {
+        processedInventoryEvents.delete(oldest);
+      }
+    }
+
+    // Agrupa eventos durante 500 ms, sin posponer indefinidamente
+    // la actualización cuando llegan ventas continuamente.
+    if (inventoryTimer !== undefined) return;
+
+    inventoryTimer = setTimeout(() => {
+      inventoryTimer = undefined;
+
+      inventoryListeners.forEach((listener) => listener());
+    }, 500);
+  }
 
   function publish(next: ConnectionStatus) {
     state = next;
@@ -116,6 +160,7 @@ function createEntry(credentials: Credentials) {
   socket.on("disconnect", disconnect);
   socket.on("connect_error", error);
   socket.on("session:ready", ready);
+  socket.on("inventory:changed", inventoryChanged);
   socket.io.on("reconnect_attempt", reconnect);
 
   return {
@@ -130,8 +175,19 @@ function createEntry(credentials: Credentials) {
         listeners.delete(listener);
       };
     },
+    subscribeInventory(listener: () => void) {
+      inventoryListeners.add(listener);
+
+      return () => {
+        inventoryListeners.delete(listener);
+      };
+    },
 
     destroy() {
+      clearTimeout(inventoryTimer);
+      inventoryListeners.clear();
+      processedInventoryEvents.clear();
+      socket.off("inventory:changed", inventoryChanged);
       clearTimeout(handshake);
 
       socket.off("connect", connect);
@@ -179,6 +235,7 @@ export function acquireSessionSocket(credentials: Credentials) {
     socket: current.socket,
     getStatus: current.getStatus,
     subscribe: current.subscribe,
+    subscribeInventory: current.subscribeInventory,
 
     release() {
       if (released) return;

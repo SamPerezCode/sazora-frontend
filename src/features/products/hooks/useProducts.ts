@@ -12,6 +12,7 @@ type Catalog = Awaited<ReturnType<typeof getProductCatalog>>;
 
 interface Snapshot {
   scope: string;
+  attempt: number;
   data: Catalog | null;
   error: string | null;
 }
@@ -59,6 +60,7 @@ export function useProducts(session: AuthSession) {
         if (!controller.signal.aborted) {
           setSnapshot({
             scope,
+            attempt,
             data: checked,
             error: null,
           });
@@ -68,6 +70,7 @@ export function useProducts(session: AuthSession) {
         if (!controller.signal.aborted) {
           setSnapshot((previous) => ({
             scope,
+            attempt,
             data: previous?.scope === scope ? previous.data : null,
             error:
               cause instanceof Error
@@ -194,6 +197,7 @@ export function useProducts(session: AuthSession) {
 
       setSnapshot({
         scope,
+        attempt,
         data: next,
         error: warning ? `El cambio se guardó. ${warning}` : null,
       });
@@ -212,6 +216,7 @@ export function useProducts(session: AuthSession) {
   return {
     data: allowed ? (current?.data ?? null) : null,
     loading: allowed && current === null,
+    pending: allowed && current?.attempt !== attempt,
     error: allowed
       ? (current?.error ?? null)
       : "No tienes acceso a los productos.",

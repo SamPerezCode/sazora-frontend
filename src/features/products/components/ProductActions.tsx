@@ -54,11 +54,14 @@ export function ProductActions({
       : []),
     {
       id: "inventory",
-      label: product.hasInventory
-        ? "Gestionar en Inventario"
-        : "Configurar en Inventario",
+      label: product.isCombo
+        ? "Editar composición"
+        : product.hasInventory
+          ? "Gestionar en Inventario"
+          : "Configurar en Inventario",
       icon: <Boxes size={16} />,
-      onSelect: () => onAction("inventory", product),
+      onSelect: () =>
+        onAction(product.isCombo ? "edit" : "inventory", product),
     },
     {
       id: "status",
