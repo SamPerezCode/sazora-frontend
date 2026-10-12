@@ -1,6 +1,5 @@
-import { ArrowRight, Mail, Store } from "lucide-react";
+import { ArrowRight, Mail } from "lucide-react";
 import { Alert } from "../../../components/feedback/Alert";
-import { Checkbox } from "../../../components/forms/Checkbox";
 import { PasswordField } from "../../../components/forms/PasswordField";
 import { TextField } from "../../../components/forms/TextField";
 import { Button } from "../../../components/ui/Button";
@@ -11,10 +10,8 @@ export function LoginForm() {
     values,
     errors,
     message,
-    remember,
     submitting,
     setField,
-    setRememberBusiness,
     handleSubmit,
   } = useLoginForm();
 
@@ -29,25 +26,7 @@ export function LoginForm() {
       {message && <Alert>{message}</Alert>}
 
       <fieldset disabled={submitting} className="login-fields">
-        <legend className="sr-only">
-          Credenciales del establecimiento
-        </legend>
-
-        <TextField
-          name="businessSlug"
-          label="Espacio de trabajo"
-          placeholder="nombre-del-restaurante"
-          icon={Store}
-          value={values.businessSlug}
-          onChange={(event) =>
-            setField("businessSlug", event.currentTarget.value)
-          }
-          error={errors.businessSlug}
-          autoComplete="off"
-          autoCapitalize="none"
-          spellCheck={false}
-          required
-        />
+        <legend className="sr-only">Credenciales de acceso</legend>
 
         <TextField
           name="email"
@@ -77,16 +56,6 @@ export function LoginForm() {
           autoComplete="current-password"
           disabled={submitting}
           required
-        />
-
-        <Checkbox
-          name="rememberBusiness"
-          label="Recordar restaurante"
-          checked={remember}
-          onChange={(event) =>
-            setRememberBusiness(event.currentTarget.checked)
-          }
-          disabled={submitting}
         />
       </fieldset>
 

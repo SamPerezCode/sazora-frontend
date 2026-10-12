@@ -170,7 +170,7 @@ export function DashboardPage() {
                 timeStyle: "short",
                 timeZone: data.period.timezone,
               }).format(new Date(data.generatedAt))}`
-            : "Resumen del negocio"}
+            : "Resumen general"}
         </p>
 
         <Button

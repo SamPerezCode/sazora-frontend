@@ -3,10 +3,7 @@ import type { SubmitEvent } from "react";
 import { ApiError } from "../../../lib/http/client";
 import type { ApiFieldError } from "../../../types/api";
 import { loginSchema } from "../schemas/auth.schema";
-import {
-  readRememberedBusiness,
-  rememberBusiness,
-} from "../services/auth-storage";
+import { ORGANIZATION_SLUG } from "../../../config/env";
 import type {
   LoginFieldErrors,
   LoginRequest,
@@ -62,12 +59,11 @@ export function useLoginForm() {
   const { login } = useAuth();
 
   const [values, setValues] = useState<LoginRequest>(() => ({
-    businessSlug: readRememberedBusiness(),
+    businessSlug: ORGANIZATION_SLUG,
     email: "",
     password: "",
   }));
 
-  const [remember, setRemember] = useState(true);
   const [errors, setErrors] = useState<LoginFieldErrors>({});
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -87,20 +83,19 @@ export function useLoginForm() {
     setMessage("");
   }
 
-  function setRememberBusiness(checked: boolean): void {
-    setRemember(checked);
-
-    if (!checked) {
-      rememberBusiness(null);
-    }
-  }
-
   async function handleSubmit(
     event: SubmitEvent<HTMLFormElement>
   ): Promise<void> {
     event.preventDefault();
 
     if (pending.current) {
+      return;
+    }
+
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(ORGANIZATION_SLUG)) {
+      setMessage(
+        "Esta instalación no tiene configurado el acceso. Contacta al administrador."
+      );
       return;
     }
 
@@ -128,8 +123,6 @@ export function useLoginForm() {
 
     const controller = new AbortController();
     requestController.current = controller;
-
-    rememberBusiness(remember ? result.data.businessSlug : null);
 
     try {
       await login(result.data, controller.signal);
@@ -161,10 +154,8 @@ export function useLoginForm() {
     values,
     errors,
     message,
-    remember,
     submitting,
     setField,
-    setRememberBusiness,
     handleSubmit,
   };
 }

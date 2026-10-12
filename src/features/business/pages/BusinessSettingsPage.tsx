@@ -24,6 +24,10 @@ import { resolveFileUrl } from "../../../lib/files";
 import { PreparationAreasPanel } from "../../preparation-areas/components/PreparationAreasPanel";
 import { RestaurantTablesPanel } from "../../restaurant-tables/components/RestaurantTablesPanel";
 import { EmployeesPanel } from "../../employees/components/EmployeesPanel";
+import {
+  DiscardChangesDialog,
+  UnsavedChangesGuard,
+} from "../../../components/feedback/UnsavedChangesGuard";
 
 import type {
   BusinessSettings,
@@ -39,9 +43,10 @@ import { useSettingsEditor } from "../hooks/useSettingsEditor";
 const tabs = [
   {
     id: "information",
-    label: "Información del negocio",
+    label: "Perfil público",
     icon: Building2,
-    description: "Nombre, contacto y datos que verán tus clientes.",
+    description:
+      "Información comercial general que ven los clientes.",
   },
   {
     id: "brand",
@@ -86,38 +91,39 @@ const tabs = [
 const informationFields = [
   {
     key: "name",
-    label: "Nombre del restaurante",
+    label: "Nombre comercial visible",
+    placeholder: "Ej. Mokai Panadería Café",
     max: 120,
   },
   {
     key: "tagline",
     label: "Eslogan o frase corta",
+    placeholder: "Ej. Pan artesanal y café de origen",
     max: 160,
   },
   {
     key: "phone",
-    label: "Teléfono de reservas y domicilios",
+    label: "Teléfono público general",
+    placeholder: "Ej. 601 745 2210",
     max: 30,
   },
   {
     key: "address",
-    label: "Dirección",
+    label: "Dirección pública general",
+    placeholder: "Ej. Carrera 11 #82-14, Bogotá",
     max: 250,
   },
   {
     key: "openingHoursText",
-    label: "Horario de atención",
+    label: "Horario público general",
+    placeholder: "Ej. Lunes a sábado, 7:00 a. m. a 8:00 p. m.",
     max: 200,
   },
   {
     key: "instagram",
     label: "Instagram",
+    placeholder: "Ej. @mokai",
     max: 100,
-  },
-  {
-    key: "taxId",
-    label: "NIT / identificación fiscal",
-    max: 50,
   },
 ] as const;
 
@@ -132,13 +138,17 @@ const colors = [
   },
 ] as const;
 
-export function BusinessSettingsPage() {
+export function BusinessSettingsPage({
+  section = "information",
+}: {
+  section?: SettingsSection;
+}) {
   const { settings, session } = useAppShell();
 
   if (settings.loading) {
     return (
       <Card>
-        <LoadingState message="Cargando tu negocio…" />
+        <LoadingState message="Cargando configuración…" />
       </Card>
     );
   }
@@ -167,6 +177,7 @@ export function BusinessSettingsPage() {
       key={`${settings.data.businessId}:${session.membership.id}`}
       settings={settings.data}
       resource={settings}
+      section={section}
     />
   );
 }
@@ -174,11 +185,15 @@ export function BusinessSettingsPage() {
 function BusinessSettingsEditor({
   settings,
   resource,
+  section,
 }: {
   settings: BusinessSettings;
   resource: BusinessSettingsResource;
+  section: SettingsSection;
 }) {
-  const editor = useSettingsEditor(settings, resource);
+  const editor = useSettingsEditor(settings, resource, section);
+
+  const [discard, setDiscard] = useState(false);
   const { draft, notice } = editor;
   const [managementTab, setManagementTab] = useState<
     "areas" | "tables" | "employees" | null
@@ -217,6 +232,20 @@ function BusinessSettingsEditor({
       className="business-settings"
       data-management={managementTab !== null}
     >
+      <UnsavedChangesGuard
+        dirty={editor.dirty(editor.active) || !!editor.selection}
+        busy={resource.busy}
+      />
+
+      {discard && (
+        <DiscardChangesDialog
+          onCancel={() => setDiscard(false)}
+          onDiscard={() => {
+            editor.resetSection();
+            setDiscard(false);
+          }}
+        />
+      )}
       <div className="business-settings-editor">
         <div
           role="tablist"
@@ -326,6 +355,14 @@ function BusinessSettingsEditor({
                     {selectedTab.description}
                   </p>
 
+                  {active === "information" && (
+                    <p className="mt-3 text-xs text-muted">
+                      La dirección y el horario corresponden a la
+                      información pública general. Posteriormente
+                      podrán configurarse por sede.
+                    </p>
+                  )}
+
                   <form
                     noValidate
                     className="mt-5"
@@ -352,6 +389,7 @@ function BusinessSettingsEditor({
                               key={field.key}
                               name={field.key}
                               label={field.label}
+                              placeholder={field.placeholder}
                               value={draft[field.key]}
                               onChange={(event) =>
                                 editor.change(
@@ -506,6 +544,11 @@ function BusinessSettingsEditor({
                                 <TextField
                                   label={color.label}
                                   name={color.key}
+                                  placeholder={
+                                    color.key === "primaryColor"
+                                      ? "#1C2A4D"
+                                      : "#F97316"
+                                  }
                                   value={draft[color.key]}
                                   maxLength={7}
                                   onChange={(event) =>
@@ -555,6 +598,7 @@ function BusinessSettingsEditor({
                           <TextAreaField
                             name="kitchenTicketFooter"
                             label="Nota final de la comanda"
+                            placeholder="Ej. Verificar las notas del pedido antes de despachar."
                             value={draft.kitchenTicketFooter}
                             maxLength={500}
                             error={notice.errors.kitchenTicketFooter}
@@ -579,6 +623,7 @@ function BusinessSettingsEditor({
                           <TextAreaField
                             name="publicMenuDescription"
                             label="Descripción del menú público"
+                            placeholder="Ej. Disfruta nuestro pan artesanal, café y productos frescos."
                             value={draft.publicMenuDescription}
                             maxLength={500}
                             error={
@@ -648,19 +693,34 @@ function BusinessSettingsEditor({
                                 : "Todo está guardado."}
                       </p>
 
-                      <Button
-                        type="submit"
-                        size="sm"
-                        disabled={
-                          !editor.dirty(editor.active) ||
-                          resource.busy
-                        }
-                        loading={resource.busy}
-                        loadingText="Guardando…"
-                      >
-                        <Save aria-hidden="true" size={16} />
-                        Guardar cambios
-                      </Button>
+                      <div className="configuration-save-actions">
+                        <Button
+                          variant="cancel"
+                          size="sm"
+                          disabled={
+                            resource.busy ||
+                            (!editor.dirty(editor.active) &&
+                              !editor.selection)
+                          }
+                          onClick={() => setDiscard(true)}
+                        >
+                          <span>Cancelar cambios</span>
+                        </Button>
+
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={
+                            !editor.dirty(editor.active) ||
+                            resource.busy
+                          }
+                          loading={resource.busy}
+                          loadingText="Guardando…"
+                        >
+                          <Save aria-hidden="true" size={16} />
+                          <span>Guardar cambios</span>
+                        </Button>
+                      </div>
                     </div>
                   </form>
                 </Card>

@@ -403,7 +403,7 @@
 
   /* Escritorio y tablets grandes */
 
-  @media (min-width: 64rem) {
+  @media (min-width: 48rem) {
     .app-shell {
       display: grid;
       grid-template-columns: 15rem minmax(0, 1fr);
@@ -610,7 +610,7 @@
 }
 
 @layer components {
-  @media (min-width: 64rem) {
+  @media (min-width: 48rem) {
     .shell-sidebar[data-collapsed="true"]
       .shell-business
       > :first-child {
@@ -701,7 +701,7 @@
 }
 
 @layer components {
-  @media (min-width: 64rem) {
+  @media (min-width: 48rem) {
     .app-shell {
       /* Tipografía de los componentes que usan text-sm/base/lg. */
       --text-sm: 0.8125rem;
@@ -866,7 +866,7 @@
 }
 
 @layer components {
-  @media (min-width: 64rem) {
+  @media (min-width: 48rem) {
     /* Abierto: opciones arriba. */
     .shell-sidebar[data-collapsed="false"] .shell-navigation {
       align-content: start;

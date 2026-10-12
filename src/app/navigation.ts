@@ -132,13 +132,14 @@ const navigation: readonly NavigationItem[] = [
   },
   {
     id: "settings",
-    label: "Configuración del negocio",
-    description: "Identidad y preferencias del establecimiento.",
+    label: "Configuración",
+    description:
+      "Administra la identidad, información fiscal, sedes y operación general.",
     icon: Settings,
     roles: ["ADMIN"],
     group: "business",
     status: "ready",
-    to: "/mi-negocio",
+    to: "/configuracion",
   },
 ];
 
@@ -158,7 +159,16 @@ export function getNavigation(
       const children = item.children.filter(allowed);
 
       if (children.length) {
-        visible.push({ ...item, children });
+        visible.push(
+          item.id === "panel" && roles.includes("ADMIN")
+            ? {
+                ...item,
+                label: "Resumen general",
+                description:
+                  "Información general de la organización.",
+              }
+            : item
+        );
       }
     } else {
       visible.push(item);

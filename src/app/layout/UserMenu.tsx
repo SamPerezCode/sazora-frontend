@@ -1,10 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import {
-  Building2,
-  LogOut,
-  ShieldCheck,
-  UserRound,
-} from "lucide-react";
+import { Building2, LogOut, ShieldCheck } from "lucide-react";
 import { Avatar } from "../../components/ui/Avatar";
 import type { AuthSession } from "../../features/auth/types/auth.types";
 import type { BusinessIdentity } from "../../features/business/schemas/business-profile.schema";
@@ -128,21 +123,10 @@ export function UserMenu({
                 size={14}
                 strokeWidth={1.75}
               />
-              Negocio
+              Organización
             </dt>
-            <dd>{business.name}</dd>
-          </div>
 
-          <div>
-            <dt>
-              <UserRound
-                aria-hidden="true"
-                size={14}
-                strokeWidth={1.75}
-              />
-              Slug
-            </dt>
-            <dd className="profile-slug">{business.slug}</dd>
+            <dd>{business.name}</dd>
           </div>
         </dl>
 

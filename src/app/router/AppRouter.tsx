@@ -1,13 +1,13 @@
 import { Navigate, Route, Routes } from "react-router";
 import { LoginPage } from "../../features/auth/pages/LoginPage";
 import { DashboardPage } from "../../features/dashboard/pages/DashboardPage";
-import { BusinessSettingsPage } from "../../features/business/pages/BusinessSettingsPage";
 import { AppShell } from "../layout/AppShell";
 import { CategoriesPage } from "../../features/categories/pages/CategoriesPage";
 import { ProductsPage } from "../../features/products/pages/ProductsPage";
 import { SalesPage } from "../../features/sales/pages/SalesPage";
 import { KitchenPage } from "../../features/kitchen/pages/KitchenPage";
 import { InventoryPage } from "../../features/inventory/pages/InventoryPage";
+import { ConfigurationPage } from "../../features/business/pages/ConfigurationPage";
 
 import {
   GuestOnly,
@@ -47,12 +47,16 @@ export function AppRouter() {
                 </RequireRole>
               }
             />
-
             <Route
               path="/mi-negocio"
+              element={<Navigate to="/configuracion" replace />}
+            />
+
+            <Route
+              path="/configuracion"
               element={
                 <RequireRole role="ADMIN">
-                  <BusinessSettingsPage />
+                  <ConfigurationPage />
                 </RequireRole>
               }
             />

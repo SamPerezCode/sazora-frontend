@@ -285,7 +285,7 @@ function MobileNavigationContent({
                 />
 
                 <div className="min-w-0">
-                  <p className="mobile-menu-caption">Negocio</p>
+                  <p className="mobile-menu-caption">Organización</p>
                   <p
                     className="mobile-menu-name"
                     title={business.name}
@@ -319,7 +319,7 @@ function MobileNavigationContent({
 }
 
 export function MobileNavigation(props: MobileNavigationProps) {
-  const isDesktop = useMediaQuery("(min-width: 64rem)");
+  const usesSidebar = useMediaQuery("(min-width: 48rem)");
 
-  return isDesktop ? null : <MobileNavigationContent {...props} />;
+  return usesSidebar ? null : <MobileNavigationContent {...props} />;
 }

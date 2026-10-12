@@ -1,0 +1,534 @@
+@layer components {
+  .configuration,
+  .configuration-modal {
+    --form-control-height: 2.75rem;
+    --field-font-size: 0.875rem;
+    --field-label-size: 0.6875rem;
+    --button-radius: 0.85rem;
+
+    color: var(--sazora-heading);
+    min-width: 0;
+  }
+
+  .configuration {
+    display: grid;
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  .configuration-content,
+  .configuration-section {
+    min-width: 0;
+  }
+
+  .configuration-section {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .configuration h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .configuration h3 {
+    font-weight: 700;
+  }
+
+  .configuration p,
+  .configuration-modal p {
+    color: var(--sazora-muted);
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  .configuration-card {
+    min-width: 0;
+    padding: 1.25rem;
+    border: 1px solid var(--sazora-outline);
+    border-radius: 1rem;
+    background: var(--sazora-surface);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 5%);
+  }
+
+  .configuration-nav {
+    display: none;
+  }
+
+  .configuration-nav h2 {
+    margin: 0.5rem 0.7rem;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--sazora-muted);
+  }
+
+  .configuration-nav > div + div {
+    margin-top: 1.5rem;
+  }
+
+  .configuration-nav button {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    width: 100%;
+    padding: 0.7rem;
+    border-radius: 1rem;
+    text-align: left;
+    font-size: 0.875rem;
+    color: var(--sazora-muted);
+    cursor: pointer;
+  }
+
+  .configuration-nav button svg {
+    flex-shrink: 0;
+  }
+
+  .configuration-nav button[aria-current] {
+    background: var(--sazora-heading);
+    color: var(--sazora-surface);
+    font-weight: 600;
+  }
+
+  .configuration-nav button:focus-visible,
+  .configuration-choice:focus-visible {
+    outline: 2px solid var(--sazora-accent);
+    outline-offset: 2px;
+  }
+
+  .configuration-grid,
+  .configuration-fields,
+  .configuration-filters {
+    display: grid;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+
+  .configuration-grid {
+    margin-block: 1rem;
+  }
+
+  .configuration-fields {
+    margin-top: 1.25rem;
+  }
+
+  .configuration-fields > * {
+    min-width: 0;
+  }
+
+  .configuration-fields dd {
+    overflow-wrap: anywhere;
+  }
+
+  .configuration-fields dt {
+    font-size: 0.75rem;
+    color: var(--sazora-muted);
+  }
+
+  .configuration-wide {
+    grid-column: 1 / -1;
+  }
+
+  .configuration-heading {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: start;
+    gap: 1rem;
+  }
+
+  .configuration-warning {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 1rem;
+    border-radius: 1rem;
+    border: 1px solid
+      color-mix(in srgb, var(--sazora-accent) 55%, transparent);
+    background: color-mix(
+      in srgb,
+      var(--sazora-accent) 9%,
+      var(--sazora-surface)
+    );
+  }
+
+  .configuration-warning svg {
+    color: var(--sazora-accent);
+    flex-shrink: 0;
+  }
+
+  .configuration-status {
+    display: inline-flex;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    background: var(--sazora-secondary);
+    font-size: 0.75rem !important;
+  }
+
+  .configuration-save {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+    padding: 1rem;
+    border: 1px solid var(--sazora-outline);
+    border-radius: 1rem;
+    background: var(--sazora-surface);
+  }
+
+  .configuration-save > p {
+    margin-right: auto;
+  }
+
+  .configuration-responsibility {
+    display: grid;
+    grid-template-columns: 1fr 2fr auto;
+    gap: 0.5rem;
+    align-items: end;
+  }
+
+  .configuration-metrics {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .configuration-metrics .configuration-card {
+    padding: 1rem;
+  }
+
+  .configuration-metrics strong {
+    display: block;
+    margin-block: 0.35rem;
+    font-size: 1.5rem;
+  }
+
+  .configuration-metrics p {
+    font-size: 0.75rem;
+  }
+
+  .configuration-state {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+    padding: 3rem 1rem;
+    text-align: center;
+  }
+
+  .configuration-state p {
+    max-width: 32rem;
+  }
+
+  .configuration-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .configuration-badges span {
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: var(--sazora-secondary);
+    font-size: 0.7rem;
+  }
+
+  .configuration-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--sazora-outline);
+    border-radius: 1rem;
+    background: var(--sazora-surface);
+  }
+
+  .configuration-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.8125rem;
+  }
+
+  .configuration-table th,
+  .configuration-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--sazora-outline);
+  }
+
+  .configuration-table th {
+    color: var(--sazora-muted);
+    font-size: 0.7rem;
+    font-weight: 500;
+  }
+
+  .configuration-table tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .configuration-table tr[data-inactive="true"] {
+    color: var(--sazora-muted);
+  }
+
+  .configuration-table tr[data-highlight="true"] {
+    background: color-mix(
+      in srgb,
+      var(--sazora-accent) 7%,
+      var(--sazora-surface)
+    );
+  }
+
+  .bottom-sheet.bottom-sheet-modal.configuration-modal {
+    inset: 0;
+    margin: auto;
+    width: min(42rem, calc(100% - 2rem));
+    max-width: 42rem;
+    height: fit-content;
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+  }
+
+  .configuration-choice {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    padding: 1rem;
+    border: 1px solid var(--sazora-outline);
+    border-radius: 1rem;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .configuration-choice svg {
+    color: var(--sazora-accent);
+    flex-shrink: 0;
+  }
+
+  .configuration-choice strong,
+  .configuration-choice small {
+    display: block;
+  }
+
+  .configuration-choice small {
+    margin-top: 0.4rem;
+    color: var(--sazora-muted);
+  }
+
+  .configuration-choice[aria-pressed="true"] {
+    border-color: var(--sazora-accent);
+    background: var(--sazora-secondary);
+  }
+
+  .configuration-step {
+    margin-bottom: 1rem;
+  }
+
+  .configuration-step progress {
+    width: 100%;
+    height: 0.3rem;
+    accent-color: var(--sazora-accent);
+  }
+
+  .configuration-skeleton {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .configuration-skeleton span {
+    height: 2.5rem;
+    border-radius: 0.65rem;
+    background: var(--sazora-secondary);
+  }
+
+  .configuration-skeleton span:first-child {
+    height: 1rem;
+    width: 40%;
+  }
+
+  /* La navegación nueva controla los formularios existentes. */
+
+  .configuration .business-settings-tabs {
+    display: none;
+  }
+
+  .configuration .business-settings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .configuration .business-settings-editor > [role="tabpanel"] {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .configuration .business-settings-preview {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  @media (min-width: 40rem) {
+    .configuration-fields,
+    .configuration-filters {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .configuration {
+      grid-template-columns: 15rem minmax(0, 1fr);
+    }
+
+    .configuration-mobile {
+      display: none;
+    }
+
+    .configuration-nav {
+      display: block;
+      padding: 0.75rem;
+      position: sticky;
+      top: 1rem;
+    }
+  }
+
+  @media (min-width: 80rem) {
+    .configuration-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 39.999rem) {
+    .configuration-table,
+    .configuration-table tbody,
+    .configuration-table tr,
+    .configuration-table td {
+      display: block;
+    }
+
+    .configuration-table thead {
+      display: none;
+    }
+
+    .configuration-table tr {
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--sazora-outline);
+    }
+
+    .configuration-table td {
+      border: 0;
+      padding: 0.4rem;
+    }
+
+    .configuration-table td::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: 0.25rem;
+      color: var(--sazora-muted);
+      font-size: 0.7rem;
+    }
+
+    .configuration-responsibility {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .configuration-save > p {
+      width: 100%;
+    }
+  }
+}
+
+@layer components {
+  /* Estado a la izquierda y acciones agrupadas a la derecha. */
+  .configuration .business-settings-save,
+  .configuration .configuration-save {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
+  }
+
+  .configuration .business-settings-save > p,
+  .configuration .configuration-save > p {
+    flex: 1 1 12rem;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .configuration .configuration-save-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: flex-end;
+    gap: 0.625rem;
+    min-width: 0;
+    margin-inline-start: auto;
+  }
+
+  .configuration .configuration-save-actions > button {
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .configuration .configuration-save-actions > button > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .configuration .configuration-save-actions > button > svg {
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 47.999rem) {
+    .configuration .business-settings-save > p,
+    .configuration .configuration-save > p {
+      flex-basis: 100%;
+      width: 100%;
+    }
+
+    /* Ambos botones permanecen en la misma fila. */
+    .configuration .configuration-save-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: 100%;
+      gap: 0.5rem;
+    }
+
+    .configuration .configuration-save-actions > button {
+      width: 100%;
+    }
+
+    .configuration .configuration-save-actions > button:only-child {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 39.999rem) {
+    .configuration-table .configuration-location-row {
+      position: relative;
+    }
+
+    /* Reserva espacio para el botón sin cubrir el código. */
+    .configuration-table
+      .configuration-location-row
+      > td:first-child {
+      min-height: 3.25rem;
+      padding-inline-end: 3.5rem;
+    }
+
+    .configuration-table
+      .configuration-location-row
+      > .configuration-location-actions {
+      position: absolute;
+      inset-block-start: 0.75rem;
+      inset-inline-end: 0.75rem;
+      width: auto;
+      padding: 0;
+      border: 0;
+    }
+
+    .configuration-table
+      .configuration-location-row
+      > .configuration-location-actions::before {
+      display: none;
+    }
+  }
+}

@@ -27,10 +27,11 @@ const emptyNotice: Notice = {
 
 export function useSettingsEditor(
   settings: BusinessSettings,
-  resource: BusinessSettingsResource
+  resource: BusinessSettingsResource,
+  initialSection: SettingsSection = "information"
 ) {
   const [active, setActive] =
-    useState<SettingsSection>("information");
+    useState<SettingsSection>(initialSection);
 
   const [draft, setDraft] = useState(() => toBusinessDraft(settings));
 
@@ -266,6 +267,23 @@ export function useSettingsEditor(
     change,
     dirty,
     resetColors,
+    resetSection: () => {
+      if (resource.busy) return;
+
+      setDraft((previous) => ({
+        ...previous,
+        ...selectSection(active, toBusinessDraft(settings)),
+      }));
+
+      setNotices((previous) => ({
+        ...previous,
+        [active]: emptyNotice,
+      }));
+
+      if (active === "brand") {
+        setSelection(null);
+      }
+    },
     save,
     notice: notices[active],
     selection,

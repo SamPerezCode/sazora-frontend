@@ -153,13 +153,13 @@ export function AppSidebar({
             onClick={onNavigate}
             className="shell-business-link"
             aria-label={`Configuración de ${business.name}`}
-            title="Configuración del negocio"
+            title="Configuración "
           >
             <Avatar name={business.name} src={business.logoUrl} />
 
             <div className="shell-label min-w-0">
               <p className="text-[0.625rem] text-slate-300">
-                Negocio
+                Organización
               </p>
 
               <p className="truncate text-sm font-semibold">
@@ -173,7 +173,7 @@ export function AppSidebar({
 
             <div className="shell-label min-w-0">
               <p className="text-[0.625rem] text-slate-300">
-                Negocio
+                Organización
               </p>
 
               <p className="truncate text-sm font-semibold">
@@ -194,7 +194,7 @@ export function AppSidebar({
               size={16}
               strokeWidth={1.75}
             />
-            Configuración del negocio
+            Configuración
           </NavLink>
         )}
 

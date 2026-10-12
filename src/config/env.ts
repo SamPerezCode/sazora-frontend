@@ -15,3 +15,9 @@ export const API_BASE_URL = environment.VITE_API_BASE_URL.replace(
   /\/+$/,
   ""
 );
+
+export const ORGANIZATION_SLUG = String(
+  import.meta.env.VITE_ORGANIZATION_SLUG ?? ""
+)
+  .trim()
+  .toLowerCase();
