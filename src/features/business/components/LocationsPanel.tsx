@@ -245,6 +245,7 @@ export function LocationsPanel() {
                     className="configuration-location-actions"
                   >
                     <ActionMenu
+                      appearance="compact"
                       label={"Acciones de " + location.name}
                       actions={[
                         {

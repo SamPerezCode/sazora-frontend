@@ -78,6 +78,7 @@ export function RestaurantTableList({
   function actions(table: RestaurantTable) {
     return (
       <ActionMenu
+        appearance="compact"
         label={"Acciones de " + table.name}
         disabled={disabled}
         actions={[
@@ -144,18 +145,18 @@ export function RestaurantTableList({
           </p>
         ) : (
           <>
-            <div className="hidden overflow-hidden rounded-xl lg:block">
-              <table className="w-full table-fixed text-left text-sm">
+            <div className="hidden overflow-x-auto rounded-xl md:block">
+              <table className="w-full min-w-[36rem] table-fixed text-left text-sm">
                 <caption className="sr-only">
                   Mesas del negocio
                 </caption>
 
                 <colgroup>
-                  <col className="w-[20%]" />
+                  <col className="w-28" />
                   <col />
-                  <col className="w-28" />
-                  <col className="w-28" />
                   <col className="w-24" />
+                  <col className="w-24" />
+                  <col className="w-20" />
                 </colgroup>
 
                 <thead className="border-b border-outline/60 bg-secondary/30">
@@ -214,7 +215,8 @@ export function RestaurantTableList({
               </table>
             </div>
 
-            <ul className="divide-y divide-outline/40 px-3 lg:hidden">
+            <ul className="divide-y divide-outline/40 px-3 md:hidden">
+              {" "}
               {visible.map((table) => (
                 <li key={table.id} className="py-4">
                   <div className="flex items-start justify-between gap-2">

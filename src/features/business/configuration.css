@@ -578,3 +578,10 @@
     flex-shrink: 0;
   }
 }
+
+@layer components {
+  /* Mismo icono horizontal que en Empleados y roles. */
+  .configuration [data-action-trigger] > svg {
+    transform: rotate(90deg);
+  }
+}

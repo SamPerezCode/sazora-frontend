@@ -146,7 +146,11 @@ export function ConfigurationPage() {
       </nav>
 
       <div
-        className="configuration-content"
+        className={
+          active.group === "Operación"
+            ? "configuration-content w-full md:max-w-4xl"
+            : "configuration-content"
+        }
         key={scope + ":" + active.id}
       >
         {active.id === "fiscal" ? (

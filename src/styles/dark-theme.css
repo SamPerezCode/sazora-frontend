@@ -140,3 +140,75 @@
   svg {
   color: inherit;
 }
+
+/*
+ * Colores de referencia para los modales oscuros.
+ * Coinciden con los utilizados en Empleados y roles.
+ */
+:root[data-theme="dark"] {
+  --sazora-modal-background: var(--sazora-background);
+  --sazora-modal-field-background: var(--sazora-surface);
+}
+
+/* Naranja utilizado en los modales y menús de Empleados. */
+:root[data-theme="dark"] .configuration .bottom-sheet,
+:root[data-theme="dark"] .configuration [role="menu"][popover] {
+  --sazora-accent: var(--sazora-brand);
+}
+
+/*
+ * Todos los modales dentro de Configuración:
+ * sedes, mesas, áreas, empleados y confirmaciones.
+ */
+:root[data-theme="dark"] .configuration .bottom-sheet {
+  background: var(--sazora-modal-background);
+  color: var(--sazora-heading);
+  border-color: var(--sazora-outline);
+}
+
+/* Oscurecimiento detrás del modal. */
+:root[data-theme="dark"] .configuration .bottom-sheet::backdrop {
+  background: var(--sazora-overlay);
+}
+
+/*
+ * Campos con una superficie más clara que el modal.
+ * Conserva los bordes de validación y los estados de foco.
+ */
+:root[data-theme="dark"]
+  .configuration
+  .bottom-sheet
+  input:not(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="color"],
+    [type="file"],
+    [type="hidden"],
+    [type="button"],
+    [type="submit"],
+    [type="reset"]
+  ),
+:root[data-theme="dark"] .configuration .bottom-sheet textarea,
+:root[data-theme="dark"] .configuration .bottom-sheet select,
+:root[data-theme="dark"]
+  .configuration
+  .bottom-sheet
+  .select-field-trigger {
+  background: var(--sazora-modal-field-background);
+}
+
+/* El pie de acciones comparte el fondo del modal. */
+:root[data-theme="dark"]
+  .configuration
+  .bottom-sheet
+  .configuration-save {
+  background: transparent;
+}
+
+/* Los menús conservan la superficie más clara de Empleados. */
+:root[data-theme="dark"] .configuration [role="menu"][popover] {
+  background: var(--sazora-popover);
+  color: var(--sazora-heading);
+  border-color: var(--sazora-outline);
+}

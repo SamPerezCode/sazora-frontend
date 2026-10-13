@@ -272,7 +272,7 @@ export function PreparationAreasPanel() {
               {resource.areas.map((area) => (
                 <li
                   key={area.id}
-                  className="flex items-center gap-2 py-3"
+                  className="flex items-center gap-2 py-3 md:grid md:grid-cols-[1rem_minmax(0,1fr)_6rem_2.75rem] md:gap-3"
                 >
                   <ChefHat
                     aria-hidden="true"
@@ -312,6 +312,7 @@ export function PreparationAreasPanel() {
                   </span>
 
                   <ActionMenu
+                    appearance="compact"
                     label={`Acciones de ${area.name}`}
                     disabled={resource.busy || editing !== undefined}
                     actions={[
