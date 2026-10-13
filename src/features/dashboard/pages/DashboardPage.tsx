@@ -6,6 +6,7 @@ import { LoadingState } from "../../../components/feedback/LoadingState";
 import { Avatar } from "../../../components/ui/Avatar";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
+import { resolveSessionAccess } from "../../auth/utils/resolve-session-access";
 import {
   CriticalInventoryCard,
   DashboardSummary,
@@ -17,7 +18,7 @@ import { WeeklySalesCard } from "../components/WeeklySalesCard";
 function WelcomePanel() {
   const { session, business } = useAppShell();
 
-  const modules = getNavigation(session.authorization.roles).filter(
+  const modules = getNavigation(session.authorization).filter(
     (item) => item.id !== "panel"
   );
 
@@ -116,7 +117,11 @@ function WelcomePanel() {
 export function DashboardPage() {
   const { session, dashboard } = useAppShell();
 
-  if (!session.authorization.roles.includes("ADMIN")) {
+  if (
+    !resolveSessionAccess(
+      session.authorization
+    ).allowedPaths.includes("/panel")
+  ) {
     return <WelcomePanel />;
   }
 

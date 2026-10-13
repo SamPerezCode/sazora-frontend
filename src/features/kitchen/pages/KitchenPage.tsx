@@ -16,14 +16,6 @@ import "../kitchen.css";
 export function KitchenPage() {
   const { session } = useAppShell();
 
-  const allowed = session.authorization.roles.some(
-    (role) => role === "ADMIN" || role === "KITCHEN"
-  );
-
-  if (!allowed) {
-    return <Alert>No tienes acceso a Cocina.</Alert>;
-  }
-
   return (
     <KitchenWorkspace
       key={`${session.business.id}:${session.membership.id}:${session.accessToken}`}

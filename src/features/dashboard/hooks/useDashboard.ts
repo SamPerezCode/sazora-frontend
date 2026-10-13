@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "../../../lib/http/client";
 import type { AuthSession } from "../../auth/types/auth.types";
 import { getDashboard } from "../services/dashboard.service";
+import { resolveSessionAccess } from "../../auth/utils/resolve-session-access";
 import type {
   DashboardData,
   DashboardResource,
@@ -21,9 +22,13 @@ export function useDashboard(
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [attempt, setAttempt] = useState(0);
 
-  const allowed =
+  const allowed = Boolean(
     active &&
-    (session?.authorization.roles.includes("ADMIN") ?? false);
+    session &&
+    resolveSessionAccess(session.authorization).allowedPaths.includes(
+      "/panel"
+    )
+  );
 
   const businessId = session?.business.id;
   const accessToken = session?.accessToken;

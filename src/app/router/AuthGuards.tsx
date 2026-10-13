@@ -1,10 +1,11 @@
-import { Navigate, Outlet } from "react-router";
+import { Navigate, Outlet, useLocation } from "react-router";
 import { Alert } from "../../components/feedback/Alert";
 import { LoadingState } from "../../components/feedback/LoadingState";
 import { Button } from "../../components/ui/Button";
 import { useAuth } from "../../features/auth/hooks/useAuth";
 import type { ReactNode } from "react";
 import type { RoleCode } from "../../features/auth/types/auth.types";
+import { resolveSessionAccess } from "../../features/auth/utils/resolve-session-access";
 
 export function SessionBoundary() {
   const { state, retrySession, logout } = useAuth();
@@ -55,12 +56,48 @@ export function GuestOnly() {
   const { state } = useAuth();
 
   return state.status === "authenticated" ? (
-    <Navigate to="/panel" replace />
+    <Navigate
+      to={resolveSessionAccess(state.session.authorization).home}
+      replace
+    />
   ) : (
     <Outlet />
   );
 }
 
+export function SessionHome() {
+  const { state } = useAuth();
+
+  return (
+    <Navigate
+      to={
+        state.status === "authenticated"
+          ? resolveSessionAccess(state.session.authorization).home
+          : "/login"
+      }
+      replace
+    />
+  );
+}
+
+export function RequireAccess() {
+  const { state } = useAuth();
+  const { pathname } = useLocation();
+
+  if (state.status !== "authenticated") {
+    return <Navigate to="/login" replace />;
+  }
+
+  const access = resolveSessionAccess(state.session.authorization);
+
+  const path = pathname.replace(/\/+$/, "") || "/";
+
+  return access.allowedPaths.includes(path) ? (
+    <Outlet />
+  ) : (
+    <Navigate to={access.home} replace />
+  );
+}
 export function RequireRole({
   role,
   children,

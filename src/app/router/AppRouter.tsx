@@ -1,19 +1,20 @@
 import { Navigate, Route, Routes } from "react-router";
 import { LoginPage } from "../../features/auth/pages/LoginPage";
+import { AccessPage } from "../../features/auth/pages/AccessPage";
 import { DashboardPage } from "../../features/dashboard/pages/DashboardPage";
-import { AppShell } from "../layout/AppShell";
 import { CategoriesPage } from "../../features/categories/pages/CategoriesPage";
 import { ProductsPage } from "../../features/products/pages/ProductsPage";
 import { SalesPage } from "../../features/sales/pages/SalesPage";
 import { KitchenPage } from "../../features/kitchen/pages/KitchenPage";
 import { InventoryPage } from "../../features/inventory/pages/InventoryPage";
 import { ConfigurationPage } from "../../features/business/pages/ConfigurationPage";
-
+import { AppShell } from "../layout/AppShell";
 import {
   GuestOnly,
   RequireAuth,
-  RequireRole,
+  RequireAccess,
   SessionBoundary,
+  SessionHome,
 } from "./AuthGuards";
 
 export function AppRouter() {
@@ -25,54 +26,40 @@ export function AppRouter() {
         </Route>
 
         <Route element={<RequireAuth />}>
-          <Route element={<AppShell />}>
-            <Route path="/panel" element={<DashboardPage />} />
-            <Route path="/ventas" element={<SalesPage />} />
-            <Route path="/cocina" element={<KitchenPage />} />
-            <Route path="/panel" element={<DashboardPage />} />
+          <Route element={<RequireAccess />}>
+            <Route element={<AppShell />}>
+              <Route path="/panel" element={<DashboardPage />} />
+              <Route path="/ventas" element={<SalesPage />} />
+              <Route path="/cocina" element={<KitchenPage />} />
+              <Route path="/inventario" element={<InventoryPage />} />
+              <Route path="/productos" element={<ProductsPage />} />
+              <Route
+                path="/productos/categorias"
+                element={<CategoriesPage />}
+              />
+              <Route
+                path="/configuracion"
+                element={<ConfigurationPage />}
+              />
+              <Route
+                path="/mi-negocio"
+                element={<Navigate to="/configuracion" replace />}
+              />
 
-            <Route
-              path="/productos/categorias"
-              element={
-                <RequireRole role="ADMIN">
-                  <CategoriesPage />
-                </RequireRole>
-              }
-            />
-            <Route
-              path="/inventario"
-              element={
-                <RequireRole role="ADMIN">
-                  <InventoryPage />
-                </RequireRole>
-              }
-            />
-            <Route
-              path="/mi-negocio"
-              element={<Navigate to="/configuracion" replace />}
-            />
-
-            <Route
-              path="/configuracion"
-              element={
-                <RequireRole role="ADMIN">
-                  <ConfigurationPage />
-                </RequireRole>
-              }
-            />
-
-            <Route
-              path="/productos"
-              element={
-                <RequireRole role="ADMIN">
-                  <ProductsPage />
-                </RequireRole>
-              }
-            />
+              <Route path="/acceso" element={<AccessPage />} />
+              <Route path="/espacios" element={<AccessPage />} />
+              <Route path="/produccion" element={<AccessPage />} />
+              <Route
+                path="/pedidos-publicos"
+                element={<AccessPage />}
+              />
+              <Route path="/domicilios" element={<AccessPage />} />
+            </Route>
           </Route>
         </Route>
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<SessionHome />} />
+        <Route path="*" element={<SessionHome />} />
       </Route>
     </Routes>
   );

@@ -3,23 +3,31 @@ import { ChevronRight, LogOut, Menu } from "lucide-react";
 import { NavLink, useLocation } from "react-router";
 import { BottomSheet } from "../../components/layout/BottomSheet";
 import { Avatar } from "../../components/ui/Avatar";
-import type { RoleCode } from "../../features/auth/types/auth.types";
+import type { CurrentSession } from "../../features/auth/types/auth.types";
 import type { BusinessIdentity } from "../../features/business/schemas/business-profile.schema";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { getNavigation } from "../navigation";
 import type { NavigationItem } from "../navigation";
 
 interface MobileNavigationProps {
-  roles: readonly RoleCode[];
+  authorization: CurrentSession;
   business: BusinessIdentity;
   onLogout: () => void;
 }
 
-const shortcuts = ["panel", "sales", "kitchen", "deliveries"];
+const shortcuts = [
+  "panel",
+  "sales",
+  "kitchen",
+  "production",
+  "public-orders",
+  "deliveries",
+];
 
 const shortLabels: Record<string, string> = {
   sales: "Ventas",
-  deliveries: "Pedidos",
+  deliveries: "Domicilios",
+  "public-orders": "Pedidos",
   settings: "Configuración",
 };
 
@@ -129,7 +137,7 @@ function NavigationEntry({
 }
 
 function MobileNavigationContent({
-  roles,
+  authorization,
   business,
   onLogout,
 }: MobileNavigationProps) {
@@ -141,13 +149,13 @@ function MobileNavigationContent({
   const sheetId = useId();
   const submenuRef = useRef<HTMLElement>(null);
 
-  const items = getNavigation(roles);
+  const items = getNavigation(authorization);
   const group = items.find(
     (item) => item.id === groupId && item.status === "group"
   );
-  const primaryItems = items.filter((item) =>
-    shortcuts.includes(item.id)
-  );
+  const primaryItems = items
+    .filter((item) => shortcuts.includes(item.id))
+    .slice(0, 3);
 
   useEffect(() => {
     if (groupId) {

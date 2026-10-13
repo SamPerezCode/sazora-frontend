@@ -286,39 +286,42 @@ export function EmployeeList({
 
   return (
     <div className="space-y-4 rounded-2xl border border-outline bg-surface p-4 sm:p-5">
-      <div className="employee-search">
-        <TextField
-          type="search"
-          label="Buscar empleados"
-          placeholder="Buscar por nombre, correo o rol"
-          icon={Search}
-          value={query}
-          aria-controls={listId}
-          aria-describedby={summaryId}
-          onChange={(event) => {
-            setQuery(event.currentTarget.value);
+      <div className="grid grid-cols-1 items-end gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
+        <div className="employee-search min-w-0">
+          <TextField
+            type="search"
+            label="Buscar empleados"
+            placeholder="Buscar por nombre, correo o rol"
+            icon={Search}
+            value={query}
+            aria-controls={listId}
+            aria-describedby={summaryId}
+            onChange={(event) => {
+              setQuery(event.currentTarget.value);
+              setRequestedPage(1);
+            }}
+          />
+        </div>
+
+        <SelectField
+          className="min-w-0"
+          label="Filtrar por rol"
+          hideLabel
+          value={roleFilter}
+          describedBy={summaryId}
+          options={[
+            { value: "", label: "Todos los roles" },
+            ...Object.entries(ROLE_LABELS).map(([value, label]) => ({
+              value,
+              label,
+            })),
+          ]}
+          onValueChange={(value) => {
+            setRoleFilter(value);
             setRequestedPage(1);
           }}
         />
       </div>
-
-      <SelectField
-        label="Filtrar por rol"
-        hideLabel
-        value={roleFilter}
-        describedBy={summaryId}
-        options={[
-          { value: "", label: "Todos los roles" },
-          ...Object.entries(ROLE_LABELS).map(([value, label]) => ({
-            value,
-            label,
-          })),
-        ]}
-        onValueChange={(value) => {
-          setRoleFilter(value);
-          setRequestedPage(1);
-        }}
-      />
 
       <p id={summaryId} role="status" className="text-xs text-muted">
         {loading ? (

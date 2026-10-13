@@ -1,5 +1,4 @@
 import { useId, useState } from "react";
-import { Navigate } from "react-router";
 
 import {
   ChevronDown,
@@ -33,14 +32,6 @@ import { STATUS_LABELS } from "../schemas/sales.schema";
 
 export function SalesPage() {
   const { session } = useAppShell();
-
-  if (
-    !session.authorization.roles.some(
-      (role) => role === "ADMIN" || role === "WAITER"
-    )
-  ) {
-    return <Navigate to="/panel" replace />;
-  }
 
   return (
     <SalesContent

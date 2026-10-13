@@ -104,6 +104,11 @@ try {
       membershipId: "2",
       authVersion: 1,
       roles: ["PRODUCTION"],
+      locationAccess: {
+        hasGlobalAccess: false,
+        defaultLocationId: null,
+        locations: [],
+      },
     }).roles,
     ["PRODUCTION"]
   );
@@ -194,13 +199,57 @@ try {
     /Procesos de planta, producción y productos terminados/
   );
   assert.match(rolesMarkup, /Después de guardar, verifica/);
+  function navigationSession(roles, locationType) {
+    return auth.currentSessionSchema.parse({
+      tokenType: "access",
+      userId: "1",
+      businessId: "3",
+      membershipId: "2",
+      authVersion: 1,
+      roles,
+      locationAccess: {
+        hasGlobalAccess: false,
+        defaultLocationId: "location-1",
+        locations: [
+          {
+            id: "location-1",
+            code: "LOC-01",
+            name: "Ubicación de prueba",
+            locationType,
+            isDefault: true,
+          },
+        ],
+      },
+    });
+  }
+
+  // Producción en una planta: muestra Producción.
   assert.deepEqual(
-    getNavigation(["PRODUCTION"]).map((item) => item.id),
-    ["panel"]
+    getNavigation(
+      navigationSession(["PRODUCTION"], "PRODUCTION_WAREHOUSE")
+    ).map((item) => item.id),
+    ["production"]
   );
+
+  // Producción y Cocina en un punto de venta:
+  // solamente Cocina es compatible.
   assert.deepEqual(
-    getNavigation(["PRODUCTION", "KITCHEN"]).map((item) => item.id),
-    ["panel", "kitchen"]
+    getNavigation(
+      navigationSession(["PRODUCTION", "KITCHEN"], "POINT_OF_SALE")
+    ).map((item) => item.id),
+    ["kitchen"]
+  );
+
+  // Producción y Cocina en una planta:
+  // solamente Producción es compatible.
+  assert.deepEqual(
+    getNavigation(
+      navigationSession(
+        ["PRODUCTION", "KITCHEN"],
+        "PRODUCTION_WAREHOUSE"
+      )
+    ).map((item) => item.id),
+    ["production"]
   );
 
   const point = Object.freeze({

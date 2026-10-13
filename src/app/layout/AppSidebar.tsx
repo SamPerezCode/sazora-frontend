@@ -27,7 +27,7 @@ export function AppSidebar({
   onNavigate,
 }: AppSidebarProps) {
   const { pathname } = useLocation();
-  const items = getNavigation(session.authorization.roles);
+  const items = getNavigation(session.authorization);
   const settings = items.find((item) => item.group === "business");
 
   const ToggleIcon = mobile
@@ -40,10 +40,10 @@ export function AppSidebar({
     <aside className="shell-sidebar" data-collapsed={collapsed}>
       <div className="shell-brand-row">
         <NavLink
-          to="/panel"
+          to="/"
           className="shell-brand"
           onClick={onNavigate}
-          aria-label="Sazora, ir al panel"
+          aria-label="Sazora, ir al inicio"
         >
           <img
             src={symbol}

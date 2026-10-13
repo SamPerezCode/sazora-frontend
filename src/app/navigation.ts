@@ -5,12 +5,18 @@ import {
   ChefHat,
   Flame,
   LayoutDashboard,
+  LayoutGrid,
   PackageOpen,
   Settings,
   Tags,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { RoleCode } from "../features/auth/types/auth.types";
+import type {
+  CurrentSession,
+  RoleCode,
+} from "../features/auth/types/auth.types";
+import { resolveSessionAccess } from "../features/auth/utils/resolve-session-access";
+import { ROLE_PRESENTATION } from "../features/auth/role-presentation";
 
 export { ROLE_LABELS } from "../features/auth/role-presentation";
 
@@ -138,35 +144,70 @@ const navigation: readonly NavigationItem[] = [
 ];
 
 export function getNavigation(
-  roles: readonly RoleCode[]
+  session: CurrentSession
 ): NavigationItem[] {
-  const allowed = (item: NavigationBase) =>
-    item.roles === null ||
-    item.roles.some((role) => roles.includes(role));
-
+  const access = resolveSessionAccess(session);
   const visible: NavigationItem[] = [];
 
-  for (const item of navigation) {
-    if (!allowed(item)) continue;
+  const allowed = (item: NavigationLeaf): boolean =>
+    item.status === "ready"
+      ? access.allowedPaths.includes(item.to)
+      : access.kind === "global" &&
+        (item.roles?.some((role) => session.roles.includes(role)) ??
+          false);
 
+  for (const item of navigation) {
     if (item.status === "group") {
       const children = item.children.filter(allowed);
 
       if (children.length) {
-        visible.push(
-          item.id === "panel" && roles.includes("ADMIN")
-            ? {
-                ...item,
-                label: "Resumen general",
-                description:
-                  "Información general de la organización.",
-              }
-            : item
-        );
+        visible.push({ ...item, children });
       }
-    } else {
-      visible.push(item);
+    } else if (allowed(item)) {
+      visible.push(
+        item.id === "panel"
+          ? {
+              ...item,
+              label: "Resumen general",
+              description: "Información general de la organización.",
+            }
+          : item
+      );
     }
+  }
+
+  if (access.kind === "choose") {
+    visible.unshift({
+      id: "workspaces",
+      label: "Espacios de trabajo",
+      description: "Elige el módulo en el que deseas trabajar.",
+      icon: LayoutGrid,
+      roles: null,
+      group: "main",
+      status: "ready",
+      to: "/espacios",
+    });
+  }
+
+  for (const workspace of access.workspaces) {
+    if (visible.some((item) => item.id === workspace.id)) {
+      continue;
+    }
+
+    const presentation = ROLE_PRESENTATION[workspace.role];
+
+    visible.push({
+      id: workspace.id,
+      label: workspace.label,
+      description: workspace.pending
+        ? "Módulo en preparación."
+        : presentation.description,
+      icon: presentation.icon,
+      roles: [workspace.role],
+      group: "main",
+      status: "ready",
+      to: workspace.path,
+    });
   }
 
   return visible;

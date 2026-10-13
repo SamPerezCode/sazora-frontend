@@ -49,6 +49,21 @@ export const loginDataSchema = z.object({
   }),
 });
 
+export const sessionLocationAccessSchema = z.object({
+  hasGlobalAccess: z.boolean(),
+  defaultLocationId: z.string().min(1).nullable(),
+  locations: z.array(
+    z.object({
+      id: z.string().min(1),
+      code: z.string(),
+      name: z.string(),
+      locationType: z.enum(["POINT_OF_SALE", "PRODUCTION_WAREHOUSE"]),
+      isDefault: z.boolean(),
+      isActive: z.boolean().optional(),
+    })
+  ),
+});
+
 export const currentSessionSchema = z.object({
   tokenType: z.literal("access"),
   userId: z.string().min(1),
@@ -56,6 +71,7 @@ export const currentSessionSchema = z.object({
   membershipId: z.string().min(1),
   authVersion: z.number().int().positive(),
   roles: z.array(roleSchema).min(1),
+  locationAccess: sessionLocationAccessSchema,
 });
 
 export const loginResponseSchema = z.object({

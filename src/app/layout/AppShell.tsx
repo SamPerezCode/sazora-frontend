@@ -37,7 +37,7 @@ export function AppShell() {
     return null;
   }
 
-  const current = getNavigation(session.authorization.roles)
+  const current = getNavigation(session.authorization)
     .flatMap((item) =>
       item.status === "group" ? item.children : [item]
     )
@@ -80,14 +80,12 @@ export function AppShell() {
           key={`${location.key}:${session.membership.id}`}
           title={
             isPanel
-              ? session.authorization.roles.includes("ADMIN")
-                ? "Resumen general"
-                : `Buen servicio, ${session.user.fullName.trim().split(/\s+/)[0]}`
+              ? "Resumen general"
               : isSettings
                 ? "Configuración"
                 : isInventory
                   ? "Gestión de inventario"
-                  : (current?.label ?? "Panel")
+                  : (current?.label ?? "Acceso")
           }
           subtitle={
             isSettings
@@ -130,7 +128,7 @@ export function AppShell() {
 
       <MobileNavigation
         key={location.key}
-        roles={session.authorization.roles}
+        authorization={session.authorization}
         business={business}
         onLogout={logout}
       />
