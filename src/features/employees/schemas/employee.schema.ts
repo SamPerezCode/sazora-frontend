@@ -2,6 +2,19 @@ import { z } from "zod";
 import { roleSchema } from "../../auth/schemas/auth.schema";
 
 export const membershipIdSchema = z.string().regex(/^[1-9]\d*$/);
+export const employeeLocationSummarySchema = z.object({
+  hasGlobalAccess: z.boolean(),
+  defaultLocationId: membershipIdSchema.nullable(),
+  locations: z.array(
+    z.object({
+      id: membershipIdSchema,
+      code: z.string(),
+      name: z.string(),
+      locationType: z.enum(["POINT_OF_SALE", "PRODUCTION_WAREHOUSE"]),
+      isDefault: z.boolean(),
+    })
+  ),
+});
 
 export const assignableRoleSchema = roleSchema.exclude(["ADMIN"]);
 export const assignableRoles = assignableRoleSchema.options;
@@ -15,6 +28,7 @@ export const employeeSchema = z.object({
   isActive: z.boolean(),
   membershipIsActive: z.boolean(),
   roles: z.array(roleSchema),
+  locationAccess: employeeLocationSummarySchema.optional(),
   lastLoginAt: z.iso.datetime({ offset: true }).nullable(),
   createdAt: z.iso.datetime({ offset: true }),
   updatedAt: z.iso.datetime({ offset: true }),
@@ -23,7 +37,11 @@ export const employeeSchema = z.object({
 export const employeeListResponseSchema = z.object({
   status: z.literal("success"),
   data: z.object({
-    employees: z.array(employeeSchema),
+    employees: z.array(
+      employeeSchema.extend({
+        locationAccess: employeeLocationSummarySchema,
+      })
+    ),
   }),
 });
 
@@ -56,7 +74,7 @@ export const employeeRolesSchema = z
     z
       .array(assignableRoleSchema)
       .min(1, "Selecciona al menos un rol.")
-      .max(4, "Puedes asignar hasta cuatro roles.")
+      .max(5, "Puedes asignar hasta cinco roles.")
   );
 
 export const employeeCreateSchema = employeeIdentitySchema

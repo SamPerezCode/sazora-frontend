@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { AuthSession } from "../../auth/types/auth.types";
+import { employeeErrorMessage } from "../utils/employee-errors";
 import { ApiError } from "../../../lib/http/client";
 import { employeePermissions } from "../schemas/employee.schema";
 import type {
@@ -73,10 +74,10 @@ export function useEmployees(session: AuthSession) {
             scope,
             attempt,
             employees: [],
-            error:
-              error instanceof ApiError
-                ? error.message
-                : "No pudimos cargar los empleados.",
+            error: employeeErrorMessage(
+              error,
+              "No pudimos cargar los empleados."
+            ),
           });
         }
       });
@@ -146,21 +147,33 @@ export function useEmployees(session: AuthSession) {
         throw new Error("No pudimos verificar el empleado guardado.");
       }
 
-      setSnapshot((previous) => ({
-        scope,
-        attempt,
-        error: null,
-        employees: sortEmployees([
-          ...(previous?.scope === scope
-            ? previous.employees
-            : []
-          ).filter(
-            (item) => item.membershipId !== employee.membershipId
-          ),
-          employee,
-        ]),
-      }));
+      setSnapshot((previous) => {
+        const previousEmployees =
+          previous?.scope === scope ? previous.employees : [];
 
+        const previousEmployee = previousEmployees.find(
+          (item) => item.membershipId === employee.membershipId
+        );
+
+        const updatedEmployee: Employee = {
+          ...employee,
+          locationAccess:
+            employee.locationAccess ??
+            previousEmployee?.locationAccess,
+        };
+
+        return {
+          scope,
+          attempt,
+          error: null,
+          employees: sortEmployees([
+            ...previousEmployees.filter(
+              (item) => item.membershipId !== employee.membershipId
+            ),
+            updatedEmployee,
+          ]),
+        };
+      });
       return employee;
     } finally {
       if (write.current === controller) {

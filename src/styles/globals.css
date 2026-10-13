@@ -18,11 +18,13 @@
 @import "../features/inventory/inventory-workspace.css";
 @import "../components/forms/date-field.css";
 @import "../features/inventory/production.css";
+@import "../features/employees/employees.css";
+@import "./dark-theme.css";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
-  --color-danger: #c9302d;
+  --color-danger: var(--sazora-danger, #c9302d);
   --color-background: var(--sazora-background);
   --color-heading: var(--sazora-heading);
   --color-muted: var(--sazora-muted);
@@ -173,5 +175,19 @@
 @media (prefers-reduced-motion: reduce) {
   :root button:is(.bottom-sheet-close, .app-close-button) {
     transition: none;
+  }
+}
+
+/*
+ * Bloquea el desplazamiento de la página únicamente
+ * mientras exista un diálogo modal abierto.
+ *
+ * Al cerrar el último modal, el navegador retira
+ * automáticamente esta regla.
+ */
+@layer base {
+  html:has(dialog:modal),
+  html:has(dialog:modal) body {
+    overflow: hidden;
   }
 }

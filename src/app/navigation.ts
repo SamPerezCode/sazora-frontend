@@ -12,13 +12,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type { RoleCode } from "../features/auth/types/auth.types";
 
-export const ROLE_LABELS: Record<RoleCode, string> = {
-  ADMIN: "Administrador",
-  WAITER: "Mesero",
-  KITCHEN: "Cocina",
-  PUBLIC_ORDER_MANAGER: "Gestor de pedidos",
-  DELIVERY_DRIVER: "Domiciliario",
-};
+export { ROLE_LABELS } from "../features/auth/role-presentation";
 
 interface NavigationBase {
   id: string;

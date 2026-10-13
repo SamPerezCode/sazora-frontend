@@ -34,13 +34,8 @@ export function BottomSheet({
     if (!dialog || !open) return;
 
     const previousFocus = document.activeElement;
-    const bodyOverflow = document.body.style.overflow;
-    const rootOverflow = document.documentElement.style.overflow;
 
     dialog.showModal();
-
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
 
     dialog
       .querySelector<HTMLElement>("[data-dialog-initial-focus]")
@@ -48,9 +43,6 @@ export function BottomSheet({
 
     return () => {
       dialog.close();
-
-      document.body.style.overflow = bodyOverflow;
-      document.documentElement.style.overflow = rootOverflow;
 
       if (
         previousFocus instanceof HTMLElement &&

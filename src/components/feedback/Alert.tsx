@@ -7,8 +7,13 @@ interface AlertProps extends ComponentPropsWithoutRef<"div"> {
 
 const variants = {
   error: "border-danger/35 bg-danger/10 text-heading",
-  success:
-    "border-emerald-600/30 bg-emerald-500/10 text-emerald-800 dark:border-emerald-400/30 dark:text-emerald-200",
+
+  success: [
+    "border-emerald-600/30 bg-emerald-500/10 text-emerald-800",
+    "dark:border-[color:var(--sazora-success)]/30",
+    "dark:bg-[color:var(--sazora-success)]/10",
+    "dark:text-[color:var(--sazora-success)]",
+  ].join(" "),
 };
 
 export function Alert({
@@ -37,9 +42,7 @@ export function Alert({
         strokeWidth={1.75}
         className={[
           "mt-0.5 shrink-0",
-          variant === "error"
-            ? "text-danger dark:text-[#efa38f]"
-            : "",
+          variant === "error" ? "text-danger" : "",
         ].join(" ")}
       />
 

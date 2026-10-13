@@ -1,71 +1,41 @@
 import { useId, useState } from "react";
 import {
-  CircleCheck,
-  CircleSlash,
+  Building2,
+  MapPin,
   Pencil,
   Plus,
+  Power,
+  RotateCcw,
   Search,
   ShieldCheck,
-  ToggleLeft,
-  ToggleRight,
+  TriangleAlert,
 } from "lucide-react";
 import { ROLE_LABELS } from "../../../app/navigation";
 import { TextField } from "../../../components/forms/TextField";
 import { SelectField } from "../../../components/forms/SelectField";
 import { ActionMenu } from "../../../components/ui/ActionMenu";
-import { Avatar } from "../../../components/ui/Avatar";
 import { Button } from "../../../components/ui/Button";
 import { Pagination } from "../../../components/ui/Pagination";
 import { employeePermissions } from "../schemas/employee.schema";
 import type { Employee } from "../schemas/employee.schema";
+import {
+  EmployeeIdentity,
+  EmployeeRoles,
+  EmployeeStatus,
+  EmployeeViewState,
+} from "./EmployeeVisuals";
 
 interface Props {
   employees: readonly Employee[];
   ownMembershipId: string;
   disabled: boolean;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  onManageLocations: (employee: Employee) => void;
   onCreate: () => void;
   onEdit: (kind: "edit" | "roles", employee: Employee) => void;
   onToggle: (employee: Employee) => void;
-}
-
-function EmployeeStatus({ employee }: { employee: Employee }) {
-  const Icon = employee.membershipIsActive
-    ? CircleCheck
-    : CircleSlash;
-
-  return (
-    <div className="space-y-1">
-      <span className="inline-flex items-center gap-1.5 text-xs text-heading">
-        <Icon
-          aria-hidden="true"
-          size={14}
-          className={
-            employee.membershipIsActive ? "text-accent" : "text-muted"
-          }
-        />
-        {employee.membershipIsActive ? "Activo" : "Inactivo"}
-      </span>
-
-      {!employee.isActive && (
-        <p className="text-xs text-danger">Cuenta global inactiva</p>
-      )}
-    </div>
-  );
-}
-
-function Roles({ employee }: { employee: Employee }) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {employee.roles.map((role) => (
-        <span
-          key={role}
-          className="rounded-lg bg-secondary px-2 py-1 text-[0.6875rem] text-heading"
-        >
-          {ROLE_LABELS[role]}
-        </span>
-      ))}
-    </div>
-  );
 }
 
 function normalize(value: string) {
@@ -84,13 +54,29 @@ function lastLogin(value: string | null) {
     : "Sin ingresos";
 }
 
+function formatLocationName(value: string): string {
+  const normalized = value
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("es-CO");
+
+  return (
+    normalized.charAt(0).toLocaleUpperCase("es-CO") +
+    normalized.slice(1)
+  );
+}
+
 export function EmployeeList({
   employees,
   ownMembershipId,
   disabled,
+  loading,
+  error,
+  onRetry,
   onCreate,
   onEdit,
   onToggle,
+  onManageLocations,
 }: Props) {
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -128,6 +114,96 @@ export function EmployeeList({
     page * pageSize
   );
 
+  const locked = disabled || loading || !!error;
+
+  function locations(employee: Employee, showSummary = false) {
+    const access = employee.locationAccess;
+
+    const globalAccess =
+      access?.hasGlobalAccess ?? employee.roles.includes("ADMIN");
+
+    if (globalAccess) {
+      return (
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-heading">
+          <Building2
+            aria-hidden="true"
+            size={15}
+            className="shrink-0 text-accent"
+          />
+          Acceso global
+        </span>
+      );
+    }
+
+    const manageButton = (
+      <button
+        type="button"
+        disabled={locked}
+        onClick={() => onManageLocations(employee)}
+        aria-label={
+          "Ver o asignar ubicaciones a " + employee.fullName
+        }
+        className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg text-xs text-muted underline-offset-4 hover:text-heading hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-6"
+      >
+        {!showSummary && <MapPin aria-hidden="true" size={15} />}
+        Ver o asignar
+      </button>
+    );
+
+    // No confundir un resumen ausente con cero ubicaciones.
+    if (!showSummary || !access) {
+      return manageButton;
+    }
+
+    const assigned = access.locations;
+
+    const primary =
+      assigned.find((item) => item.id === access.defaultLocationId) ??
+      assigned.find((item) => item.isDefault) ??
+      assigned[0];
+
+    const additional = Math.max(0, assigned.length - 1);
+
+    return (
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+        {primary ? (
+          <span
+            className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-xs font-semibold text-heading"
+            title={assigned
+              .map((item) => formatLocationName(item.name))
+              .join(" · ")}
+          >
+            <MapPin
+              aria-hidden="true"
+              size={15}
+              className="shrink-0 text-muted"
+            />
+
+            <span className="truncate">
+              {formatLocationName(primary.name)}
+            </span>
+
+            {additional > 0 && (
+              <span
+                className="shrink-0"
+                aria-label={additional + " ubicaciones adicionales"}
+              >
+                +{additional}
+              </span>
+            )}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-1 text-xs font-semibold leading-none text-amber-800 dark:text-amber-300">
+            <TriangleAlert aria-hidden="true" size={12} />
+            Sin ubicación
+          </span>
+        )}
+
+        {manageButton}
+      </div>
+    );
+  }
+
   function actions(employee: Employee) {
     const allowed = employeePermissions(employee, ownMembershipId);
 
@@ -154,6 +230,17 @@ export function EmployeeList({
           ]
         : []),
 
+      ...(!employee.roles.includes("ADMIN")
+        ? [
+            {
+              id: "locations",
+              label: "Gestionar ubicaciones",
+              icon: <MapPin aria-hidden="true" size={16} />,
+              onSelect: () => onManageLocations(employee),
+            },
+          ]
+        : []),
+
       ...(allowed.status
         ? [
             {
@@ -161,11 +248,9 @@ export function EmployeeList({
               label: employee.membershipIsActive
                 ? "Desactivar"
                 : "Activar",
-              icon: employee.membershipIsActive ? (
-                <ToggleRight aria-hidden="true" size={20} />
-              ) : (
-                <ToggleLeft aria-hidden="true" size={20} />
-              ),
+              icon: <Power aria-hidden="true" size={16} />,
+              danger: employee.membershipIsActive,
+              separatorBefore: true,
               onSelect: () => onToggle(employee),
             },
           ]
@@ -174,14 +259,15 @@ export function EmployeeList({
 
     return entries.length ? (
       <ActionMenu
+        appearance="compact"
         label={"Acciones de " + employee.fullName}
-        disabled={disabled}
+        disabled={locked}
         actions={entries}
       />
     ) : (
       <span
-        className="text-xs text-muted"
         aria-label="Sin acciones disponibles"
+        className="text-muted"
       >
         —
       </span>
@@ -190,148 +276,200 @@ export function EmployeeList({
 
   function identity(employee: Employee) {
     return (
-      <div className="flex min-w-0 items-center gap-3">
-        <Avatar name={employee.fullName} size="sm" />
-
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-heading [overflow-wrap:anywhere]">
-            {employee.fullName}
-
-            {employee.membershipId === ownMembershipId && (
-              <span className="ml-2 text-xs font-normal text-muted">
-                (Tú)
-              </span>
-            )}
-          </p>
-
-          <p className="mt-1 text-xs text-muted [overflow-wrap:anywhere]">
-            {employee.email}
-          </p>
-        </div>
-      </div>
+      <EmployeeIdentity
+        name={employee.fullName}
+        email={employee.email}
+        own={employee.membershipId === ownMembershipId}
+      />
     );
   }
 
   return (
-    <div className="mt-5 space-y-4">
-      <div className="grid items-end gap-3 lg:grid-cols-[minmax(0,22.5rem)_minmax(0,15rem)_minmax(0,1fr)_auto]">
-        <div className="min-w-0">
-          <TextField
-            type="search"
-            label="Buscar empleados"
-            placeholder="Nombre, correo o rol"
-            icon={Search}
-            value={query}
-            aria-controls={listId}
-            aria-describedby={summaryId}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setRequestedPage(1);
-            }}
-          />
-        </div>
-
-        <SelectField
-          label="Filtrar por rol"
-          value={roleFilter}
-          describedBy={summaryId}
-          options={[
-            { value: "", label: "Todos los roles" },
-            ...Object.entries(ROLE_LABELS).map(([value, label]) => ({
-              value,
-              label,
-            })),
-          ]}
-          onValueChange={(value) => {
-            setRoleFilter(value);
+    <div className="space-y-4 rounded-2xl border border-outline bg-surface p-4 sm:p-5">
+      <div className="employee-search">
+        <TextField
+          type="search"
+          label="Buscar empleados"
+          placeholder="Buscar por nombre, correo o rol"
+          icon={Search}
+          value={query}
+          aria-controls={listId}
+          aria-describedby={summaryId}
+          onChange={(event) => {
+            setQuery(event.currentTarget.value);
             setRequestedPage(1);
           }}
         />
-
-        <Button
-          size="sm"
-          className="justify-self-end whitespace-nowrap lg:col-start-4"
-          disabled={disabled}
-          onClick={onCreate}
-        >
-          <Plus aria-hidden="true" size={16} />
-          Nuevo empleado
-        </Button>
       </div>
 
-      <div
-        id={listId}
-        className="rounded-xl border border-outline/60 bg-surface/50"
-      >
-        {!visible.length ? (
-          <p className="px-4 py-10 text-center text-sm text-muted">
-            {employees.length
-              ? "No encontramos empleados con estos filtros."
-              : "No hay empleados registrados."}
-          </p>
+      <SelectField
+        label="Filtrar por rol"
+        hideLabel
+        value={roleFilter}
+        describedBy={summaryId}
+        options={[
+          { value: "", label: "Todos los roles" },
+          ...Object.entries(ROLE_LABELS).map(([value, label]) => ({
+            value,
+            label,
+          })),
+        ]}
+        onValueChange={(value) => {
+          setRoleFilter(value);
+          setRequestedPage(1);
+        }}
+      />
+
+      <p id={summaryId} role="status" className="text-xs text-muted">
+        {loading ? (
+          "Consultando empleados…"
+        ) : error ? (
+          "Listado no disponible"
         ) : (
           <>
-            <div className="hidden overflow-hidden rounded-xl lg:block">
-              <table className="w-full table-fixed text-left">
+            {employees.length}{" "}
+            {employees.length === 1 ? "empleado" : "empleados"}
+            {(words.length > 0 || roleFilter) &&
+              " · " + filtered.length + " resultados"}
+          </>
+        )}
+      </p>
+
+      <div id={listId} aria-busy={loading}>
+        {loading ? (
+          <EmployeeViewState
+            kind="loading"
+            title="Cargando empleados…"
+          />
+        ) : error ? (
+          <EmployeeViewState
+            kind="error"
+            title="No pudimos cargar los empleados"
+            description={error}
+            action={
+              <Button size="sm" variant="secondary" onClick={onRetry}>
+                <RotateCcw aria-hidden="true" size={16} />
+                Reintentar
+              </Button>
+            }
+          />
+        ) : employees.length === 0 ? (
+          <EmployeeViewState
+            kind="empty"
+            title="Aún no hay empleados"
+            action={
+              <Button
+                size="sm"
+                disabled={disabled}
+                onClick={onCreate}
+              >
+                <Plus aria-hidden="true" size={16} />
+                Nuevo empleado
+              </Button>
+            }
+          />
+        ) : visible.length === 0 ? (
+          <EmployeeViewState
+            kind="empty"
+            title="No encontramos empleados con estos filtros"
+            action={
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setQuery("");
+                  setRoleFilter("");
+                  setRequestedPage(1);
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            }
+          />
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full min-w-[52rem] table-fixed text-left text-sm">
                 <caption className="sr-only">
                   Empleados del negocio
                 </caption>
 
                 <colgroup>
-                  <col className="w-[30%]" />
-                  <col />
-                  <col className="w-36" />
-                  <col className="w-36" />
-                  <col className="w-24" />
+                  <col className="w-[20%]" />
+                  <col className="w-[21%]" />
+                  <col className="w-[29%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[6%]" />
                 </colgroup>
 
-                <thead className="border-b border-outline/60 bg-secondary/30">
+                <thead className="border-b border-outline">
                   <tr>
                     {[
                       "Empleado",
                       "Roles",
-                      "Acceso al negocio",
+                      "Ubicaciones",
+                      "Estado",
                       "Último ingreso",
                       "Acciones",
                     ].map((label) => (
                       <th
                         key={label}
                         scope="col"
-                        className="px-4 py-3 text-[0.6875rem] font-medium uppercase text-muted"
+                        className="px-3 py-3 text-[0.6875rem] font-semibold uppercase text-muted"
                       >
-                        {label}
+                        <span
+                          className={
+                            label === "Acciones"
+                              ? "sr-only"
+                              : undefined
+                          }
+                        >
+                          {label}
+                        </span>
                       </th>
                     ))}
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-outline/40">
+                <tbody className="divide-y divide-outline/60">
                   {visible.map((employee) => (
                     <tr
                       key={employee.membershipId}
-                      className="hover:bg-secondary/30"
+                      className={
+                        employee.membershipIsActive
+                          ? ""
+                          : "opacity-65"
+                      }
                     >
                       <th
                         scope="row"
-                        className="px-4 py-4 font-normal"
+                        className="px-3 py-4 font-normal"
                       >
                         {identity(employee)}
                       </th>
 
-                      <td className="px-4 py-4">
-                        <Roles employee={employee} />
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <EmployeeStatus employee={employee} />
-                      </td>
-
-                      <td className="px-4 py-4 text-xs text-muted">
-                        {lastLogin(employee.lastLoginAt)}
+                      <td className="px-3 py-4">
+                        <EmployeeRoles roles={employee.roles} />
                       </td>
 
                       <td className="px-3 py-4">
-                        <div className="flex justify-center">
+                        {locations(employee, true)}
+                      </td>
+
+                      <td className="px-3 py-4">
+                        <EmployeeStatus
+                          active={employee.membershipIsActive}
+                          accountActive={employee.isActive}
+                        />
+                      </td>
+
+                      <td className="px-3 py-4 text-xs text-muted">
+                        {lastLogin(employee.lastLoginAt)}
+                      </td>
+
+                      <td className="py-3">
+                        <div className="flex justify-end">
                           {actions(employee)}
                         </div>
                       </td>
@@ -341,32 +479,33 @@ export function EmployeeList({
               </table>
             </div>
 
-            <ul className="divide-y divide-outline/40 px-3 lg:hidden">
+            <ul className="divide-y divide-outline lg:hidden">
               {visible.map((employee) => (
                 <li
                   key={employee.membershipId}
-                  className="space-y-3 py-4"
+                  className={
+                    "space-y-3 py-4 " +
+                    (employee.membershipIsActive ? "" : "opacity-65")
+                  }
                 >
                   <div className="flex items-start justify-between gap-2">
                     {identity(employee)}
                     {actions(employee)}
                   </div>
 
-                  <Roles employee={employee} />
+                  <EmployeeRoles roles={employee.roles} />
 
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="mb-1 text-[0.625rem] uppercase text-muted">
-                        Acceso al negocio
-                      </p>
-                      <EmployeeStatus employee={employee} />
-                    </div>
-
-                    <p className="text-xs text-muted">
-                      Último ingreso:{" "}
-                      {lastLogin(employee.lastLoginAt)}
-                    </p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    {locations(employee)}
+                    <EmployeeStatus
+                      active={employee.membershipIsActive}
+                      accountActive={employee.isActive}
+                    />
                   </div>
+
+                  <p className="text-xs text-muted">
+                    Último ingreso: {lastLogin(employee.lastLoginAt)}
+                  </p>
                 </li>
               ))}
             </ul>
@@ -374,21 +513,7 @@ export function EmployeeList({
         )}
       </div>
 
-      <p
-        id={summaryId}
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="text-center text-xs text-muted sm:text-left"
-      >
-        {words.length || roleFilter
-          ? filtered.length + " resultados · "
-          : ""}
-        Total: {employees.length}{" "}
-        {employees.length === 1 ? "empleado" : "empleados"}
-      </p>
-
-      {employees.length > 10 && (
+      {!loading && !error && employees.length > 10 && (
         <Pagination
           page={page}
           pageSize={pageSize}

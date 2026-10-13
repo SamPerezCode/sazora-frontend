@@ -1,0 +1,142 @@
+/*
+ * El proyecto usa data-theme="dark", no la clase .dark.
+ * Estos valores no se aplican al modo claro.
+ *
+ * Se incluye login-page porque actualmente redefine algunos
+ * colores locales y debe recibir la misma paleta.
+ */
+:root[data-theme="dark"],
+:root[data-theme="dark"] .login-page {
+  color-scheme: dark;
+
+  /* Superficies y texto */
+  --sazora-background: oklch(0.243 0.04 259);
+  --sazora-heading: oklch(0.95 0.008 250);
+  --sazora-surface: oklch(0.301 0.048 261);
+  --sazora-popover: oklch(0.345 0.048 261);
+  --sazora-popover-heading: oklch(0.96 0.006 250);
+  --sazora-overlay: oklch(0.1 0.025 266 / 76%);
+
+  /* Acción */
+  --sazora-brand: oklch(0.677 0.176 43);
+  --sazora-accent: oklch(0.718 0.164 53);
+  --sazora-on-accent: oklch(0.2 0.035 259);
+  --sazora-ring: oklch(0.677 0.176 43);
+
+  /* Secundarios */
+  --sazora-secondary: oklch(0.355 0.043 261);
+  --sazora-subtle: oklch(0.275 0.034 259);
+  --sazora-muted: oklch(0.76 0.022 250);
+
+  /* Estados */
+  --sazora-danger: oklch(0.73 0.16 27);
+  --sazora-success: oklch(0.74 0.15 155);
+  --sazora-action-danger: var(--sazora-danger);
+  --sazora-action-danger-hover: oklch(0.73 0.16 27 / 10%);
+
+  /* Bordes */
+  --sazora-outline: oklch(0.59 0.035 260 / 30%);
+  --sazora-input-border: oklch(0.62 0.035 260 / 42%);
+
+  /* Sidebar */
+  --sazora-sidebar-top: oklch(0.36 0.067 264 / 94%);
+  --sazora-sidebar-bottom: oklch(0.317 0.063 265 / 96%);
+  --sazora-sidebar-heading: oklch(0.95 0.008 250);
+  --sazora-sidebar-hover: oklch(0.62 0.04 260 / 16%);
+  --sazora-sidebar-border: oklch(0.72 0.035 260 / 23%);
+
+  --sazora-sidebar-shadow:
+    0 18px 44px -24px oklch(0.12 0.025 260 / 70%),
+    inset 0 1px 0 oklch(0.8 0.025 260 / 12%);
+
+  /* Profundidad */
+  --sazora-shell-background: linear-gradient(
+    145deg,
+    oklch(0.29 0.047 260),
+    var(--sazora-background) 58%,
+    oklch(0.265 0.042 260)
+  );
+
+  --sazora-header-background: linear-gradient(
+    115deg,
+    oklch(0.36 0.06 264 / 86%),
+    oklch(0.305 0.047 260 / 92%)
+  );
+}
+
+/* Fondo general */
+:root[data-theme="dark"] .app-shell,
+:root[data-theme="dark"] .auth-background {
+  background: var(--sazora-shell-background);
+}
+
+/* Header */
+:root[data-theme="dark"] .shell-header {
+  background: var(--sazora-header-background);
+  border-color: var(--sazora-sidebar-border);
+  box-shadow: var(--sazora-sidebar-shadow);
+  -webkit-backdrop-filter: blur(20px) saturate(115%);
+  backdrop-filter: blur(20px) saturate(115%);
+}
+
+/* Sidebar y tarjeta de login */
+:root[data-theme="dark"] .shell-sidebar,
+:root[data-theme="dark"] .login-card {
+  background: linear-gradient(
+    165deg,
+    var(--sazora-sidebar-top),
+    var(--sazora-sidebar-bottom)
+  );
+  border-color: var(--sazora-sidebar-border);
+  box-shadow: var(--sazora-sidebar-shadow);
+  -webkit-backdrop-filter: blur(24px) saturate(115%);
+  backdrop-filter: blur(24px) saturate(115%);
+}
+
+/* Barra de navegación móvil */
+:root[data-theme="dark"] .mobile-bottom-nav {
+  background: var(--sazora-header-background);
+  border-color: var(--sazora-sidebar-border);
+  -webkit-backdrop-filter: blur(20px) saturate(115%);
+  backdrop-filter: blur(20px) saturate(115%);
+}
+
+/* Modales y paneles */
+:root[data-theme="dark"] .bottom-sheet,
+:root[data-theme="dark"] .bottom-sheet.bottom-sheet-modal {
+  background: var(--sazora-popover);
+  color: var(--sazora-popover-heading);
+  border-color: var(--sazora-outline);
+}
+
+/* Los modales de inventario tienen fondos propios en estas partes. */
+:root[data-theme="dark"] .inv-dialog > .bottom-sheet-heading,
+:root[data-theme="dark"] .inv-dialog-footer {
+  background: var(--sazora-popover);
+  border-color: var(--sazora-outline);
+}
+
+/* Fondo detrás de los modales nativos */
+:root[data-theme="dark"] dialog::backdrop {
+  background: var(--sazora-overlay);
+}
+
+/* Dropdown del usuario */
+:root[data-theme="dark"] .profile-panel {
+  background: var(--sazora-popover);
+  color: var(--sazora-popover-heading);
+  border-color: var(--sazora-outline);
+}
+:root[data-theme="dark"]
+  .configuration-nav
+  button[aria-current="page"] {
+  background: var(--sazora-accent);
+  color: var(--sazora-on-accent);
+}
+
+:root[data-theme="dark"]
+  .configuration-nav
+  button[aria-current="page"]
+  svg {
+  color: inherit;
+}

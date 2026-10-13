@@ -19,18 +19,12 @@ export function Drawer({
   useEffect(() => {
     const dialog = ref.current;
 
-    if (!dialog || !open) {
-      return;
-    }
-
-    const previousOverflow = document.body.style.overflow;
+    if (!dialog || !open) return;
 
     dialog.showModal();
-    document.body.style.overflow = "hidden";
 
     return () => {
       dialog.close();
-      document.body.style.overflow = previousOverflow;
     };
   }, [open]);
 
