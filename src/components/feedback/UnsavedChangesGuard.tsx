@@ -29,17 +29,25 @@ export function DiscardChangesDialog({
           : "Si continúas, se perderán los cambios pendientes."}
       </p>
 
-      <div className="mt-5 flex flex-wrap justify-end gap-2">
+      <div className="mt-5 grid grid-cols-2 items-stretch gap-2 sm:flex sm:justify-end">
         <Button
+          size="sm"
           variant="secondary"
+          className="min-w-0 whitespace-normal"
           disabled={busy}
           onClick={onCancel}
         >
-          Continuar editando
+          <span className="min-w-0">Continuar editando</span>
         </Button>
 
-        <Button variant="cancel" disabled={busy} onClick={onDiscard}>
-          Descartar cambios
+        <Button
+          size="sm"
+          variant="cancel"
+          className="min-w-0 whitespace-normal"
+          disabled={busy}
+          onClick={onDiscard}
+        >
+          <span className="min-w-0">Descartar cambios</span>
         </Button>
       </div>
     </BottomSheet>

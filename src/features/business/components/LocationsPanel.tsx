@@ -19,6 +19,7 @@ import { getLocations } from "../services/organization.service";
 import { locationTypes } from "../schemas/organization.schema";
 import type { BusinessLocation } from "../schemas/organization.schema";
 import { ConfigurationState } from "./ConfigurationState";
+import { useTimedMessage } from "../../../hooks/useTimedMessage";
 import {
   LocationCapabilities,
   LocationDialog,
@@ -30,7 +31,7 @@ export function LocationsPanel() {
 
   const [type, setType] = useState("ALL");
   const [activity, setActivity] = useState("ALL");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useTimedMessage();
   const [savedId, setSavedId] = useState("");
 
   const [action, setAction] = useState<{
@@ -90,7 +91,7 @@ export function LocationsPanel() {
         {create}
       </header>
 
-      <div className="configuration-metrics">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {[
           {
             label: "Plantas / bodegas",
@@ -112,10 +113,25 @@ export function LocationsPanel() {
             count: items?.filter((item) => item.isActive).length,
           },
         ].map((metric) => (
-          <div className="configuration-card" key={metric.label}>
-            <metric.Icon size={20} className="text-accent" />
-            <strong>{metric.count ?? "—"}</strong>
-            <p>{metric.label}</p>
+          <div
+            key={metric.label}
+            className="configuration-card flex items-center gap-3 p-4 md:block"
+          >
+            <metric.Icon
+              aria-hidden="true"
+              size={22}
+              className="shrink-0 text-accent"
+            />
+
+            <div className="min-w-0 md:mt-2">
+              <strong className="block text-xl font-bold leading-none">
+                {metric.count ?? "—"}
+              </strong>
+
+              <p className="mt-1 text-xs leading-snug">
+                {metric.label}
+              </p>
+            </div>
           </div>
         ))}
       </div>

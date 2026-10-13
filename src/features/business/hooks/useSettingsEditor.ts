@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../../lib/http/client";
+import { useTimedMessage } from "../../../hooks/useTimedMessage";
 import {
   SECTION_FIELDS,
   sectionSchemas,
@@ -49,7 +50,7 @@ export function useSettingsEditor(
     url: string;
   } | null>(null);
 
-  const [logoNotice, setLogoNotice] = useState("");
+  const [logoNotice, setLogoNotice] = useTimedMessage();
   const [logoError, setLogoError] = useState(false);
   const alive = useRef(false);
 
@@ -69,6 +70,32 @@ export function useSettingsEditor(
     },
     [selection]
   );
+
+  useEffect(() => {
+    const currentNotice = notices[active];
+
+    if (!currentNotice.message) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setNotices((previous) => {
+        // Evita que un temporizador anterior oculte un aviso nuevo.
+        if (previous[active] !== currentNotice) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          [active]: {
+            ...previous[active],
+            message: "",
+            success: false,
+          },
+        };
+      });
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [active, notices]);
 
   const baseline = toBusinessDraft(settings);
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { ApiError } from "../lib/http/client";
+import { useTimedMessage } from "./useTimedMessage";
 
 export function useAdminForm<T extends object>(initial: T) {
   const [draft, setDraft] = useState(initial);
@@ -8,7 +9,7 @@ export function useAdminForm<T extends object>(initial: T) {
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useTimedMessage();
   const [success, setSuccess] = useState(false);
 
   const writing = useRef<AbortController | null>(null);

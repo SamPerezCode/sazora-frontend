@@ -386,7 +386,7 @@ function LocationForm({
 
           {form.message && <Alert>{form.message}</Alert>}
 
-          <footer className="configuration-save">
+          <footer className="configuration-save configuration-location-form-actions">
             {!original && step === 2 && (
               <Button
                 variant="secondary"
