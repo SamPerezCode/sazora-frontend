@@ -61,7 +61,13 @@ export interface AccessResolution {
   kind: "global" | "blocked" | "single" | "choose";
   home: string;
   allowedPaths: readonly string[];
+
+  // Todos los módulos compatibles con el rol y la ubicación.
   workspaces: readonly Workspace[];
+
+  // Opciones utilizadas para decidir el ingreso inicial.
+  entryWorkspaces: readonly Workspace[];
+
   defaultLocation: SessionLocation | null;
   issue: AccessIssue | null;
 }
@@ -76,12 +82,10 @@ export function resolveSessionAccess(
 
   const isAdmin = roles.includes("ADMIN");
 
-  // No usar locations[0] ni isDefault como sustitutos de este ID.
   const defaultLocation =
     locations.find((location) => location.id === defaultLocationId) ??
     null;
 
-  // Orden estable, independiente del orden de roles recibido.
   const workspaces =
     defaultLocation && defaultLocation.isActive !== false
       ? WORKSPACES.filter(
@@ -91,7 +95,6 @@ export function resolveSessionAccess(
         )
       : [];
 
-  // El acceso global siempre tiene prioridad para el destino inicial.
   if (isAdmin || hasGlobalAccess) {
     return {
       kind: "global",
@@ -110,6 +113,7 @@ export function resolveSessionAccess(
         ...workspaces.map((workspace) => workspace.path),
       ],
       workspaces,
+      entryWorkspaces: [],
       defaultLocation,
       issue: null,
     };
@@ -135,21 +139,32 @@ export function resolveSessionAccess(
       home: "/acceso",
       allowedPaths: ["/acceso"],
       workspaces: [],
+      entryWorkspaces: [],
       defaultLocation,
       issue,
     };
   }
 
-  const choose = workspaces.length > 1;
+  // Si hay módulos disponibles, tienen prioridad al ingresar.
+  const readyWorkspaces = workspaces.filter(
+    (workspace) => !workspace.pending
+  );
+
+  // Si todos están pendientes, se ofrecen sus pantallas informativas.
+  const entryWorkspaces =
+    readyWorkspaces.length > 0 ? readyWorkspaces : workspaces;
+
+  const choose = entryWorkspaces.length > 1;
 
   return {
     kind: choose ? "choose" : "single",
-    home: choose ? "/espacios" : workspaces[0].path,
+    home: choose ? "/espacios" : entryWorkspaces[0].path,
     allowedPaths: [
       ...workspaces.map((workspace) => workspace.path),
       ...(choose ? ["/espacios"] : []),
     ],
     workspaces,
+    entryWorkspaces,
     defaultLocation,
     issue: null,
   };

@@ -108,7 +108,7 @@ export function UserMenu({
                     size={12}
                     strokeWidth={1.75}
                   />
-                  {role}
+                  {ROLE_LABELS[role]}
                 </li>
               ))}
             </ul>

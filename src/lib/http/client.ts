@@ -40,6 +40,7 @@ interface RequestOptions {
   body?: unknown;
   accessToken?: string;
   signal?: AbortSignal;
+  cache?: RequestCache;
 }
 
 type UnauthorizedListener = (accessToken: string) => void;
@@ -94,6 +95,7 @@ export async function request<T>(
             ? options.body
             : JSON.stringify(options.body),
       credentials: "omit",
+      cache: options.cache,
       signal,
     });
 

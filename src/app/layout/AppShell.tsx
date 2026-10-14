@@ -6,6 +6,7 @@ import { useAuth } from "../../features/auth/hooks/useAuth";
 import { useBusinessProfile } from "../../features/business/hooks/useBusinessProfile";
 import { useDashboard } from "../../features/dashboard/hooks/useDashboard";
 import { businessDate } from "../../features/dashboard/utils/dashboard-format";
+import { resolveSessionAccess } from "../../features/auth/utils/resolve-session-access";
 import {
   readSidebarCollapsed,
   saveSidebarCollapsed,
@@ -36,6 +37,32 @@ export function AppShell() {
   if (!session || !business) {
     return null;
   }
+
+  const access = resolveSessionAccess(session.authorization);
+  const pathname = location.pathname.replace(/\/+$/, "") || "/";
+
+  const operatingLocation = access.workspaces.some(
+    (workspace) => workspace.path === pathname
+  )
+    ? access.defaultLocation
+    : null;
+
+  const normalizedLocationName =
+    operatingLocation?.name
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLocaleLowerCase("es-CO") ?? "";
+
+  const operatingLocationLabel = operatingLocation
+    ? {
+        name:
+          normalizedLocationName
+            .charAt(0)
+            .toLocaleUpperCase("es-CO") +
+          normalizedLocationName.slice(1),
+        code: operatingLocation.code,
+      }
+    : undefined;
 
   const current = getNavigation(session.authorization)
     .flatMap((item) =>
@@ -98,6 +125,7 @@ export function AppShell() {
           }
           session={session}
           business={business}
+          operatingLocation={operatingLocationLabel}
           showCashAction={isPanel}
           onLogout={logout}
         />

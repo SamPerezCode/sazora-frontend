@@ -42,7 +42,13 @@ function formatName(value: string): string {
 }
 
 export function AccessPage() {
-  const { state, logout, retrySession } = useAuth();
+  const {
+    state,
+    logout,
+    refreshSession,
+    refreshingSession,
+    sessionRefreshMessage,
+  } = useAuth();
   const { pathname } = useLocation();
 
   if (state.status !== "authenticated") {
@@ -93,6 +99,27 @@ export function AccessPage() {
               : `Tienes acceso a ${workspace?.label}. El módulo operativo todavía se está preparando.`)}
         </p>
       </div>
+
+      {message && (
+        <div className="space-y-3">
+          <p className="text-sm leading-relaxed text-muted">
+            Tu acceso debe ser corregido por un administrador. Después
+            de que te asignen una ubicación compatible, pulsa
+            “Actualizar acceso”.
+          </p>
+
+          <p
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            className="text-sm font-medium text-heading"
+          >
+            {refreshingSession
+              ? "Comprobando…"
+              : sessionRefreshMessage}
+          </p>
+        </div>
+      )}
 
       {location && (
         <dl className="grid gap-3 rounded-2xl border border-outline bg-secondary p-4 text-sm">
@@ -149,7 +176,7 @@ export function AccessPage() {
 
       {choosing && (
         <div className="grid gap-3 sm:grid-cols-2">
-          {access.workspaces.map((item) => {
+          {access.entryWorkspaces.map((item) => {
             const WorkspaceIcon = ROLE_PRESENTATION[item.role].icon;
 
             return (
@@ -192,8 +219,13 @@ export function AccessPage() {
         )}
 
         {message && (
-          <Button variant="secondary" onClick={retrySession}>
-            Volver a comprobar
+          <Button
+            variant="secondary"
+            loading={refreshingSession}
+            loadingText="Comprobando…"
+            onClick={() => void refreshSession()}
+          >
+            Actualizar acceso
           </Button>
         )}
 

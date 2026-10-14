@@ -9,6 +9,10 @@ interface AppHeaderProps {
   subtitle: string;
   session: AuthSession;
   business: BusinessIdentity;
+  operatingLocation?: {
+    name: string;
+    code: string;
+  };
   showCashAction?: boolean;
   onLogout: () => void;
 }
@@ -18,6 +22,7 @@ export function AppHeader({
   subtitle,
   session,
   business,
+  operatingLocation,
   showCashAction = false,
   onLogout,
 }: AppHeaderProps) {
@@ -28,7 +33,23 @@ export function AppHeader({
     <header className="shell-header">
       <div className="shell-header-copy">
         <h1 title={title}>{title}</h1>
-        <p title={subtitle}>{subtitle}</p>
+
+        {operatingLocation ? (
+          <p
+            className="flex min-w-0 items-center gap-1.5"
+            title={`${operatingLocation.name} · ${operatingLocation.code}`}
+          >
+            <span className="min-w-0 truncate">
+              {operatingLocation.name}
+            </span>
+
+            <span className="shrink-0">
+              · {operatingLocation.code}
+            </span>
+          </p>
+        ) : (
+          <p title={subtitle}>{subtitle}</p>
+        )}
       </div>
 
       <div className="shell-header-actions">

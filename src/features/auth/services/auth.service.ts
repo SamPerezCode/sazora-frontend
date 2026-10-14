@@ -18,6 +18,7 @@ export async function validateSession(
     sessionResponseSchema,
     {
       accessToken: identity.accessToken,
+      cache: "no-store",
       signal,
     }
   );

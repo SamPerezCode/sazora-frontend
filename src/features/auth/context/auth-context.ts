@@ -6,6 +6,9 @@ export interface AuthContextValue {
   login: (input: LoginRequest, signal?: AbortSignal) => Promise<void>;
   logout: () => void;
   retrySession: () => void;
+  refreshSession: () => Promise<void>;
+  refreshingSession: boolean;
+  sessionRefreshMessage: string;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(
