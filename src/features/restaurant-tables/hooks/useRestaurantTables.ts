@@ -1,167 +1,181 @@
-import { useEffect, useRef, useState } from "react";
-import type { AuthSession } from "../../auth/types/auth.types";
+import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "../../../lib/http/client";
-import type {
-  RestaurantTable,
-  TableAction,
-} from "../schemas/restaurant-table.schema";
+import { useTimedMessage } from "../../../hooks/useTimedMessage";
+import { useAuth } from "../../auth/hooks/useAuth";
+import type { AuthSession } from "../../auth/types/auth.types";
+import type { BusinessLocation } from "../../business/schemas/organization.schema";
+import { getLocations } from "../../business/services/organization.service";
+import type { RestaurantTable } from "../schemas/restaurant-table.schema";
 import {
   getRestaurantTables,
-  saveRestaurantTable,
+  tableErrorMessage,
 } from "../services/restaurant-table.service";
 
 interface Snapshot {
-  scope: string;
-  attempt: number;
+  key: string;
   tables: RestaurantTable[];
-  error: string | null;
-}
-
-function sortTables(tables: RestaurantTable[]) {
-  return [...tables].sort(
-    (a, b) =>
-      a.code.localeCompare(b.code, "es", {
-        numeric: true,
-        sensitivity: "base",
-      }) || a.id.localeCompare(b.id, "es", { numeric: true })
-  );
+  locations: BusinessLocation[];
+  error: string;
 }
 
 export function useRestaurantTables(session: AuthSession) {
-  const { accessToken, business, membership } = session;
-  const businessId = business.id;
+  const { logout } = useAuth();
   const allowed = session.authorization.roles.includes("ADMIN");
-  const scope = [businessId, membership.id, accessToken].join(":");
 
+  const [locationId, setLocationId] = useState("");
+  const [revision, setRevision] = useState(0);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [attempt, setAttempt] = useState(0);
-  const [pendingScope, setPendingScope] = useState<string | null>(
-    null
+  const [denied, setDenied] = useState("");
+
+  const [noticeMessage, showNoticeMessage] = useTimedMessage(5000);
+  const [noticeError, setNoticeError] = useState(false);
+
+  const key = locationId + ":" + revision;
+
+  const retry = useCallback(() => {
+    setRevision((value) => value + 1);
+  }, []);
+
+  const notify = useCallback(
+    (message: string, error = false) => {
+      setNoticeError(error);
+      showNoticeMessage(message);
+    },
+    [showNoticeMessage]
   );
 
-  const read = useRef<AbortController | null>(null);
-  const write = useRef<AbortController | null>(null);
+  const handleError = useCallback(
+    (error: unknown): boolean => {
+      if (!(error instanceof ApiError)) return false;
+
+      if (
+        error.status === 401 ||
+        error.code === "AUTHENTICATION_REQUIRED"
+      ) {
+        logout();
+        return true;
+      }
+
+      if (
+        error.status === 403 ||
+        error.code === "FORBIDDEN" ||
+        error.code === "LOCATION_ACCESS_DENIED"
+      ) {
+        setDenied(tableErrorMessage(error));
+        return true;
+      }
+
+      if (error.code === "RESTAURANT_TABLE_NOT_FOUND") {
+        notify(tableErrorMessage(error), true);
+        retry();
+        return true;
+      }
+
+      if (error.code === "LOCATION_NOT_FOUND" && locationId) {
+        setLocationId("");
+
+        notify(
+          "El punto de venta no existe. Mostramos todos los puntos de venta.",
+          true
+        );
+
+        retry();
+        return true;
+      }
+
+      return false;
+    },
+    [locationId, logout, notify, retry]
+  );
 
   useEffect(() => {
-    if (!allowed) return;
+    if (!allowed || denied) return;
 
     const controller = new AbortController();
-    read.current = controller;
 
-    void getRestaurantTables(accessToken, controller.signal)
-      .then((tables) => {
-        if (tables.some((table) => table.businessId !== businessId)) {
-          throw new Error("Respuesta de otro negocio.");
+    void Promise.all([
+      getLocations(session, controller.signal),
+      getRestaurantTables(session.accessToken, controller.signal, {
+        locationId: locationId || undefined,
+        activeOnly: false,
+      }),
+    ])
+      .then(([locations, tables]) => {
+        controller.signal.throwIfAborted();
+
+        if (
+          tables.some(
+            (table) =>
+              table.businessId !== session.business.id ||
+              (locationId && table.locationId !== locationId)
+          )
+        ) {
+          throw new ApiError(
+            502,
+            "INVALID_RESPONSE",
+            "Respuesta inesperada."
+          );
         }
 
-        if (!controller.signal.aborted) {
-          setSnapshot({
-            scope,
-            attempt,
-            tables: sortTables(tables),
-            error: null,
-          });
-        }
+        setSnapshot({
+          key,
+          tables,
+          error: "",
+          locations: locations.filter(
+            (location) => location.locationType === "POINT_OF_SALE"
+          ),
+        });
       })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) {
-          setSnapshot({
-            scope,
-            attempt,
-            tables: [],
-            error:
-              error instanceof ApiError
-                ? error.message
-                : "No pudimos consultar las mesas.",
-          });
+        if (controller.signal.aborted || handleError(error)) {
+          return;
         }
+
+        setSnapshot({
+          key,
+          tables: [],
+          locations: [],
+          error: tableErrorMessage(error),
+        });
       });
 
     return () => controller.abort();
-  }, [accessToken, businessId, allowed, scope, attempt]);
+  }, [allowed, denied, handleError, key, locationId, session]);
 
-  useEffect(
-    () => () => {
-      write.current?.abort();
-      write.current = null;
-    },
-    [scope, allowed]
-  );
-
-  const current =
-    snapshot?.scope === scope && snapshot.attempt === attempt
-      ? snapshot
-      : null;
-
-  const busy = pendingScope === scope;
-
-  async function mutate(
-    action: TableAction
-  ): Promise<RestaurantTable> {
-    if (!allowed || !current || current.error) {
-      throw new Error("No puedes guardar mesas en este momento.");
-    }
-
-    if (write.current) {
-      throw new Error("Espera a que termine el guardado.");
-    }
-
-    read.current?.abort();
-
-    const controller = new AbortController();
-    write.current = controller;
-    setPendingScope(scope);
-
-    try {
-      const table = await saveRestaurantTable(
-        action,
-        accessToken,
-        controller.signal
-      );
-
-      controller.signal.throwIfAborted();
-
-      if (
-        table.businessId !== businessId ||
-        (action.kind !== "create" && table.id !== action.id)
-      ) {
-        throw new Error("No pudimos verificar la mesa guardada.");
-      }
-
-      setSnapshot((previous) => ({
-        scope,
-        attempt,
-        error: null,
-        tables: sortTables([
-          ...(previous?.scope === scope
-            ? previous.tables
-            : []
-          ).filter((item) => item.id !== table.id),
-          table,
-        ]),
-      }));
-
-      return table;
-    } finally {
-      if (write.current === controller) {
-        write.current = null;
-        setPendingScope(null);
-      }
-    }
-  }
+  const current = snapshot?.key === key ? snapshot : null;
 
   return {
-    tables: allowed ? (current?.tables ?? []) : [],
-    loading: allowed && !current,
-    error: allowed
-      ? (current?.error ?? null)
-      : "No tienes acceso a las mesas.",
-    busy,
-    mutate,
-    retry: () => {
-      if (!write.current) {
-        setAttempt((value) => value + 1);
+    tables: current?.tables ?? [],
+    locations: snapshot?.locations ?? [],
+    loading: allowed && !denied && !current,
+    error: current?.error ?? "",
+
+    denied: allowed
+      ? denied
+      : "No tienes permisos para administrar las mesas.",
+
+    locationId,
+
+    notice: {
+      message: noticeMessage,
+      error: noticeError,
+    },
+
+    retry,
+    handleError,
+
+    selectLocation: (id: string) => {
+      if (
+        !id ||
+        current?.locations.some((location) => location.id === id)
+      ) {
+        setLocationId(id);
       }
+    },
+
+    saved: (message: string) => {
+      notify(message);
+      retry();
     },
   };
 }

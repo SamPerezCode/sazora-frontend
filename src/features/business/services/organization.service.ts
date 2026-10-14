@@ -102,12 +102,21 @@ export async function saveFiscalProfile(
 
 export async function getLocations(
   session: AuthSession,
-  signal: AbortSignal
+  signal: AbortSignal,
+  filters: { activeOnly?: boolean } = {}
 ) {
+  const query =
+    filters.activeOnly === undefined
+      ? ""
+      : "?activeOnly=" + String(filters.activeOnly);
+
   const response = await request(
-    "/locations",
+    "/locations" + query,
     locationsResponse,
-    options(session, signal)
+    {
+      ...options(session, signal),
+      cache: "no-store",
+    }
   );
 
   return response.data.locations.map((value) =>

@@ -1,21 +1,24 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { DiningTableIcon } from "../../../components/ui/DiningTableIcon";
+import { useCallback, useState } from "react";
+import { Link } from "react-router";
+import {
+  Plus,
+  RotateCcw,
+  Search,
+  ShieldAlert,
+  WifiOff,
+} from "lucide-react";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { Alert } from "../../../components/feedback/Alert";
-import { LoadingState } from "../../../components/feedback/LoadingState";
-import { BottomSheet } from "../../../components/layout/BottomSheet";
 import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
-import { ApiError } from "../../../lib/http/client";
+import { SelectField } from "../../../components/forms/SelectField";
+import { DiningTableIcon } from "../../../components/ui/DiningTableIcon";
 import type { AuthSession } from "../../auth/types/auth.types";
-import { tableChanges } from "../schemas/restaurant-table.schema";
-import type {
-  RestaurantTable,
-  TableInput,
-} from "../schemas/restaurant-table.schema";
+import { tableLocationLabel } from "../schemas/restaurant-table.schema";
 import { useRestaurantTables } from "../hooks/useRestaurantTables";
 import { RestaurantTableForm } from "./RestaurantTableForm";
+import type { TableModalMode } from "./RestaurantTableForm";
 import { RestaurantTableList } from "./RestaurantTableList";
+import "../restaurant-tables.css";
 
 export function RestaurantTablesPanel() {
   const { session } = useAppShell();
@@ -35,174 +38,256 @@ export function RestaurantTablesPanel() {
 function TablesContent({ session }: { session: AuthSession }) {
   const resource = useRestaurantTables(session);
 
-  // undefined: cerrado; null: crear; objeto: editar.
-  const [editing, setEditing] = useState<
-    RestaurantTable | null | undefined
-  >();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const [modal, setModal] = useState<{
+    mode: TableModalMode;
+    id?: string;
+  } | null>(null);
 
-  const [notice, setNotice] = useState({
-    message: "",
-    error: false,
-  });
+  const close = useCallback(() => setModal(null), []);
 
-  const modalId = useId();
-  const alive = useRef(false);
+  const query = search.trim().toLocaleLowerCase("es");
 
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
+  const filtered =
+    !!query || status !== "all" || !!resource.locationId;
 
-  useEffect(() => {
-    if (!notice.message) return;
+  const hasActiveLocations = resource.locations.some(
+    (location) => location.isActive
+  );
 
-    const timer = window.setTimeout(() => {
-      setNotice({ message: "", error: false });
-    }, 5000);
-
-    return () => window.clearTimeout(timer);
-  }, [notice]);
-
-  async function save(values: TableInput) {
-    const input = editing ? tableChanges(editing, values) : values;
-
-    if (!Object.keys(input).length) {
-      setEditing(undefined);
-      return;
-    }
-
-    await resource.mutate(
-      editing
-        ? { kind: "update", id: editing.id, input }
-        : { kind: "create", input: values }
+  const rows = resource.tables
+    .filter(
+      (table) =>
+        (!query ||
+          (table.code + " " + table.name)
+            .toLocaleLowerCase("es")
+            .includes(query)) &&
+        (status === "all" || table.isActive === (status === "active"))
+    )
+    .sort(
+      (a, b) =>
+        a.location.name.localeCompare(b.location.name, "es") ||
+        a.code.localeCompare(b.code, "es", { numeric: true }) ||
+        a.id.localeCompare(b.id, "es", { numeric: true })
     );
 
-    if (!alive.current) return;
+  if (resource.denied) {
+    return (
+      <section className="rt-panel">
+        <h2>Mesas</h2>
 
-    setNotice({
-      message: editing ? "Mesa actualizada." : "Mesa creada.",
-      error: false,
-    });
-    setEditing(undefined);
+        <div className="rt-card rt-empty" role="alert">
+          <ShieldAlert size={28} aria-hidden="true" />
+          <strong>{resource.denied}</strong>
+        </div>
+      </section>
+    );
   }
 
-  async function toggle(table: RestaurantTable) {
-    if (resource.busy || editing !== undefined) return;
-
-    setNotice({ message: "", error: false });
-
-    try {
-      const saved = await resource.mutate({
-        kind: "status",
-        id: table.id,
-        isActive: !table.isActive,
-      });
-
-      if (alive.current) {
-        setNotice({
-          message: saved.isActive
-            ? "Mesa activada."
-            : "Mesa desactivada.",
-          error: false,
-        });
+  const newButton = (
+    <Button
+      size="sm"
+      disabled={
+        resource.loading ||
+        !!resource.error ||
+        !hasActiveLocations ||
+        !!modal
       }
-    } catch (error: unknown) {
-      if (alive.current) {
-        setNotice({
-          message:
-            error instanceof ApiError
-              ? error.message
-              : "No pudimos cambiar el estado.",
-          error: true,
-        });
-      }
-    }
-  }
+      onClick={() => setModal({ mode: "create" })}
+    >
+      <Plus size={16} aria-hidden="true" />
+      Nueva mesa
+    </Button>
+  );
 
   return (
-    <>
-      <Card>
-        <h2 className="flex items-center gap-2 text-base font-bold text-heading">
-          <DiningTableIcon
-            aria-hidden="true"
-            size={18}
-            className="text-accent"
-          />
-          Mesas
-        </h2>
+    <section className="rt-panel">
+      <header className="rt-header">
+        <div>
+          <h2>Mesas</h2>
+          <p>Administra las mesas físicas de cada punto de venta.</p>
+        </div>
 
-        <p className="mt-1 text-xs leading-relaxed text-muted">
-          Administra los espacios de atención de tu negocio.
-        </p>
+        {newButton}
+      </header>
+
+      {resource.notice.message && (
+        <Alert variant={resource.notice.error ? "error" : "success"}>
+          {resource.notice.message}
+        </Alert>
+      )}
+
+      <div className="rt-card">
+        <div className="rt-filters">
+          <label className="rt-search">
+            <span className="sr-only">
+              Buscar por código o nombre
+            </span>
+
+            <Search size={16} aria-hidden="true" />
+
+            <input
+              type="search"
+              placeholder="Buscar por código o nombre"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+
+          <SelectField
+            label="Punto de venta"
+            hideLabel
+            value={resource.locationId}
+            disabled={resource.loading || !!resource.error}
+            onValueChange={resource.selectLocation}
+            options={[
+              {
+                value: "",
+                label: "Todos los puntos de venta",
+              },
+              ...resource.locations.map((location) => ({
+                value: location.id,
+                label:
+                  tableLocationLabel(location.name) +
+                  " · " +
+                  location.code +
+                  (location.isActive ? "" : " (inactiva)"),
+              })),
+            ]}
+          />
+
+          <SelectField
+            label="Estado de la mesa"
+            hideLabel
+            value={status}
+            onValueChange={setStatus}
+            options={[
+              { value: "all", label: "Todos los estados" },
+              { value: "active", label: "Activas" },
+              { value: "inactive", label: "Inactivas" },
+            ]}
+          />
+        </div>
 
         {resource.loading ? (
-          <div className="py-8">
-            <LoadingState message="Cargando mesas…" />
+          <div className="rt-skeleton" role="status" aria-busy="true">
+            <span className="sr-only">
+              Cargando mesas y puntos de venta…
+            </span>
+
+            {Array.from({ length: 5 }, (_, index) => (
+              <div key={index} />
+            ))}
           </div>
         ) : resource.error ? (
-          <Alert className="mt-4">
+          <div className="rt-empty" role="alert">
+            <span className="rt-empty-icon">
+              <WifiOff size={24} aria-hidden="true" />
+            </span>
+
+            <strong>No pudimos cargar las mesas</strong>
             <p>{resource.error}</p>
+
             <Button
               size="sm"
               variant="secondary"
-              className="mt-3"
               onClick={resource.retry}
             >
+              <RotateCcw size={16} aria-hidden="true" />
               Reintentar
             </Button>
-          </Alert>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="rt-empty">
+            <span className="rt-empty-icon">
+              <DiningTableIcon size={24} aria-hidden="true" />
+            </span>
+
+            <strong>
+              {filtered
+                ? "No hay resultados con estos filtros."
+                : "Aún no tienes mesas registradas."}
+            </strong>
+
+            <p>
+              {filtered
+                ? "Cambia o limpia los filtros."
+                : hasActiveLocations
+                  ? "Crea la primera mesa y asígnala a un punto de venta."
+                  : "Necesitas un punto de venta activo para crear mesas."}
+            </p>
+
+            {filtered ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setSearch("");
+                  setStatus("all");
+                  resource.selectLocation("");
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            ) : hasActiveLocations ? (
+              newButton
+            ) : (
+              <Link
+                className="rt-link"
+                to="/configuracion?section=locations"
+              >
+                Ir a Sedes y planta
+              </Link>
+            )}
+          </div>
         ) : (
           <RestaurantTableList
-            tables={resource.tables}
-            disabled={resource.busy || editing !== undefined}
-            onCreate={() => {
-              setNotice({ message: "", error: false });
-              setEditing(null);
-            }}
-            onEdit={(table) => {
-              setNotice({ message: "", error: false });
-              setEditing(table);
-            }}
-            onToggle={(table) => {
-              void toggle(table);
-            }}
+            key={[search, status, resource.locationId].join(":")}
+            tables={rows}
+            disabled={!!modal}
+            onEdit={(table) =>
+              setModal({
+                mode: "edit",
+                id: table.id,
+              })
+            }
+            onToggle={(table) =>
+              setModal({
+                mode: table.isActive ? "deactivate" : "reactivate",
+                id: table.id,
+              })
+            }
           />
         )}
+      </div>
 
-        <p className="mt-5 text-xs leading-relaxed text-muted">
-          Una mesa inactiva no admite órdenes nuevas. Sus órdenes
-          existentes y su historial se conservan.
-        </p>
-      </Card>
+      {!resource.loading &&
+        !resource.error &&
+        resource.tables.length > 0 &&
+        !hasActiveLocations && (
+          <p>
+            No hay puntos de venta activos para crear mesas.{" "}
+            <Link
+              className="rt-link"
+              to="/configuracion?section=locations"
+            >
+              Ir a Sedes y planta
+            </Link>
+          </p>
+        )}
 
-      {notice.message && (
-        <div className="fixed inset-x-4 bottom-24 z-40 sm:left-auto sm:bottom-6 sm:w-96">
-          <Alert variant={notice.error ? "error" : "success"}>
-            {notice.message}
-          </Alert>
-        </div>
+      {modal && (
+        <RestaurantTableForm
+          session={session}
+          mode={modal.mode}
+          tableId={modal.id}
+          initialLocationId={resource.locationId}
+          onClose={close}
+          onSaved={resource.saved}
+          onError={resource.handleError}
+        />
       )}
-
-      {editing !== undefined && (
-        <BottomSheet
-          id={modalId}
-          open
-          variant="modal"
-          busy={resource.busy}
-          title={editing ? "Editar mesa" : "Nueva mesa"}
-          onClose={() => setEditing(undefined)}
-        >
-          <RestaurantTableForm
-            key={editing?.id ?? "new"}
-            table={editing ?? undefined}
-            busy={resource.busy}
-            onSave={save}
-            onCancel={() => setEditing(undefined)}
-          />
-        </BottomSheet>
-      )}
-    </>
+    </section>
   );
 }

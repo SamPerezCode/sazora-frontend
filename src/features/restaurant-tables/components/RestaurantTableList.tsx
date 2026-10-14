@@ -1,76 +1,81 @@
 import { useId, useState } from "react";
 import {
-  CircleCheck,
-  CircleSlash,
   Pencil,
-  Plus,
-  Search,
-  ToggleLeft,
-  ToggleRight,
+  Power,
+  RotateCcw,
+  Store,
+  TriangleAlert,
 } from "lucide-react";
-import { TextField } from "../../../components/forms/TextField";
 import { ActionMenu } from "../../../components/ui/ActionMenu";
-import { Button } from "../../../components/ui/Button";
 import { Pagination } from "../../../components/ui/Pagination";
+import {
+  tableCapacityLabel,
+  tableLocationLabel,
+} from "../schemas/restaurant-table.schema";
 import type { RestaurantTable } from "../schemas/restaurant-table.schema";
 
 interface Props {
   tables: readonly RestaurantTable[];
   disabled: boolean;
-  onCreate: () => void;
   onEdit: (table: RestaurantTable) => void;
   onToggle: (table: RestaurantTable) => void;
 }
 
 function TableStatus({ active }: { active: boolean }) {
-  const Icon = active ? CircleCheck : CircleSlash;
-
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-heading">
-      <Icon
-        aria-hidden="true"
-        size={14}
-        className={active ? "text-accent" : "text-muted"}
-      />
+    <span className="rt-status" data-active={active}>
+      <span aria-hidden="true">●</span>
       {active ? "Activa" : "Inactiva"}
     </span>
   );
 }
 
-function normalize(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+function PointOfSale({ table }: { table: RestaurantTable }) {
+  return (
+    <div>
+      <div className="rt-location">
+        <Store size={14} aria-hidden="true" />
+
+        <span>
+          {tableLocationLabel(table.location.name)}{" "}
+          <span className="text-muted">· {table.location.code}</span>
+        </span>
+
+        {!table.location.isActive && (
+          <span className="rt-location-inactive">
+            <TriangleAlert size={12} aria-hidden="true" />
+            Inactiva
+          </span>
+        )}
+      </div>
+
+      {!table.location.isActive && (
+        <p className="rt-location-help">
+          Esta mesa no está disponible para la operación porque su
+          punto de venta está inactivo.
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function RestaurantTableList({
   tables,
   disabled,
-  onCreate,
   onEdit,
   onToggle,
 }: Props) {
-  const [query, setQuery] = useState("");
+  const listId = useId();
+
   const [requestedPage, setRequestedPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const listId = useId();
-  const summaryId = useId();
-
-  const words = normalize(query).trim().split(/\s+/).filter(Boolean);
-
-  const filtered = tables.filter((table) => {
-    const text = normalize(table.code + " " + table.name);
-    return words.every((word) => text.includes(word));
-  });
-
   const page = Math.min(
     requestedPage,
-    Math.max(1, Math.ceil(filtered.length / pageSize))
+    Math.max(1, Math.ceil(tables.length / pageSize))
   );
 
-  const visible = filtered.slice(
+  const visible = tables.slice(
     (page - 1) * pageSize,
     page * pageSize
   );
@@ -84,17 +89,20 @@ export function RestaurantTableList({
         actions={[
           {
             id: "edit",
-            label: "Editar",
-            icon: <Pencil aria-hidden="true" size={16} />,
+            label: "Editar mesa",
+            icon: <Pencil size={16} aria-hidden="true" />,
             onSelect: () => onEdit(table),
           },
           {
             id: "status",
-            label: table.isActive ? "Desactivar" : "Activar",
+            label: table.isActive
+              ? "Desactivar mesa"
+              : "Reactivar mesa",
+            danger: table.isActive,
             icon: table.isActive ? (
-              <ToggleRight aria-hidden="true" size={20} />
+              <Power size={16} aria-hidden="true" />
             ) : (
-              <ToggleLeft aria-hidden="true" size={20} />
+              <RotateCcw size={16} aria-hidden="true" />
             ),
             onSelect: () => onToggle(table),
           },
@@ -104,177 +112,109 @@ export function RestaurantTableList({
   }
 
   return (
-    <div className="mt-5 space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="w-full min-w-0 sm:max-w-[22.5rem]">
-          <TextField
-            type="search"
-            label="Buscar mesas"
-            icon={Search}
-            placeholder="Código o nombre"
-            value={query}
-            aria-controls={listId}
-            aria-describedby={summaryId}
-            onChange={(event) => {
-              setQuery(event.target.value);
+    <div id={listId}>
+      <div className="rt-table-scroll hidden md:block">
+        <table className="rt-table">
+          <caption className="sr-only">
+            Mesas por punto de venta
+          </caption>
+
+          <colgroup>
+            <col className="rt-col-code" />
+            <col className="rt-col-name" />
+            <col />
+            <col className="rt-col-capacity" />
+            <col className="rt-col-status" />
+            <col className="rt-col-actions" />
+          </colgroup>
+
+          <thead>
+            <tr>
+              <th scope="col">Código</th>
+              <th scope="col">Nombre</th>
+              <th scope="col">Punto de venta</th>
+              <th scope="col">Capacidad</th>
+              <th scope="col">Estado</th>
+              <th scope="col">
+                <span className="sr-only">Acciones</span>
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {visible.map((table) => (
+              <tr key={table.id}>
+                <td className="rt-code">{table.code}</td>
+
+                <th scope="row">{table.name}</th>
+
+                <td>
+                  <PointOfSale table={table} />
+                </td>
+
+                <td className="text-muted">
+                  {tableCapacityLabel(table.capacity)}
+                </td>
+
+                <td>
+                  <TableStatus active={table.isActive} />
+                </td>
+
+                <td className="rt-actions">{actions(table)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <ul className="divide-y divide-outline/40 px-3 md:hidden">
+        {visible.map((table) => (
+          <li key={table.id} className="py-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-heading [overflow-wrap:anywhere]">
+                  {table.name}
+                </p>
+
+                <p className="mt-1 text-xs text-muted [overflow-wrap:anywhere]">
+                  {table.code}
+                </p>
+              </div>
+
+              {actions(table)}
+            </div>
+
+            <div className="mt-3">
+              <PointOfSale table={table} />
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted">
+                Capacidad: {tableCapacityLabel(table.capacity)}
+              </p>
+
+              <TableStatus active={table.isActive} />
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {tables.length > 10 && (
+        <div className="rt-pagination">
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={tables.length}
+            itemLabel={tables.length === 1 ? "mesa" : "mesas"}
+            controlsId={listId}
+            disabled={disabled}
+            onPageChange={setRequestedPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
               setRequestedPage(1);
             }}
           />
         </div>
-
-        <Button
-          size="sm"
-          className="self-end whitespace-nowrap"
-          disabled={disabled}
-          onClick={onCreate}
-        >
-          <Plus aria-hidden="true" size={16} />
-          Nueva mesa
-        </Button>
-      </div>
-
-      <div
-        id={listId}
-        className="rounded-xl border border-outline/60 bg-surface/50"
-      >
-        {visible.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm text-muted">
-            {tables.length === 0
-              ? "Todavía no tienes mesas registradas."
-              : "No encontramos mesas con esa búsqueda."}
-          </p>
-        ) : (
-          <>
-            <div className="hidden overflow-x-auto rounded-xl md:block">
-              <table className="w-full min-w-[36rem] table-fixed text-left text-sm">
-                <caption className="sr-only">
-                  Mesas del negocio
-                </caption>
-
-                <colgroup>
-                  <col className="w-28" />
-                  <col />
-                  <col className="w-24" />
-                  <col className="w-24" />
-                  <col className="w-20" />
-                </colgroup>
-
-                <thead className="border-b border-outline/60 bg-secondary/30">
-                  <tr>
-                    {[
-                      "Código",
-                      "Nombre",
-                      "Capacidad",
-                      "Estado",
-                      "Acciones",
-                    ].map((label) => (
-                      <th
-                        key={label}
-                        scope="col"
-                        className="px-4 py-3 text-[0.6875rem] font-medium uppercase text-muted"
-                      >
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-outline/40">
-                  {visible.map((table) => (
-                    <tr
-                      key={table.id}
-                      className="hover:bg-secondary/30"
-                    >
-                      <td className="px-4 py-3 text-xs text-muted [overflow-wrap:anywhere]">
-                        {table.code}
-                      </td>
-
-                      <th
-                        scope="row"
-                        className="px-4 py-3 font-semibold text-heading [overflow-wrap:anywhere]"
-                      >
-                        {table.name}
-                      </th>
-
-                      <td className="px-4 py-3 text-xs text-muted">
-                        {table.capacity ?? "Sin definir"}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <TableStatus active={table.isActive} />
-                      </td>
-
-                      <td className="px-3 py-3">
-                        <div className="flex justify-center">
-                          {actions(table)}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <ul className="divide-y divide-outline/40 px-3 md:hidden">
-              {" "}
-              {visible.map((table) => (
-                <li key={table.id} className="py-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-heading [overflow-wrap:anywhere]">
-                        {table.name}
-                      </p>
-                      <p className="mt-1 text-xs text-muted [overflow-wrap:anywhere]">
-                        {table.code}
-                      </p>
-                    </div>
-
-                    {actions(table)}
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs text-muted">
-                      Capacidad:{" "}
-                      {table.capacity == null
-                        ? "sin definir"
-                        : table.capacity + " personas"}
-                    </p>
-
-                    <TableStatus active={table.isActive} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </div>
-
-      <p
-        id={summaryId}
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="text-center text-xs text-muted sm:text-left"
-      >
-        {words.length > 0 ? filtered.length + " resultados · " : ""}
-        Total: {tables.length}{" "}
-        {tables.length === 1 ? "mesa" : "mesas"}
-      </p>
-
-      {tables.length > 10 && (
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          totalItems={filtered.length}
-          itemLabel={filtered.length === 1 ? "mesa" : "mesas"}
-          controlsId={listId}
-          disabled={disabled}
-          onPageChange={setRequestedPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setRequestedPage(1);
-          }}
-        />
       )}
     </div>
   );
