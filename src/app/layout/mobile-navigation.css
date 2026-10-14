@@ -348,3 +348,16 @@
     }
   }
 }
+
+@layer components {
+  .mobile-bottom-nav .mobile-nav-item > svg {
+    flex-shrink: 0;
+  }
+
+  .mobile-bottom-nav .mobile-nav-item > span {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}

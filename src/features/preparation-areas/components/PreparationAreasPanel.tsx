@@ -1,366 +1,406 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useState } from "react";
+import { Link } from "react-router";
 import {
   ChefHat,
-  CircleAlert,
-  CircleCheck,
-  CircleSlash,
+  MapPin,
   Pencil,
   Plus,
-  ToggleLeft,
-  ToggleRight,
+  Power,
+  RotateCcw,
+  Search,
+  TriangleAlert,
+  WifiOff,
 } from "lucide-react";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { Alert } from "../../../components/feedback/Alert";
-import { LoadingState } from "../../../components/feedback/LoadingState";
 import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
-import { ApiError } from "../../../lib/http/client";
-import { areaChanges } from "../schemas/preparation-area.schema";
-import { BottomSheet } from "../../..//components/layout/BottomSheet";
 import { ActionMenu } from "../../../components/ui/ActionMenu";
-import type {
-  AreaInput,
-  PreparationArea,
+import type { AuthSession } from "../../auth/types/auth.types";
+import {
+  areaLocationGroups,
+  locationLabel,
 } from "../schemas/preparation-area.schema";
-import { PreparationAreaForm } from "../components/PreparationAreaForm";
 import { usePreparationAreas } from "../hooks/usePreparationAreas";
+import { PreparationAreaForm } from "./PreparationAreaForm";
+import type { AreaMode } from "./PreparationAreaForm";
+import { AreaLocationChips } from "./PreparationAreaLocations";
+import "../preparation-areas.css";
 
 export function PreparationAreasPanel() {
   const { session } = useAppShell();
-  const resource = usePreparationAreas(session);
-  const modalId = useId();
-
-  // undefined: cerrado; null: crear; objeto: editar.
-  const [editing, setEditing] = useState<
-    PreparationArea | null | undefined
-  >(undefined);
-
-  const [notice, setNotice] = useState({
-    message: "",
-    error: false,
-  });
-
-  const alive = useRef(false);
-  const opener = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    alive.current = true;
-
-    return () => {
-      alive.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!notice.message) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setNotice((current) =>
-        current === notice ? { message: "", error: false } : current
-      );
-    }, 5000);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [notice]);
-
-  function closeForm(): void {
-    setEditing(undefined);
-
-    requestAnimationFrame(() => {
-      if (opener.current?.isConnected) {
-        opener.current.focus();
-      }
-    });
-  }
-
-  async function save(values: AreaInput): Promise<void> {
-    const area = editing ?? undefined;
-    const patch = area ? areaChanges(area, values) : values;
-
-    if (area && Object.keys(patch).length === 0) {
-      closeForm();
-      return;
-    }
-
-    await resource.mutate(
-      area
-        ? {
-            kind: "update",
-            id: area.id,
-            input: patch,
-          }
-        : {
-            kind: "create",
-            input: values,
-          }
-    );
-
-    if (!alive.current) return;
-
-    setNotice({
-      message: area ? "Área actualizada." : "Área creada.",
-      error: false,
-    });
-
-    closeForm();
-  }
-
-  async function changeStatus(
-    area: PreparationArea,
-    isActive: boolean
-  ): Promise<void> {
-    setNotice({
-      message: "",
-      error: false,
-    });
-
-    try {
-      const saved = await resource.mutate({
-        kind: "status",
-        id: area.id,
-        isActive,
-      });
-
-      if (!alive.current) return;
-
-      setNotice({
-        message: `${saved.name}: ${
-          saved.isActive ? "área activada" : "área desactivada"
-        }.`,
-        error: false,
-      });
-    } catch (error: unknown) {
-      if (!alive.current) return;
-
-      setNotice({
-        message:
-          error instanceof ApiError
-            ? error.message
-            : "No pudimos cambiar el estado.",
-        error: true,
-      });
-    }
-  }
 
   return (
-    <Card>
-      <h2 className="flex items-center gap-2 text-base font-bold text-heading">
-        <ChefHat
-          aria-hidden="true"
-          size={18}
-          className="text-accent"
-        />
-        Áreas de preparación
-      </h2>
+    <AreasContent
+      key={`${session.business.id}:${session.membership.id}:${session.accessToken}`}
+      session={session}
+    />
+  );
+}
 
-      <p className="mt-1 text-xs leading-relaxed text-muted">
-        Organiza dónde se prepara o despacha cada producto. Los
-        cambios de estado se guardan al instante.
-      </p>
+function AreasContent({ session }: { session: AuthSession }) {
+  const resource = usePreparationAreas(session);
 
-      <div className="mt-4 grid h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-        <div className="flex h-full min-w-0 items-center">
-          {resource.busy ? (
-            <p role="status" className="text-xs text-muted">
-              Guardando…
-            </p>
-          ) : notice.message ? (
-            <div
-              role={notice.error ? "alert" : "status"}
-              aria-atomic="true"
-              className={[
-                "flex max-h-full w-full items-start gap-2",
-                "overflow-y-auto rounded-xl border px-3 py-2",
-                "text-xs leading-relaxed",
-                notice.error
-                  ? "border-danger/35 bg-danger/10 text-danger dark:text-[#efa38f]"
-                  : "border-emerald-600/30 bg-emerald-500/10 text-emerald-800 dark:border-emerald-400/30 dark:text-emerald-200",
-              ].join(" ")}
-            >
-              {notice.error ? (
-                <CircleAlert
-                  aria-hidden="true"
-                  size={16}
-                  className="mt-0.5 shrink-0"
-                />
-              ) : (
-                <CircleCheck
-                  aria-hidden="true"
-                  size={16}
-                  className="mt-0.5 shrink-0"
-                />
-              )}
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const [modal, setModal] = useState<{
+    mode: AreaMode;
+    id?: string;
+  } | null>(null);
 
-              <span className="min-w-0 [overflow-wrap:anywhere]">
-                {notice.message}
-              </span>
-            </div>
-          ) : null}
+  const close = useCallback(() => setModal(null), []);
+
+  const query = search.trim().toLocaleLowerCase("es");
+  const filtered =
+    !!query || status !== "all" || !!resource.locationId;
+
+  const rows = resource.areas
+    .filter(
+      (area) =>
+        (!query ||
+          `${area.name} ${area.description ?? ""}`
+            .toLocaleLowerCase("es")
+            .includes(query)) &&
+        (status === "all" || area.isActive === (status === "active"))
+    )
+    .sort(
+      (a, b) =>
+        a.displayOrder - b.displayOrder ||
+        a.name.localeCompare(b.name, "es")
+    );
+
+  const hasActiveLocations = resource.locations.some(
+    (location) => location.isActive
+  );
+
+  const createDisabled =
+    resource.loading ||
+    !!resource.error ||
+    !hasActiveLocations ||
+    !!modal;
+
+  const locationsLink = (
+    <Link to="/configuracion?section=locations">
+      Ir a Sedes y planta
+    </Link>
+  );
+
+  if (resource.denied) {
+    return (
+      <Alert>
+        No tienes permisos para administrar las áreas de preparación.
+        Se ha solicitado una actualización de tu acceso.
+      </Alert>
+    );
+  }
+
+  const newButton = (
+    <Button
+      size="sm"
+      disabled={createDisabled}
+      onClick={() => setModal({ mode: "create" })}
+    >
+      <Plus size={16} aria-hidden="true" />
+      Nueva área
+    </Button>
+  );
+
+  return (
+    <section className="pa-panel">
+      <header className="pa-header">
+        <div>
+          <h2>Áreas de preparación</h2>
+          <p>
+            Define qué áreas reciben productos y comandas, y en cuáles
+            ubicaciones funcionan.
+          </p>
         </div>
 
-        <Button
-          size="sm"
-          className="whitespace-nowrap"
-          disabled={
-            resource.loading ||
-            !!resource.error ||
-            resource.busy ||
-            editing !== undefined
-          }
-          onClick={(event) => {
-            opener.current = event.currentTarget;
-            setNotice({ message: "", error: false });
-            setEditing(null);
-          }}
-        >
-          <Plus aria-hidden="true" size={16} />
-          Nueva área
-        </Button>
-      </div>
+        {newButton}
+      </header>
 
-      {resource.loading && (
-        <div className="py-8">
-          <LoadingState message="Cargando áreas…" />
-        </div>
+      {resource.notice.message && (
+        <Alert variant={resource.notice.error ? "error" : "success"}>
+          {resource.notice.message}
+        </Alert>
       )}
 
-      {resource.error && (
-        <Alert className="mt-4">
+      {!resource.loading &&
+        !resource.error &&
+        resource.locations.length > 0 &&
+        !hasActiveLocations && (
+          <div className="pa-warning" role="status">
+            <TriangleAlert size={16} aria-hidden="true" />
+            <span>
+              No hay ubicaciones activas disponibles. Activa una sede
+              o planta antes de configurar las áreas. {locationsLink}
+            </span>
+          </div>
+        )}
+
+      <div className="pa-filters">
+        <label className="pa-search">
+          <span className="sr-only">
+            Buscar por nombre o descripción
+          </span>
+
+          <Search size={16} aria-hidden="true" />
+
+          <input
+            type="search"
+            placeholder="Buscar por nombre o descripción"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
+
+        <label>
+          <span className="sr-only">Filtrar por ubicación</span>
+
+          <select
+            value={resource.locationId}
+            disabled={resource.loading || !!resource.error}
+            onChange={(event) =>
+              resource.selectLocation(event.target.value)
+            }
+          >
+            <option value="">Todas las ubicaciones</option>
+
+            {areaLocationGroups.map((group) => (
+              <optgroup key={group.type} label={group.label}>
+                {resource.locations
+                  .filter(
+                    (location) => location.locationType === group.type
+                  )
+                  .map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {locationLabel(location.name)} · {location.code}
+                      {location.isActive ? "" : " (inactiva)"}
+                    </option>
+                  ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          <span className="sr-only">Filtrar por estado</span>
+
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <option value="all">Todos los estados</option>
+            <option value="active">Activas</option>
+            <option value="inactive">Inactivas</option>
+          </select>
+        </label>
+      </div>
+
+      {resource.loading ? (
+        <div className="pa-skeleton" role="status" aria-busy="true">
+          <span className="sr-only">
+            Cargando áreas y ubicaciones…
+          </span>
+
+          {Array.from({ length: 5 }, (_, index) => (
+            <div key={index} />
+          ))}
+        </div>
+      ) : resource.error ? (
+        <div className="pa-empty" role="alert">
+          <WifiOff size={28} aria-hidden="true" />
+
+          <strong>No pudimos cargar las áreas de preparación.</strong>
+
           <p>{resource.error}</p>
 
           <Button
             size="sm"
             variant="secondary"
-            className="mt-3"
             onClick={resource.retry}
           >
+            <RotateCcw size={16} aria-hidden="true" />
             Reintentar
           </Button>
-        </Alert>
-      )}
+        </div>
+      ) : resource.locations.length === 0 ? (
+        <div className="pa-empty">
+          <MapPin size={28} aria-hidden="true" />
 
-      {editing !== undefined && (
-        <BottomSheet
-          id={modalId}
-          open
-          variant="modal"
-          title={editing ? "Editar área" : "Nueva área"}
-          busy={resource.busy}
-          onClose={closeForm}
-        >
-          <PreparationAreaForm
-            key={editing?.id ?? "new"}
-            area={editing ?? undefined}
-            busy={resource.busy}
-            onSave={save}
-            onCancel={closeForm}
-          />
-        </BottomSheet>
-      )}
+          <strong>Primero debes crear una sede o planta.</strong>
 
-      {!resource.loading && !resource.error && (
-        <>
-          {resource.areas.length === 0 ? (
-            <p className="py-8 text-sm text-muted">
-              Todavía no tienes áreas. Crea al menos una para
-              asignarla a tus productos.
-            </p>
+          <p>
+            Las áreas de preparación necesitan al menos una ubicación
+            donde funcionar.
+          </p>
+
+          {locationsLink}
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="pa-empty">
+          <ChefHat size={28} aria-hidden="true" />
+
+          <strong>
+            {filtered
+              ? "No hay resultados con estos filtros."
+              : "Aún no tienes áreas de preparación."}
+          </strong>
+
+          <p>
+            {filtered
+              ? "Cambia o limpia los filtros para ver otras áreas."
+              : "Crea áreas como Cocina, Barra o Panadería y asígnalas a tus sedes."}
+          </p>
+
+          {filtered ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setSearch("");
+                setStatus("all");
+                resource.selectLocation("");
+              }}
+            >
+              Limpiar filtros
+            </Button>
           ) : (
-            <ul className="mt-4 divide-y divide-outline">
-              {resource.areas.map((area) => (
-                <li
-                  key={area.id}
-                  className="flex items-center gap-2 py-3 md:grid md:grid-cols-[1rem_minmax(0,1fr)_6rem_2.75rem] md:gap-3"
-                >
-                  <ChefHat
-                    aria-hidden="true"
-                    size={16}
-                    className="shrink-0 text-accent"
-                  />
-
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-heading [overflow-wrap:anywhere]">
-                      {area.name}
-                    </p>
-
-                    {area.description && (
-                      <p className="mt-1 text-xs text-muted [overflow-wrap:anywhere]">
-                        {area.description}
-                      </p>
-                    )}
-                  </div>
-
-                  <span
-                    className={[
-                      "flex shrink-0 items-center gap-1 text-xs font-medium",
-                      area.isActive ? "text-heading" : "text-muted",
-                    ].join(" ")}
-                  >
-                    {area.isActive ? (
-                      <CircleCheck
-                        aria-hidden="true"
-                        size={14}
-                        className="text-accent"
-                      />
-                    ) : (
-                      <CircleSlash aria-hidden="true" size={14} />
-                    )}
-
-                    {area.isActive ? "Activa" : "Inactiva"}
-                  </span>
-
-                  <ActionMenu
-                    appearance="compact"
-                    label={`Acciones de ${area.name}`}
-                    disabled={resource.busy || editing !== undefined}
-                    actions={[
-                      {
-                        id: "edit",
-                        label: "Editar",
-                        icon: <Pencil aria-hidden="true" size={16} />,
-                        onSelect: (trigger) => {
-                          opener.current = trigger;
-                          setNotice({ message: "", error: false });
-                          setEditing(area);
-                        },
-                      },
-                      {
-                        id: "status",
-                        label: area.isActive
-                          ? "Desactivar"
-                          : "Activar",
-                        icon: area.isActive ? (
-                          <ToggleRight
-                            aria-hidden="true"
-                            size={20}
-                            className="shrink-0"
-                          />
-                        ) : (
-                          <ToggleLeft
-                            aria-hidden="true"
-                            size={20}
-                            className="shrink-0"
-                          />
-                        ),
-                        onSelect: () => {
-                          void changeStatus(area, !area.isActive);
-                        },
-                      },
-                    ]}
-                  />
-                </li>
-              ))}
-            </ul>
+            newButton
           )}
-        </>
+        </div>
+      ) : (
+        <div className="pa-table-wrap">
+          <table className="pa-table">
+            <caption className="sr-only">
+              Áreas de preparación y ubicaciones asignadas
+            </caption>
+
+            <colgroup>
+              <col className="pa-col-name" />
+              <col className="pa-col-description" />
+              <col />
+              <col className="pa-col-order" />
+              <col className="pa-col-status" />
+              <col className="pa-col-actions" />
+            </colgroup>
+
+            <thead>
+              <tr>
+                <th scope="col">Área</th>
+                <th scope="col">Descripción</th>
+                <th scope="col">Ubicaciones asignadas</th>
+                <th scope="col">Orden</th>
+                <th scope="col">Estado</th>
+                <th scope="col">
+                  <span className="sr-only">Acciones</span>
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.map((area) => (
+                <tr key={area.id} data-inactive={!area.isActive}>
+                  <td data-label="Área" className="pa-name">
+                    <span>
+                      <ChefHat size={16} aria-hidden="true" />
+                      <strong>{area.name}</strong>
+                    </span>
+                  </td>
+
+                  <td
+                    data-label="Descripción"
+                    className="pa-description"
+                  >
+                    {area.description || "Sin descripción"}
+                  </td>
+
+                  <td data-label="Ubicaciones asignadas">
+                    <AreaLocationChips
+                      locations={area.locations}
+                      compact
+                    />
+                  </td>
+
+                  <td data-label="Orden" className="pa-order">
+                    {area.displayOrder}
+                  </td>
+
+                  <td data-label="Estado">
+                    <span
+                      className="pa-status"
+                      data-active={area.isActive}
+                    >
+                      <span aria-hidden="true">●</span>
+                      {area.isActive ? "Activa" : "Inactiva"}
+                    </span>
+                  </td>
+
+                  <td className="pa-actions">
+                    <ActionMenu
+                      appearance="compact"
+                      label={`Acciones de ${area.name}`}
+                      disabled={!!modal}
+                      actions={[
+                        {
+                          id: "edit",
+                          label: "Editar área",
+                          icon: (
+                            <Pencil size={16} aria-hidden="true" />
+                          ),
+                          onSelect: () =>
+                            setModal({
+                              mode: "edit",
+                              id: area.id,
+                            }),
+                        },
+                        {
+                          id: "locations",
+                          label: "Administrar ubicaciones",
+                          icon: (
+                            <MapPin size={16} aria-hidden="true" />
+                          ),
+                          onSelect: () =>
+                            setModal({
+                              mode: "locations",
+                              id: area.id,
+                            }),
+                        },
+                        {
+                          id: "status",
+                          label: area.isActive
+                            ? "Desactivar"
+                            : "Activar",
+                          danger: area.isActive,
+                          icon: (
+                            <Power size={16} aria-hidden="true" />
+                          ),
+                          onSelect: () =>
+                            setModal({
+                              mode: "status",
+                              id: area.id,
+                            }),
+                        },
+                      ]}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      <p className="mt-5 text-xs leading-relaxed text-muted">
-        Desactivar un área conserva su historial e impide asignarla a
-        productos nuevos o al cambiar su área.
-      </p>
-    </Card>
+      {modal && (
+        <PreparationAreaForm
+          session={session}
+          mode={modal.mode}
+          areaId={modal.id}
+          initialLocationId={resource.locationId}
+          onClose={close}
+          onSaved={resource.saved}
+          onError={resource.handleError}
+        />
+      )}
+    </section>
   );
 }

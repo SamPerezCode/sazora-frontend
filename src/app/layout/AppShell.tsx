@@ -150,6 +150,12 @@ export function AppShell() {
             </Alert>
           )}
 
+          {typeof location.state?.accessNotice === "string" && (
+            <Alert className="mb-5">
+              {location.state.accessNotice}
+            </Alert>
+          )}
+
           <Outlet context={context} />
         </main>
       </div>

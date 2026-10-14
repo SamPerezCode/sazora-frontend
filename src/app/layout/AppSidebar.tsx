@@ -147,7 +147,7 @@ export function AppSidebar({
       </nav>
 
       <div className="shell-business" title={business.name}>
-        {settings?.status === "ready" ? (
+        {collapsed && !mobile && settings?.status === "ready" ? (
           <NavLink
             to={settings.to}
             onClick={onNavigate}

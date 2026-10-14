@@ -22,13 +22,19 @@ const shortcuts = [
   "production",
   "public-orders",
   "deliveries",
+  "inventory",
+  "products",
+  "settings",
+  "workspaces",
 ];
 
 const shortLabels: Record<string, string> = {
+  panel: "Panel",
   sales: "Ventas",
   deliveries: "Domicilios",
   "public-orders": "Pedidos",
-  settings: "Configuración",
+  settings: "Ajustes",
+  workspaces: "Espacios",
 };
 
 function NavigationEntry({
@@ -47,11 +53,9 @@ function NavigationEntry({
   const { pathname } = useLocation();
   const Icon = item.icon;
 
-  const label = detail
-    ? item.label
-    : shortLabels[item.id] && (compact || item.id === "settings")
-      ? shortLabels[item.id]
-      : item.label;
+  const label = compact
+    ? (shortLabels[item.id] ?? item.label)
+    : item.label;
 
   const className = detail
     ? "mobile-submenu-item"
@@ -153,9 +157,18 @@ function MobileNavigationContent({
   const group = items.find(
     (item) => item.id === groupId && item.status === "group"
   );
+  const priority = new Map(shortcuts.map((id, index) => [id, index]));
+
   const primaryItems = items
-    .filter((item) => shortcuts.includes(item.id))
-    .slice(0, 3);
+    .filter(
+      (item) => item.status === "ready" || item.status === "group"
+    )
+    .sort(
+      (a, b) =>
+        (priority.get(a.id) ?? shortcuts.length) -
+        (priority.get(b.id) ?? shortcuts.length)
+    )
+    .slice(0, 4);
 
   useEffect(() => {
     if (groupId) {

@@ -147,7 +147,7 @@ export function ConfigurationPage() {
 
       <div
         className={
-          active.group === "Operación"
+          active.group === "Operación" && active.id !== "areas"
             ? "configuration-content w-full md:max-w-4xl"
             : "configuration-content"
         }
