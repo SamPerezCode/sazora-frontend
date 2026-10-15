@@ -46,7 +46,7 @@ export function CancelUnitsDialog({
     resource.data.order.status === "CONFIRMED" &&
     item?.status === "ACTIVE" &&
     !!preparationStatus &&
-    ["PENDING", "IN_PREPARATION", "READY"].includes(
+    ["PENDING", "PREPARING", "IN_PREPARATION", "READY"].includes(
       preparationStatus
     );
 

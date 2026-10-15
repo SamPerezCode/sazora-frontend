@@ -1,24 +1,38 @@
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import {
+  ArrowRight,
   ChevronDown,
+  Clock,
+  History,
+  MapPin,
   Plus,
   RefreshCw,
   ShoppingBag,
+  Store,
+  Users,
+  Utensils,
 } from "lucide-react";
 
+import { ResponsiveFilter } from "../../../components/ui/ResponsiveFilter";
+
 import { useAppShell } from "../../../app/layout/shell-context";
+
 import { Alert } from "../../../components/feedback/Alert";
 import { SelectField } from "../../../components/forms/SelectField";
 import { BottomSheet } from "../../../components/layout/BottomSheet";
 import { Button } from "../../../components/ui/Button";
 
+import type { AuthSession } from "../../auth/types/auth.types";
+
 import { useSales } from "../hooks/useSales";
+import { useSalesLocations } from "../hooks/useSalesLocations";
 
 import { OrderWorkspace } from "../components/OrderWorkspace";
-import { SalesOrderCard } from "../components/SalesOrderCard";
-import { SalesTableCard } from "../components/SalesTableCard";
+import { OrderSummaryView } from "../components/OrderSummaryView";
+import { OrderStatusBadge } from "../components/OrderStatusBadge";
 import { SalesSummary } from "../components/SalesSummary";
+import { SalesHistory } from "../components/SalesHistory";
 
 import {
   getBoardTables,
@@ -28,44 +42,180 @@ import {
 
 import type { SalesFilter } from "../utils/sales-board";
 
-import { STATUS_LABELS } from "../schemas/sales.schema";
+import { cents, money, STATUS_LABELS } from "../schemas/sales.schema";
+
+import type { OrderSummary } from "../schemas/sales.schema";
+
+import type { SalesLocation } from "../services/sales.service";
+
+import "../mesas-pedidos.css";
+
+type Locations = ReturnType<typeof useSalesLocations>;
+
+function LocationControl({
+  locations,
+  value,
+  onChange,
+  disabled = false,
+}: {
+  locations: Locations;
+  value: string;
+  onChange: (id: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="mp-location-control">
+      <span className="mp-location-icon">
+        <Store size={22} />
+      </span>
+
+      {locations.options.length === 1 && value ? (
+        <div>
+          <small>Punto de venta</small>
+          <strong>
+            {locations.options[0].name} · {locations.options[0].code}
+          </strong>
+        </div>
+      ) : (
+        <SelectField
+          label="Punto de venta"
+          value={value}
+          disabled={disabled || locations.loading}
+          placeholder="Selecciona un punto de venta"
+          options={locations.options.map((location) => ({
+            value: location.id,
+            label: `${location.name} · ${location.code}`,
+          }))}
+          onValueChange={onChange}
+        />
+      )}
+    </div>
+  );
+}
 
 export function SalesPage() {
   const { session } = useAppShell();
 
+  const allowed = session.authorization.roles.some(
+    (role) => role === "ADMIN" || role === "WAITER"
+  );
+
+  if (!allowed) {
+    return <Alert>No tienes acceso a Mesas y pedidos.</Alert>;
+  }
+
   return (
-    <SalesContent
-      key={session.accessToken}
-      token={session.accessToken}
+    <SalesLocations
+      key={`${session.business.id}:${session.membership.id}`}
+      session={session}
     />
   );
 }
 
-function SalesContent({ token }: { token: string }) {
-  const resource = useSales(token);
-  const modalId = useId();
-  const resultsId = useId();
-  const takeawayHeadingId = useId();
-  const takeawayToggleId = useId();
-  const takeawayPanelId = useId();
+function SalesLocations({ session }: { session: AuthSession }) {
+  const locations = useSalesLocations(session);
 
-  const [takeawayOpen, setTakeawayOpen] = useState(false);
+  if (!locations.location) {
+    return (
+      <section className="mp-page">
+        <div className="mp-toolbar">
+          <LocationControl
+            locations={locations}
+            value=""
+            onChange={locations.select}
+          />
+        </div>
+
+        {locations.issue && <Alert>{locations.issue}</Alert>}
+
+        {locations.loading ? (
+          <p role="status">Consultando puntos de venta…</p>
+        ) : locations.error ? (
+          <Alert>
+            <p>{locations.error}</p>
+            <Button variant="secondary" onClick={locations.retry}>
+              Reintentar
+            </Button>
+          </Alert>
+        ) : (
+          <div className="mp-empty">
+            <Store size={28} />
+
+            <h2>
+              {locations.options.length
+                ? "Selecciona un punto de venta para comenzar."
+                : "No tienes un punto de venta disponible para operar."}
+            </h2>
+
+            {!locations.options.length && (
+              <Button variant="secondary" onClick={locations.retry}>
+                Actualizar acceso
+              </Button>
+            )}
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <SalesContent
+      key={locations.location.id}
+      session={session}
+      location={locations.location}
+      locations={locations}
+    />
+  );
+}
+
+function SalesContent({
+  session,
+  location,
+  locations,
+}: {
+  session: AuthSession;
+  location: SalesLocation;
+  locations: Locations;
+}) {
+  const scope = useMemo(
+    () => ({
+      businessId: session.business.id,
+      location,
+    }),
+    [session.business.id, location]
+  );
+
+  const resource = useSales(
+    session.accessToken,
+    scope,
+    locations.invalidate
+  );
+
+  const modalId = useId();
+  const pickupId = useId();
 
   const [filter, setFilter] = useState<SalesFilter>("ALL");
+  const [takeawayOpen, setTakeawayOpen] = useState(false);
+  const [chooseTable, setChooseTable] = useState(false);
+  const [history, setHistory] = useState(false);
 
-  const { data } = resource;
+  const [leaving, setLeaving] = useState<
+    { kind: "location"; id: string } | { kind: "close" } | null
+  >(null);
+
+  const data = resource.data;
 
   const board = getBoardTables(
     data?.tables ?? [],
     data?.orders ?? []
   );
 
-  const visibleTables = board.filter(
-    ({ order }) =>
-      filter === "ALL" ||
-      (filter === "FREE"
+  const visible = board.filter(({ order }) =>
+    filter === "ALL"
+      ? true
+      : filter === "FREE"
         ? !order
-        : !!order && matchesOrder(order, filter))
+        : !!order && matchesOrder(order, filter)
   );
 
   const takeaway = (data?.orders ?? []).filter(
@@ -73,56 +223,51 @@ function SalesContent({ token }: { token: string }) {
       order.serviceType === "TAKEAWAY" && matchesOrder(order, filter)
   );
 
-  const activeOrder =
+  const active =
     data?.order?.id === resource.selectedId ? data.order : null;
 
-  const localDraft = resource.localDraft;
+  const draft = resource.localDraft;
 
-  // Adaptador para reutilizar la vista.
-  // id: null indica que todavía no existe una orden en el backend.
   const workspaceOrder =
-    activeOrder ??
-    (localDraft
+    active ??
+    (draft
       ? {
-          serviceType: localDraft.serviceType,
-          restaurantTableId: localDraft.restaurantTableId,
-          customerCount: localDraft.customerCount,
-          notes: localDraft.notes,
           id: null,
+          serviceType: draft.serviceType,
+          restaurantTableId: draft.restaurantTableId,
+          customerCount: draft.customerCount,
+          notes: draft.notes,
           status: "OPEN" as const,
           subtotal: "0",
           items: [],
         }
       : null);
 
-  const workspaceOpen = !!resource.selectedId || !!localDraft;
-
-  const needsConfirmation =
-    !!resource.selectedId &&
-    !!resource.confirmationIds[resource.selectedId];
+  const table = data?.tables.find(
+    (entry) => entry.id === workspaceOrder?.restaurantTableId
+  );
 
   const blocked =
-    resource.busy || resource.uncertain || !!resource.error;
+    resource.busy ||
+    resource.uncertain ||
+    !!resource.error ||
+    resource.accessLost ||
+    resource.loading;
 
-  const detailTitle = workspaceOrder
+  const title = workspaceOrder
     ? workspaceOrder.serviceType === "TABLE"
-      ? (data?.tables.find(
-          (table) => table.id === workspaceOrder.restaurantTableId
-        )?.name ?? "Mesa")
-      : "Para recoger"
+      ? (table?.name ?? "Mesa")
+      : "Pedido para recoger"
     : "Cargando cuenta…";
 
-  function pendingFor(id: string) {
-    return Object.values(resource.drafts[id] ?? {}).reduce(
-      (sum, item) => sum + item.quantity,
-      0
-    );
-  }
-
   function openTable(id: string) {
-    const entry = board.find(({ table }) => table.id === id);
+    const entry = board.find(
+      ({ table: candidate }) => candidate.id === id
+    );
 
     if (!entry || resource.busy) return;
+
+    setChooseTable(false);
 
     if (entry.order) {
       resource.select(entry.order.id);
@@ -136,274 +281,498 @@ function SalesContent({ token }: { token: string }) {
     }
   }
 
+  function startTakeaway() {
+    resource.start({
+      serviceType: "TAKEAWAY",
+      restaurantTableId: null,
+      customerCount: null,
+      notes: null,
+    });
+  }
+
+  function pendingCount(id: string) {
+    return Object.values(resource.drafts[id] ?? {}).reduce(
+      (sum, item) => sum + item.quantity,
+      0
+    );
+  }
+
+  function closeWorkspace() {
+    if (draft && Object.keys(draft.items).length) {
+      setLeaving({ kind: "close" });
+    } else if (draft) {
+      resource.discardLocal();
+    } else {
+      resource.select(null);
+    }
+  }
+
+  function changeLocation(id: string) {
+    if (id === location.id || resource.busy || resource.uncertain) {
+      return;
+    }
+
+    if (resource.hasPending) {
+      setLeaving({ kind: "location", id });
+    } else {
+      locations.select(id);
+    }
+  }
+
+  const newPickup = (
+    <Button size="compact" disabled={blocked} onClick={startTakeaway}>
+      <Plus size={16} />
+      Nuevo pedido para recoger
+    </Button>
+  );
+
+  function orderInfo(order: OrderSummary) {
+    return (
+      <>
+        <div className="mp-card-line">
+          <strong>Orden #{order.id}</strong>
+
+          {order.customerCount !== null && (
+            <span>
+              <Users size={14} />
+              {order.customerCount}
+            </span>
+          )}
+        </div>
+
+        <p>
+          {order.activeItemCount}{" "}
+          {order.activeItemCount === 1
+            ? "producto guardado"
+            : "productos guardados"}{" "}
+          ·{" "}
+          {order.status === "OPEN"
+            ? "Sin enviar a cocina"
+            : order.status === "DELIVERED"
+              ? "Por cerrar"
+              : "Consultar preparación"}
+        </p>
+
+        {pendingCount(order.id) > 0 && (
+          <p className="mp-accent">
+            {pendingCount(order.id)} unidades locales por enviar
+          </p>
+        )}
+
+        <strong>{money(cents(order.subtotal))}</strong>
+      </>
+    );
+  }
+
   return (
-    <section className="sales-page sales-board">
-      {resource.loading && (
-        <p role="status">Cargando mesas y pedidos…</p>
-      )}
-
-      {resource.error && (
-        <Alert>
-          <p>{resource.error}</p>
-
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={resource.busy}
-            onClick={resource.retry}
-          >
-            Reintentar
-          </Button>
-        </Alert>
-      )}
-
-      {data && (
+    <section className="mp-page sales-page sales-board">
+      {history ? (
+        <SalesHistory
+          token={session.accessToken}
+          scope={scope}
+          onBack={() => setHistory(false)}
+          onLocationLost={locations.invalidate}
+        />
+      ) : (
         <>
-          <div className="sales-board-header">
-            <div>
-              <h2>Mesas y pedidos</h2>
+          <div className="mp-toolbar">
+            <LocationControl
+              locations={locations}
+              value={location.id}
+              onChange={changeLocation}
+              disabled={resource.busy || resource.uncertain}
+            />
 
-              <p className="sales-board-muted">
-                Abre una mesa o continúa atendiendo una cuenta.
-              </p>
+            <div className="mp-toolbar-actions">
+              <Button
+                variant="soft"
+                size="icon"
+                disabled={resource.busy}
+                onClick={resource.retry}
+                aria-label="Actualizar mesas y pedidos"
+              >
+                <RefreshCw size={17} />
+              </Button>
+
+              <Button
+                variant="soft"
+                size="compact"
+                disabled={
+                  blocked ||
+                  !board.some(
+                    ({ table: entry, order }) =>
+                      entry.isActive && !order
+                  )
+                }
+                onClick={() => setChooseTable(true)}
+              >
+                <Utensils size={16} />
+                Abrir mesa
+              </Button>
+
+              {newPickup}
+            </div>
+          </div>
+
+          <div className="mp-section-heading">
+            <div>
+              <h2>Salón de {location.name}</h2>
+              <p>Abre una mesa o continúa atendiendo una cuenta.</p>
             </div>
 
-            <button
-              type="button"
-              className="sales-icon"
-              aria-label="Actualizar mesas y pedidos"
-              disabled={resource.busy}
-              onClick={resource.retry}
+            <Button
+              variant="soft"
+              size="compact"
+              disabled={resource.busy || resource.uncertain}
+              onClick={() => setHistory(true)}
             >
-              <RefreshCw size={18} />
-            </button>
+              <History size={16} />
+              Ver historial
+            </Button>
           </div>
 
-          <SalesSummary
-            free={
-              board.filter(
-                ({ table, order }) => table.isActive && !order
-              ).length
-            }
-            attending={
-              board.filter(
-                ({ order }) =>
-                  order?.status === "OPEN" ||
-                  order?.status === "CONFIRMED"
-              ).length
-            }
-            closing={
-              board.filter(
-                ({ order }) => order?.status === "DELIVERED"
-              ).length
-            }
-          />
+          {resource.loading && (
+            <div
+              className="mp-skeletons"
+              role="status"
+              aria-label="Cargando tablero"
+            >
+              {[1, 2, 3].map((number) => (
+                <div key={number} />
+              ))}
+            </div>
+          )}
 
-          <div
-            className="sales-board-filters"
-            role="group"
-            aria-label="Filtrar operación actual"
-          >
-            {SALES_FILTERS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={filter === option.id}
-                aria-controls={resultsId}
-                onClick={() => setFilter(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          {resource.error && (
+            <Alert>
+              <p>{resource.error}</p>
 
-          <div id={resultsId} className="sales-board-results">
-            {filter !== "FREE" && (
-              <section
-                className="sales-service-group sales-pickup-accordion"
-                aria-labelledby={takeawayHeadingId}
+              <Button
+                variant="secondary"
+                disabled={resource.busy}
+                onClick={resource.retry}
               >
-                <div className="sales-pickup-header">
-                  <h2 id={takeawayHeadingId}>
+                Reintentar
+              </Button>
+            </Alert>
+          )}
+
+          {resource.notice && !resource.selectedId && !draft && (
+            <p className="mp-notice" role="status">
+              {resource.notice}
+            </p>
+          )}
+
+          {resource.uncertain && !resource.selectedId && !draft && (
+            <div className="mp-warning" role="alert">
+              <p>
+                Hay una operación pendiente de verificar. Revisa las
+                cuentas antes de volver a enviar.
+              </p>
+
+              <Button
+                variant="secondary"
+                disabled={resource.busy}
+                onClick={() => void resource.reconcile()}
+              >
+                {resource.needsWriteVerification
+                  ? "Verificar operación"
+                  : "Ya revisé las cuentas: habilitar acciones"}
+              </Button>
+            </div>
+          )}
+
+          {data && (
+            <>
+              <SalesSummary
+                free={
+                  board.filter(
+                    ({ table: entry, order }) =>
+                      entry.isActive && !order
+                  ).length
+                }
+                attending={
+                  board.filter(
+                    ({ order }) =>
+                      order?.status === "OPEN" ||
+                      order?.status === "CONFIRMED"
+                  ).length
+                }
+                closing={
+                  board.filter(
+                    ({ order }) => order?.status === "DELIVERED"
+                  ).length
+                }
+              />
+
+              <ResponsiveFilter
+                label="Estado de mesas y pedidos"
+                value={filter}
+                options={SALES_FILTERS.map((option) => ({
+                  value: option.id,
+                  label: option.label,
+                }))}
+                onChange={setFilter}
+              />
+
+              {filter !== "FREE" && (
+                <section className="mp-pickup">
+                  <div className="mp-section-heading">
                     <button
-                      id={takeawayToggleId}
+                      className="mp-pickup-toggle"
                       type="button"
-                      className="sales-pickup-toggle"
+                      aria-controls={pickupId}
                       aria-expanded={takeawayOpen}
-                      aria-controls={takeawayPanelId}
                       onClick={() => setTakeawayOpen((open) => !open)}
                     >
-                      <ShoppingBag size={20} aria-hidden="true" />
-
-                      <span className="sales-pickup-title">
-                        Pedidos para recoger
-                      </span>
-
-                      <span className="sales-pickup-count">
+                      <ShoppingBag size={18} />
+                      <strong>Pedidos para recoger</strong>
+                      <span className="mp-neutral">
                         {takeaway.length}
-
-                        <span className="sr-only"> pedidos</span>
                       </span>
-
-                      <ChevronDown
-                        size={18}
-                        aria-hidden="true"
-                        className="sales-pickup-chevron"
-                      />
+                      <ChevronDown size={16} />
                     </button>
-                  </h2>
 
-                  <Button
-                    size="sm"
-                    className="sales-pickup-create"
-                    disabled={blocked}
-                    aria-label="Nuevo pedido para recoger"
-                    onClick={() =>
-                      resource.start({
-                        serviceType: "TAKEAWAY",
-                        restaurantTableId: null,
-                        customerCount: null,
-                        notes: null,
-                      })
-                    }
-                  >
-                    <Plus size={16} aria-hidden="true" />
-
-                    <span className="hidden sm:inline">
+                    <Button
+                      variant="soft"
+                      size="compact"
+                      disabled={blocked}
+                      onClick={startTakeaway}
+                    >
+                      <Plus size={16} />
                       Nuevo pedido para recoger
-                    </span>
-
-                    <span className="sm:hidden">Nuevo</span>
-                  </Button>
-                </div>
-
-                <div
-                  id={takeawayPanelId}
-                  className="sales-pickup-body"
-                  role="region"
-                  aria-labelledby={takeawayToggleId}
-                  hidden={!takeawayOpen}
-                >
-                  <div className="sales-board-grid">
-                    {takeaway.map((order) => (
-                      <SalesOrderCard
-                        key={order.id}
-                        order={order}
-                        pendingCount={pendingFor(order.id)}
-                        disabled={resource.busy}
-                        onOpen={resource.select}
-                      />
-                    ))}
+                    </Button>
                   </div>
 
-                  {!takeaway.length && (
-                    <p className="sales-board-empty">
-                      No hay pedidos para recoger en este estado.
-                    </p>
-                  )}
-                </div>
-              </section>
-            )}
-            <section
-              className="sales-physical-tables"
-              aria-label="Mesas del salón"
-            >
-              <div className="sales-section-heading">
-                <h2>Mesas del salón</h2>
+                  <div id={pickupId} hidden={!takeawayOpen}>
+                    <div className="mp-cards">
+                      {takeaway.map((order) => (
+                        <button
+                          type="button"
+                          className="mp-card"
+                          key={order.id}
+                          disabled={resource.busy}
+                          onClick={() => resource.select(order.id)}
+                        >
+                          <div className="mp-card-line">
+                            <strong>Pedido #{order.id}</strong>
+                            <OrderStatusBadge status={order.status} />
+                          </div>
 
-                <span className="sales-board-muted">
-                  {visibleTables.length} mesas
-                </span>
-              </div>
+                          {orderInfo(order)}
 
-              <div className="sales-mobile-table-picker">
-                <SelectField
-                  label="Elegir mesa"
-                  value=""
-                  placeholder="Selecciona una mesa"
-                  disabled={resource.busy || !visibleTables.length}
-                  options={visibleTables.map(({ table, order }) => ({
-                    value: table.id,
-                    label:
-                      table.name +
-                      (table.capacity
-                        ? ` · ${table.capacity} pax`
-                        : "") +
-                      " · " +
-                      (order ? STATUS_LABELS[order.status] : "Libre"),
-                    disabled: !order && blocked,
-                  }))}
-                  onValueChange={openTable}
-                />
-              </div>
+                          <small>
+                            <Clock size={13} />
+                            {new Date(
+                              order.createdAt
+                            ).toLocaleTimeString("es-CO", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </small>
 
-              <div className="sales-board-grid sales-desktop-tables">
-                {visibleTables.map(({ table, order }) => (
-                  <SalesTableCard
-                    key={table.id}
-                    table={table}
-                    order={order}
-                    pendingCount={order ? pendingFor(order.id) : 0}
-                    disabled={order ? resource.busy : blocked}
-                    onOpen={() => openTable(table.id)}
-                  />
-                ))}
-              </div>
+                          <span className="mp-card-action">
+                            {order.status === "DELIVERED"
+                              ? "Cerrar cuenta"
+                              : "Ver cuenta"}
+                            <ArrowRight size={16} />
+                          </span>
+                        </button>
+                      ))}
+                    </div>
 
-              {!visibleTables.length && (
-                <p className="sales-board-empty">
-                  No hay mesas en este estado.
-                </p>
+                    {!takeaway.length && (
+                      <p className="mp-empty">
+                        No hay pedidos para recoger en este estado.
+                      </p>
+                    )}
+                  </div>
+                </section>
               )}
-            </section>
-          </div>
 
-          <p className="sales-sync">
-            Actualización automática cada 15 segundos.
-          </p>
+              <section>
+                <div className="mp-section-heading">
+                  <h3>Mesas del salón</h3>
+                  <span>
+                    {visible.length}{" "}
+                    {visible.length === 1 ? "mesa" : "mesas"}
+                  </span>
+                </div>
+
+                <div className="mp-mobile-table-picker">
+                  <SelectField
+                    label="Elegir mesa"
+                    value=""
+                    placeholder="Selecciona una mesa"
+                    disabled={resource.busy}
+                    onValueChange={openTable}
+                    options={visible.map(
+                      ({ table: entry, order }) => ({
+                        value: entry.id,
+                        label: `${entry.name} · ${
+                          order
+                            ? STATUS_LABELS[order.status]
+                            : "Libre"
+                        }`,
+                        disabled: !order && blocked,
+                      })
+                    )}
+                  />
+                </div>
+
+                <div className="mp-cards">
+                  {visible.map(({ table: entry, order }) => (
+                    <button
+                      type="button"
+                      className="mp-card"
+                      key={entry.id}
+                      disabled={resource.busy || (!order && blocked)}
+                      onClick={() => openTable(entry.id)}
+                    >
+                      <div className="mp-card-line">
+                        <strong>
+                          <Utensils size={21} />
+                          {entry.name}
+                        </strong>
+
+                        <OrderStatusBadge
+                          status={order?.status ?? "FREE"}
+                        />
+                      </div>
+
+                      <p>
+                        {entry.code}
+                        {entry.capacity
+                          ? ` · Capacidad: ${entry.capacity}`
+                          : ""}
+                      </p>
+
+                      {entry.continuityOnly && (
+                        <p className="mp-warning">
+                          Mesa fuera del listado activo · continúa la
+                          cuenta existente
+                        </p>
+                      )}
+
+                      {order ? (
+                        orderInfo(order)
+                      ) : (
+                        <p className="mp-free-text">
+                          Disponible para una nueva cuenta
+                        </p>
+                      )}
+
+                      <span className="mp-card-action">
+                        {!order
+                          ? "Abrir mesa"
+                          : order.status === "DELIVERED"
+                            ? "Cerrar cuenta"
+                            : order.status === "OPEN"
+                              ? "Continuar cuenta"
+                              : "Ver cuenta"}
+
+                        <ArrowRight size={16} />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {!visible.length && (
+                  <p className="mp-empty">
+                    {board.length
+                      ? "No hay mesas en este estado."
+                      : "Este punto de venta no tiene mesas disponibles. Puedes crear un pedido para recoger."}
+                  </p>
+                )}
+              </section>
+
+              <p className="mp-updated">
+                Última actualización{" "}
+                {new Date(data.updatedAt).toLocaleTimeString(
+                  "es-CO",
+                  {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }
+                )}{" "}
+                · Actualización automática cada 15 segundos.
+              </p>
+            </>
+          )}
         </>
       )}
 
-      {resource.notice && !workspaceOpen && (
-        <p className="sales-notice" role="status">
-          {resource.notice}
-        </p>
-      )}
-
-      {resource.uncertain && !workspaceOpen && (
-        <Button
-          variant="secondary"
-          disabled={resource.busy}
-          onClick={() => void resource.reconcile()}
-        >
-          {resource.needsWriteVerification
-            ? "Verificar operación"
-            : "Ya revisé las cuentas: habilitar acciones"}
-        </Button>
-      )}
-
-      {workspaceOpen && (
+      {chooseTable && (
         <BottomSheet
-          id={modalId + "-order"}
+          id={`${modalId}-tables`}
           open
           variant="modal"
-          title={detailTitle}
-          busy={resource.busy}
-          className={
-            workspaceOrder?.status === "DELIVERED"
-              ? "sales-workspace sales-workspace-summary"
-              : "sales-workspace"
-          }
-          onClose={() => {
-            if (resource.localDraft) {
-              resource.discardLocal();
-              return;
-            }
-
-            resource.select(null);
-          }}
+          title="Elegir una mesa libre"
+          className="mp-dialog"
+          onClose={() => setChooseTable(false)}
         >
-          {workspaceOrder && data ? (
+          <div className="mp-dialog-content">
+            <p>
+              {location.name} · {location.code}
+            </p>
+
+            <div className="mp-table-choices">
+              {board
+                .filter(
+                  ({ table: entry, order }) =>
+                    entry.isActive && !order
+                )
+                .map(({ table: entry }) => (
+                  <Button
+                    variant="secondary"
+                    key={entry.id}
+                    disabled={blocked}
+                    onClick={() => openTable(entry.id)}
+                  >
+                    <Utensils size={18} />
+                    {entry.name}
+                  </Button>
+                ))}
+            </div>
+          </div>
+        </BottomSheet>
+      )}
+
+      {(resource.selectedId || draft) && (
+        <BottomSheet
+          id={`${modalId}-order`}
+          open
+          variant="modal"
+          title={title}
+          busy={resource.busy}
+          className={`sales-workspace mp-workspace ${
+            active?.status === "DELIVERED"
+              ? "mp-workspace-summary"
+              : ""
+          }`}
+          onClose={closeWorkspace}
+        >
+          <div className="mp-workspace-location">
+            <MapPin size={14} />
+            Punto de venta:
+            <strong>
+              {location.name} · {location.code}
+            </strong>
+            {workspaceOrder && (
+              <span>
+                {active ? `Orden #${active.id}` : "Borrador"}
+                <OrderStatusBadge status={workspaceOrder.status} />
+              </span>
+            )}
+          </div>
+
+          {active?.status === "DELIVERED" ? (
+            <OrderSummaryView
+              order={active}
+              table={table}
+              resource={resource}
+            />
+          ) : workspaceOrder && data ? (
             <OrderWorkspace
               key={
                 workspaceOrder.id ??
@@ -416,48 +785,72 @@ function SalesContent({ token }: { token: string }) {
               data={data}
             />
           ) : (
-            <div className="sales-loading">
+            <div className="mp-dialog-content">
               <p role="status">
-                {resource.sending
-                  ? "Enviando pedido..."
-                  : resource.notice ||
-                    resource.error ||
-                    "Cargando cuenta…"}
+                {resource.error ||
+                  resource.notice ||
+                  "Cargando cuenta…"}
               </p>
 
-              {needsConfirmation &&
-                !resource.cancellationIds[
-                  resource.selectedId ?? ""
-                ] && (
-                  <Button
-                    loading={resource.busy}
-                    disabled={resource.uncertain}
-                    onClick={() => void resource.retryConfirmation()}
-                  >
-                    Reintentar confirmación
-                  </Button>
-                )}
-
-              {resource.selectedId &&
-                resource.cancellationIds[resource.selectedId] && (
-                  <Button
-                    disabled={resource.busy}
-                    onClick={() => void resource.verifyCancellation()}
-                  >
-                    Verificar cancelación
-                  </Button>
-                )}
-
-              {resource.error && (
-                <Button
-                  disabled={resource.busy}
-                  onClick={resource.retry}
-                >
-                  Actualizar cuenta
-                </Button>
-              )}
+              <Button
+                variant="secondary"
+                disabled={resource.busy}
+                onClick={resource.retry}
+              >
+                Actualizar cuenta
+              </Button>
             </div>
           )}
+        </BottomSheet>
+      )}
+
+      {leaving && (
+        <BottomSheet
+          id={`${modalId}-leave`}
+          open
+          variant="modal"
+          title={
+            leaving.kind === "location"
+              ? "¿Cambiar de punto de venta?"
+              : "¿Descartar este borrador?"
+          }
+          className="mp-dialog"
+          busy={resource.busy}
+          onClose={() => setLeaving(null)}
+        >
+          <div className="mp-dialog-content">
+            <p>
+              Los cambios locales sin enviar se perderán. Las órdenes
+              guardadas se conservarán.
+            </p>
+
+            <div className="sales-form-actions">
+              <Button
+                variant="secondary"
+                onClick={() => setLeaving(null)}
+              >
+                Continuar editando
+              </Button>
+
+              <Button
+                variant="danger"
+                disabled={resource.busy || resource.uncertain}
+                onClick={() => {
+                  if (leaving.kind === "location") {
+                    locations.select(leaving.id);
+                  } else {
+                    resource.discardLocal();
+                  }
+
+                  setLeaving(null);
+                }}
+              >
+                {leaving.kind === "location"
+                  ? "Descartar y cambiar"
+                  : "Descartar borrador"}
+              </Button>
+            </div>
+          </div>
         </BottomSheet>
       )}
     </section>

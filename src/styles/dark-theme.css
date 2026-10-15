@@ -212,3 +212,27 @@
   color: var(--sazora-heading);
   border-color: var(--sazora-outline);
 }
+:root[data-theme="dark"] {
+  --sazora-warning: oklch(0.8 0.14 75);
+  --sazora-secondary-foreground: oklch(0.94 0.008 250);
+  --sazora-on-danger: oklch(0.98 0.01 88);
+}
+
+/* La barra móvil utiliza la misma superficie de las tarjetas. */
+
+:root[data-theme="dark"] .mobile-bottom-nav {
+  background: color-mix(
+    in srgb,
+    var(--sazora-surface) 95%,
+    transparent
+  );
+  border-top-color: var(--sazora-outline);
+  -webkit-backdrop-filter: blur(20px) saturate(115%);
+  backdrop-filter: blur(20px) saturate(115%);
+}
+
+:root[data-theme="dark"] .mobile-bottom-nav,
+:root[data-theme="dark"] .mobile-menu-grid {
+  --mobile-active-background: var(--sazora-brand);
+  --mobile-active-text: var(--sazora-on-accent);
+}

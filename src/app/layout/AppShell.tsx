@@ -30,6 +30,7 @@ export function AppShell() {
     useBusinessProfile(session);
 
   const isSettings = location.pathname === "/configuracion";
+  const isSales = location.pathname === "/ventas";
   const isPanel = location.pathname === "/panel";
   const isInventory = location.pathname === "/inventario";
   const dashboard = useDashboard(session, isPanel);
@@ -41,11 +42,11 @@ export function AppShell() {
   const access = resolveSessionAccess(session.authorization);
   const pathname = location.pathname.replace(/\/+$/, "") || "/";
 
-  const operatingLocation = access.workspaces.some(
-    (workspace) => workspace.path === pathname
-  )
-    ? access.defaultLocation
-    : null;
+  const operatingLocation =
+    !isSales &&
+    access.workspaces.some((workspace) => workspace.path === pathname)
+      ? access.defaultLocation
+      : null;
 
   const normalizedLocationName =
     operatingLocation?.name
@@ -115,13 +116,15 @@ export function AppShell() {
                   : (current?.label ?? "Acceso")
           }
           subtitle={
-            isSettings
-              ? "Administra la identidad, información fiscal, sedes y operación general."
-              : isInventory
-                ? "Controla existencias, movimientos, consumo por producto y producción."
-                : isPanel && dashboard.data
-                  ? `${businessDate(dashboard.data.period.today)} · ${business.name}`
-                  : business.name
+            isSales
+              ? "Órdenes por punto de venta"
+              : isSettings
+                ? "Administra la identidad, información fiscal, sedes y operación general."
+                : isInventory
+                  ? "Controla existencias, movimientos, consumo por producto y producción."
+                  : isPanel && dashboard.data
+                    ? `${businessDate(dashboard.data.period.today)} · ${business.name}`
+                    : business.name
           }
           session={session}
           business={business}

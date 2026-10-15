@@ -13,7 +13,14 @@ import {
   writeOrder,
 } from "../services/sales.service";
 
-import type { SalesData } from "../services/sales.service";
+import { locationErrorCodes } from "../services/sales.service";
+
+import type {
+  SalesData,
+  SalesScope,
+} from "../services/sales.service";
+
+import { useTimedMessage } from "../../../hooks/useTimedMessage";
 
 import type {
   Draft,
@@ -50,10 +57,18 @@ export type CancellationResult = {
   reason?: string;
 };
 
-const messageOf = (cause: unknown) =>
-  cause instanceof Error
+const messageOf = (cause: unknown) => {
+  if (cause instanceof ApiError && cause.errors.length) {
+    return [
+      cause.message,
+      ...new Set(cause.errors.map((error) => error.message)),
+    ].join(" ");
+  }
+
+  return cause instanceof Error
     ? cause.message
     : "No fue posible completar la operación.";
+};
 
 const isUnknown = (cause: unknown) =>
   !(cause instanceof ApiError) ||
@@ -69,7 +84,11 @@ const confirmationMessages: Record<string, string> = {
     "Uno de los artículos de inventario asociado al pedido no existe o está desactivado.",
 };
 
-export function useSales(token: string) {
+export function useSales(
+  token: string,
+  scope: SalesScope,
+  onLocationLost: (message: string) => void
+) {
   const { session } = useAppShell();
   const { logout } = useAuth();
 
@@ -82,6 +101,7 @@ export function useSales(token: string) {
   const inventoryRefreshRequired = useRef(false);
 
   const ownQuantityChanges = useRef(new Set<string>());
+  const knownOrders = useRef(new Set<string>());
   const [data, setData] = useState<SalesData | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -112,7 +132,9 @@ export function useSales(token: string) {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useTimedMessage(5000);
+  const [accessLost, setAccessLost] = useState(false);
+  const [uncertainAdditions, setUncertainAdditions] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const [needsWriteVerification, setNeedsWriteVerification] =
     useState(false);
@@ -205,7 +227,31 @@ export function useSales(token: string) {
     );
   }
 
+  const reportAccessError = useCallback(
+    (cause: unknown) => {
+      if (!(cause instanceof ApiError)) return false;
+
+      if (
+        cause.status === 401 ||
+        cause.code === "AUTHENTICATION_REQUIRED"
+      ) {
+        logout();
+        return true;
+      }
+
+      if (locationErrorCodes.has(cause.code)) {
+        setAccessLost(true);
+        onLocationLost(cause.message);
+        return true;
+      }
+
+      return false;
+    },
+    [logout, onLocationLost]
+  );
+
   const refresh = useCallback(async () => {
+    if (accessLost) return false;
     reader.current?.abort();
 
     const controller = new AbortController();
@@ -213,7 +259,7 @@ export function useSales(token: string) {
 
     try {
       const [next] = await Promise.all([
-        getSales(token, selected.current, controller.signal),
+        getSales(token, selected.current, controller.signal, scope),
 
         inventoryRefreshRequired.current && canReadInventory
           ? getInventoryItems(token, controller.signal)
@@ -225,6 +271,10 @@ export function useSales(token: string) {
       }
 
       inventoryRefreshRequired.current = false;
+
+      knownOrders.current = new Set(
+        next.orders.map((order) => order.id)
+      );
 
       const detail = next.order;
 
@@ -275,6 +325,7 @@ export function useSales(token: string) {
         forgetOrder(selected.current);
       }
 
+      reportAccessError(cause);
       setError(messageOf(cause));
 
       return false;
@@ -283,7 +334,15 @@ export function useSales(token: string) {
         setLoading(false);
       }
     }
-  }, [token, forgetOrder, canReadInventory]);
+  }, [
+    token,
+    scope,
+    forgetOrder,
+    canReadInventory,
+    accessLost,
+    reportAccessError,
+    setNotice,
+  ]);
 
   useEffect(() => {
     alive.current = true;
@@ -384,7 +443,11 @@ export function useSales(token: string) {
 
       const parsed = quantityCancelledEventSchema.safeParse(raw);
 
-      if (!parsed.success || parsed.data.businessId !== businessId) {
+      if (
+        !parsed.success ||
+        parsed.data.businessId !== businessId ||
+        !knownOrders.current.has(parsed.data.orderId)
+      ) {
         return;
       }
 
@@ -434,7 +497,15 @@ export function useSales(token: string) {
       unsubscribe();
       lease.release();
     };
-  }, [token, businessId, membershipId, userId, refresh, logout]);
+  }, [
+    token,
+    businessId,
+    membershipId,
+    userId,
+    refresh,
+    logout,
+    setNotice,
+  ]);
 
   function closeLocal() {
     const key = currentLocal.current;
@@ -498,7 +569,13 @@ export function useSales(token: string) {
   }
 
   function select(id: string | null) {
-    if (locked.current) return;
+    if (
+      locked.current ||
+      accessLost ||
+      (id && !data?.orders.some((order) => order.id === id))
+    ) {
+      return;
+    }
 
     reader.current?.abort();
     closeLocal();
@@ -518,6 +595,7 @@ export function useSales(token: string) {
       uncertain ||
       error ||
       !data ||
+      accessLost ||
       input.serviceType === "DELIVERY"
     ) {
       return;
@@ -534,12 +612,12 @@ export function useSales(token: string) {
         return select(existing.id);
       }
 
-      if (
-        !data.tables.some(
-          (table) =>
-            table.id === input.restaurantTableId && table.isActive
-        )
-      ) {
+      const available = data.tables.some(
+        (table) =>
+          table.id === input.restaurantTableId && table.isActive
+      );
+
+      if (!available) {
         setNotice("Esta mesa ya no está disponible.");
         return;
       }
@@ -557,6 +635,7 @@ export function useSales(token: string) {
       ...previous,
       [key]: previous[key] ?? {
         ...input,
+        locationId: scope.location.id,
         restaurantTableId:
           input.serviceType === "TABLE"
             ? input.restaurantTableId
@@ -668,7 +747,9 @@ export function useSales(token: string) {
     sendOperation = false,
     recovery?: () => Promise<string>
   ) {
-    if (locked.current || uncertain) return false;
+    if (locked.current || uncertain || accessLost) {
+      return false;
+    }
 
     locked.current = true;
     reader.current?.abort();
@@ -684,6 +765,8 @@ export function useSales(token: string) {
       message = (await work()) ?? success;
       ok = true;
     } catch (cause) {
+      reportAccessError(cause);
+
       if (
         recovery &&
         !(cause instanceof RecoveryError) &&
@@ -725,12 +808,14 @@ export function useSales(token: string) {
 
   async function readOrder(id: string) {
     try {
-      const order = await getOrder(token, id);
+      const order = await getOrder(token, id, scope);
 
       acceptOrder(order);
 
       return order;
     } catch (cause) {
+      reportAccessError(cause);
+
       if (
         cause instanceof ApiError &&
         cause.code === "ORDER_NOT_FOUND"
@@ -1002,8 +1087,55 @@ export function useSales(token: string) {
 
     const order = data?.order;
 
-    if (!order || order.id !== id) {
+    if (
+      !order ||
+      order.id !== id ||
+      order.locationId !== scope.location.id
+    ) {
       return Promise.resolve(false);
+    }
+
+    if (
+      path.startsWith("/orders/") &&
+      path !== `/orders/${id}` &&
+      !path.startsWith(`/orders/${id}/`)
+    ) {
+      return Promise.resolve(false);
+    }
+
+    if (
+      (method === "PATCH" || method === "DELETE") &&
+      path.startsWith("/orders/") &&
+      order.status !== "OPEN"
+    ) {
+      return Promise.resolve(false);
+    }
+
+    if (body && typeof body === "object" && "locationId" in body) {
+      return Promise.resolve(false);
+    }
+
+    if (
+      path === `/orders/${id}` &&
+      body &&
+      typeof body === "object" &&
+      "restaurantTableId" in body
+    ) {
+      const tableId = body.restaurantTableId;
+
+      const allowedTable = data.tables.some(
+        (table) =>
+          table.id === tableId &&
+          table.isActive &&
+          !data.orders.some(
+            (other) =>
+              other.id !== id && other.restaurantTableId === tableId
+          )
+      );
+
+      if (tableId !== order.restaurantTableId && !allowedTable) {
+        return Promise.resolve(false);
+      }
     }
 
     const closing =
@@ -1173,7 +1305,7 @@ export function useSales(token: string) {
       order.status !== "CONFIRMED" ||
       item?.status !== "ACTIVE" ||
       !preparation ||
-      !["PENDING", "IN_PREPARATION", "READY"].includes(
+      !["PENDING", "PREPARING", "IN_PREPARATION", "READY"].includes(
         preparation.preparationStatus
       )
     ) {
@@ -1341,7 +1473,7 @@ export function useSales(token: string) {
   }
 
   async function send() {
-    if (locked.current || uncertain || error || !data) {
+    if (locked.current || uncertain || error || !data || accessLost) {
       return false;
     }
 
@@ -1382,7 +1514,6 @@ export function useSales(token: string) {
         !order.items.some((item) => item.status === "ACTIVE"))
     ) {
       setNotice("Agrega al menos un producto antes de enviar.");
-
       return false;
     }
 
@@ -1411,6 +1542,7 @@ export function useSales(token: string) {
 
           try {
             id = await createOrder(token, {
+              locationId: local.locationId,
               serviceType: local.serviceType,
               restaurantTableId: local.restaurantTableId,
               customerCount: local.customerCount,
@@ -1418,6 +1550,53 @@ export function useSales(token: string) {
               items,
             });
           } catch (cause) {
+            reportAccessError(cause);
+
+            if (
+              cause instanceof ApiError &&
+              cause.code === "RESTAURANT_TABLE_OCCUPIED" &&
+              local.restaurantTableId
+            ) {
+              const snapshot = await getSales(
+                token,
+                null,
+                new AbortController().signal,
+                scope
+              );
+
+              if (!alive.current) return;
+
+              setData(snapshot);
+
+              const existing = snapshot.orders.find(
+                (entry) =>
+                  entry.restaurantTableId === local.restaurantTableId
+              );
+
+              if (existing) {
+                setDrafts((previous) => ({
+                  ...previous,
+                  [existing.id]: draft,
+                }));
+
+                setLocalDrafts((previous) => {
+                  const next = { ...previous };
+                  delete next[key];
+                  return next;
+                });
+
+                currentLocal.current = null;
+                setLocalKey(null);
+
+                selected.current = existing.id;
+                setSelectedId(existing.id);
+
+                throw new RecoveryError(
+                  "La mesa ya tiene una cuenta. La abrimos y conservamos tus productos como adiciones por revisar."
+                );
+              }
+            }
+
             if (isUnknown(cause)) {
               setUncertain(true);
 
@@ -1431,6 +1610,8 @@ export function useSales(token: string) {
                 " El borrador continúa guardado en esta pantalla. Revisa la información e inténtalo nuevamente."
             );
           }
+
+          if (!alive.current) return;
 
           selected.current = id;
           currentLocal.current = null;
@@ -1474,6 +1655,7 @@ export function useSales(token: string) {
 
             if (isUnknown(cause)) {
               uncertainBatch.current = order.id;
+              setUncertainAdditions(true);
             }
 
             throw cause;
@@ -1496,7 +1678,7 @@ export function useSales(token: string) {
     );
   }
 
-  async function reconcile() {
+  async function reconcile(additions?: "applied" | "not-applied") {
     if (locked.current) return;
 
     locked.current = true;
@@ -1529,7 +1711,14 @@ export function useSales(token: string) {
       if (alive.current && ok) {
         const id = uncertainBatch.current;
 
-        if (id) {
+        if (id && !additions) {
+          setNotice(
+            "Revisa los productos guardados y decide si las adiciones ya aparecen. No se enviará nada automáticamente."
+          );
+          return;
+        }
+
+        if (id && additions === "applied") {
           setDrafts((previous) => ({
             ...previous,
             [id]: {},
@@ -1537,8 +1726,7 @@ export function useSales(token: string) {
         }
 
         uncertainBatch.current = null;
-
-        // La creación sin ID sigue requiriendo revisión manual.
+        setUncertainAdditions(false);
         setUncertain(false);
 
         setNotice(
@@ -1556,6 +1744,15 @@ export function useSales(token: string) {
 
   return {
     data,
+    accessLost,
+    uncertainAdditions,
+    hasPending:
+      Object.values(localDrafts).some(
+        (draft) => Object.keys(draft.items).length > 0
+      ) ||
+      Object.values(drafts).some(
+        (draft) => Object.keys(draft).length > 0
+      ),
     selectedId,
     drafts,
     localDraft: localKey ? localDrafts[localKey] : null,

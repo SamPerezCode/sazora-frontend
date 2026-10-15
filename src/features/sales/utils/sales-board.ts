@@ -1,4 +1,4 @@
-import type { RestaurantTable } from "../../restaurant-tables/schemas/restaurant-table.schema";
+import type { SalesTable as RestaurantTable } from "../services/sales.service";
 
 import type { Order, OrderSummary } from "../schemas/sales.schema";
 

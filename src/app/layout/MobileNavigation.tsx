@@ -30,7 +30,7 @@ const shortcuts = [
 
 const shortLabels: Record<string, string> = {
   panel: "Panel",
-  sales: "Ventas",
+  sales: "Mesas",
   deliveries: "Domicilios",
   "public-orders": "Pedidos",
   settings: "Ajustes",

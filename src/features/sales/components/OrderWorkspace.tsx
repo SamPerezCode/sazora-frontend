@@ -15,6 +15,8 @@ import {
 import { Button } from "../../../components/ui/Button";
 import { Avatar } from "../../../components/ui/Avatar";
 
+import { BottomSheet } from "../../../components/layout/BottomSheet";
+
 import { resolveFileUrl } from "../../../lib/files";
 
 import { OrderDetailsForm } from "./OrderDetailsForm";
@@ -31,6 +33,7 @@ import { CancelUnitsDialog } from "./CancelUnitsDialog";
 const PREPARATION_LABELS = {
   PENDING: "Pendiente",
   IN_PREPARATION: "En preparación",
+  PREPARING: "En preparación",
   READY: "Listo para entregar",
   DELIVERED: "Entregado",
   CANCELLED: "Cancelado",
@@ -42,7 +45,16 @@ export function OrderWorkspace({
   data,
 }: {
   resource: SalesResource;
-  order: Omit<Order, "id" | "openedByMembershipId"> & {
+  order: Pick<
+    Order,
+    | "serviceType"
+    | "restaurantTableId"
+    | "customerCount"
+    | "notes"
+    | "status"
+    | "subtotal"
+    | "items"
+  > & {
     id: string | null;
   };
   data: SalesData;
@@ -77,6 +89,7 @@ export function OrderWorkspace({
 
   const blocked =
     resource.busy ||
+    resource.accessLost ||
     resource.uncertain ||
     !!resource.error ||
     needsConfirmation ||
@@ -213,6 +226,67 @@ export function OrderWorkspace({
 
   return (
     <div className="sales-order-body">
+      {showDetails && editable && (
+        <BottomSheet
+          id={`${accountId}-details`}
+          open
+          variant="modal"
+          title="Datos de la cuenta"
+          className="mp-dialog"
+          busy={resource.busy}
+          onClose={() => setShowDetails(false)}
+        >
+          <div className="sales-details">
+            <p>
+              {data.location.name} · {data.location.code}
+            </p>
+
+            <OrderDetailsForm
+              initial={order}
+              tables={
+                order.id
+                  ? freeTables
+                  : freeTables.filter(
+                      (table) => table.id === order.restaurantTableId
+                    )
+              }
+              busy={blocked}
+              onCancel={() => setShowDetails(false)}
+              onSave={async (input) => {
+                const ok = order.id
+                  ? await resource.action(
+                      `/orders/${order.id}`,
+                      "PATCH",
+                      input
+                    )
+                  : resource.updateLocal(input);
+
+                if (ok) {
+                  setShowDetails(false);
+                }
+
+                return ok;
+              }}
+            />
+          </div>
+        </BottomSheet>
+      )}
+
+      {data.ticketsError && (
+        <div className="mp-warning" role="alert">
+          {data.ticketsError}
+
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={resource.busy}
+            onClick={resource.retry}
+          >
+            Actualizar cuenta
+          </Button>
+        </div>
+      )}
+
       {partialItemId && order.id && (
         <CancelUnitsDialog
           key={partialItemId}
@@ -335,6 +409,30 @@ export function OrderWorkspace({
                   ? "Verificar operación"
                   : "Ya revisé las cuentas: habilitar acciones"}
               </Button>
+
+              {resource.uncertainAdditions && (
+                <div className="sales-form-actions">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={resource.busy}
+                    onClick={() => void resource.reconcile("applied")}
+                  >
+                    Ya aparecen guardadas: descartar copia local
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={resource.busy}
+                    onClick={() =>
+                      void resource.reconcile("not-applied")
+                    }
+                  >
+                    Verifiqué que faltan: conservar para reintentar
+                  </Button>
+                </div>
+              )}
             </>
           ) : (
             resource.error && (
@@ -357,148 +455,110 @@ export function OrderWorkspace({
         data-readonly={!canAdd}
       >
         <section className="sales-catalog" aria-label="Catálogo">
-          {showDetails && editable ? (
-            <div className="sales-details">
-              <OrderDetailsForm
-                initial={order}
-                tables={
-                  order.id
-                    ? freeTables
-                    : freeTables.filter(
-                        (table) =>
-                          table.id === order.restaurantTableId
-                      )
-                }
-                busy={blocked}
-                onCancel={() => setShowDetails(false)}
-                onSave={async (input) => {
-                  const ok = order.id
-                    ? await resource.action(
-                        `/orders/${order.id}`,
-                        "PATCH",
-                        input
-                      )
-                    : resource.updateLocal(input);
+          <div className="sales-catalog-tools">
+            <label className="sales-search" htmlFor={searchId}>
+              <Search size={17} aria-hidden="true" />
 
-                  if (ok) {
-                    setShowDetails(false);
-                  }
+              <span className="sr-only">Buscar plato o bebida</span>
 
-                  return ok;
-                }}
+              <input
+                id={searchId}
+                type="search"
+                placeholder="Buscar plato o bebida"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
               />
-            </div>
-          ) : (
-            <>
-              <div className="sales-catalog-tools">
-                <label className="sales-search" htmlFor={searchId}>
-                  <Search size={17} aria-hidden="true" />
+            </label>
 
-                  <span className="sr-only">
-                    Buscar plato o bebida
-                  </span>
+            <div
+              className="sales-chips"
+              aria-label="Filtrar por categoría"
+            >
+              <button
+                type="button"
+                aria-pressed={!category}
+                onClick={() => setCategory("")}
+              >
+                Todo
+              </button>
 
-                  <input
-                    id={searchId}
-                    type="search"
-                    placeholder="Buscar plato o bebida"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
-                </label>
-
-                <div
-                  className="sales-chips"
-                  aria-label="Filtrar por categoría"
+              {categories.map(([id, name]) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={category === id}
+                  onClick={() => setCategory(id)}
                 >
-                  <button
-                    type="button"
-                    aria-pressed={!category}
-                    onClick={() => setCategory("")}
-                  >
-                    Todo
-                  </button>
+                  {name}
+                </button>
+              ))}
+            </div>
+          </div>
 
-                  {categories.map(([id, name]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      aria-pressed={category === id}
-                      onClick={() => setCategory(id)}
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              </div>
+          <div className="sales-product-grid">
+            {!products.length && (
+              <p className="sales-muted">
+                No hay productos disponibles con ese filtro.
+              </p>
+            )}
 
-              <div className="sales-product-grid">
-                {!products.length && (
-                  <p className="sales-muted">
-                    No hay productos disponibles con ese filtro.
-                  </p>
-                )}
+            {products.map((product) => (
+              <article key={product.id} className="sales-product">
+                <Avatar
+                  name={product.name}
+                  src={resolveFileUrl(product.imageUrl)}
+                  size="md"
+                />
 
-                {products.map((product) => (
-                  <article key={product.id} className="sales-product">
-                    <Avatar
-                      name={product.name}
-                      src={resolveFileUrl(product.imageUrl)}
-                      size="md"
-                    />
+                <div className="sales-product-content">
+                  <h3>{product.name}</h3>
+                  <p>{product.description}</p>
 
-                    <div className="sales-product-content">
-                      <h3>{product.name}</h3>
+                  <div className="sales-product-bottom">
+                    <strong>
+                      {money(cents(product.currentPrice))}
+                    </strong>
 
-                      <p>{product.description}</p>
-
-                      <div className="sales-product-bottom">
-                        <strong>
-                          {money(cents(product.currentPrice))}
-                        </strong>
-
-                        {canAdd && (
-                          <div className="sales-quantity">
-                            {!!draft[product.id] && (
-                              <>
-                                <button
-                                  type="button"
-                                  className="sales-icon"
-                                  disabled={blocked}
-                                  aria-label={`Quitar uno de ${product.name} del borrador`}
-                                  onClick={() =>
-                                    changeQuantity(product.id, -1)
-                                  }
-                                >
-                                  <Minus size={15} />
-                                </button>
-
-                                <span aria-label="Cantidad por enviar">
-                                  {draft[product.id].quantity}
-                                </span>
-                              </>
-                            )}
-
+                    {canAdd && (
+                      <div className="sales-quantity">
+                        {!!draft[product.id] && (
+                          <>
                             <button
                               type="button"
-                              className="sales-icon sales-add"
+                              className="sales-icon"
                               disabled={blocked}
-                              aria-label={`Agregar ${product.name}`}
+                              aria-label={`Quitar uno de ${product.name} del borrador`}
                               onClick={() =>
-                                changeQuantity(product.id, 1)
+                                changeQuantity(product.id, -1)
                               }
                             >
-                              <Plus size={17} />
+                              <Minus size={15} />
                             </button>
-                          </div>
+
+                            <span aria-label="Cantidad por enviar">
+                              {draft[product.id].quantity}
+                            </span>
+                          </>
                         )}
+
+                        <button
+                          type="button"
+                          className="sales-icon sales-add"
+                          disabled={blocked}
+                          aria-label={`Agregar ${product.name}`}
+                          onClick={() =>
+                            changeQuantity(product.id, 1)
+                          }
+                        >
+                          <Plus size={17} />
+                        </button>
                       </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </>
-          )}
+                    )}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
 
         <aside
@@ -515,7 +575,8 @@ export function OrderWorkspace({
 
             <span>
               {items.reduce((sum, item) => sum + item.quantity, 0) +
-                pendingCount}
+                pendingCount}{" "}
+              unidades
             </span>
           </h3>
 
@@ -558,9 +619,11 @@ export function OrderWorkspace({
             )}
 
             {!items.length && !pendingCount && (
-              <p className="sales-muted">
-                Agrega productos para comenzar la cuenta.
-              </p>
+              <div className="mp-empty">
+                <ShoppingBag size={28} />
+                <strong>La cuenta está vacía</strong>
+                <p>Agrega productos para comenzar.</p>
+              </div>
             )}
 
             {order.status === "CONFIRMED" && items.length > 0 && (
@@ -583,14 +646,11 @@ export function OrderWorkspace({
                   {item.notes && <p>{item.notes}</p>}
 
                   <span className="sales-line-status">
-                    {editable
+                    {order.status === "OPEN"
                       ? "Sin enviar"
                       : ticket
                         ? PREPARATION_LABELS[ticket.preparationStatus]
-                        : order.status === "DELIVERED" ||
-                            order.status === "CLOSED"
-                          ? "Entregado"
-                          : "Sin comanda activa"}
+                        : "Preparación no disponible"}
                   </span>
 
                   <div className="sales-line-actions">
@@ -631,9 +691,12 @@ export function OrderWorkspace({
                     {order.status === "CONFIRMED" &&
                       item.status === "ACTIVE" &&
                       ticket &&
-                      ["PENDING", "IN_PREPARATION", "READY"].includes(
-                        ticket.preparationStatus
-                      ) && (
+                      [
+                        "PENDING",
+                        "PREPARING",
+                        "IN_PREPARATION",
+                        "READY",
+                      ].includes(ticket.preparationStatus) && (
                         <>
                           {item.quantity > 1 && (
                             <button
@@ -687,26 +750,42 @@ export function OrderWorkspace({
                   </div>
 
                   {editing === item.id && canAdd && (
-                    <ItemEditor
-                      key={`${item.id}:${order.status}`}
-                      item={item}
-                      cancel={!editable}
-                      busy={blocked}
+                    <BottomSheet
+                      id={`${accountId}-item`}
+                      open
+                      variant="modal"
+                      title={
+                        editable
+                          ? "Editar producto"
+                          : "Cancelar producto"
+                      }
+                      className="mp-dialog"
+                      busy={resource.busy}
                       onClose={() => setEditing(null)}
-                      onSave={async (body) => {
-                        const ok = await resource.action(
-                          `/orders/${order.id}/items/${item.id}${
-                            editable ? "" : "/cancel"
-                          }`,
-                          editable ? "PATCH" : "POST",
-                          body
-                        );
+                    >
+                      <div className="mp-dialog-content">
+                        <ItemEditor
+                          key={`${item.id}:${order.status}`}
+                          item={item}
+                          cancel={!editable}
+                          busy={blocked}
+                          onClose={() => setEditing(null)}
+                          onSave={async (body) => {
+                            const ok = await resource.action(
+                              `/orders/${order.id}/items/${item.id}${
+                                editable ? "" : "/cancel"
+                              }`,
+                              editable ? "PATCH" : "POST",
+                              body
+                            );
 
-                        if (ok) {
-                          setEditing(null);
-                        }
-                      }}
-                    />
+                            if (ok) {
+                              setEditing(null);
+                            }
+                          }}
+                        />
+                      </div>
+                    </BottomSheet>
                   )}
                 </article>
               );
@@ -894,6 +973,7 @@ export function OrderWorkspace({
               onClick={() => setShowAccount(!showAccount)}
             >
               <ShoppingBag size={19} />
+              <span>{showAccount ? "Productos" : "Cuenta"}</span>
             </button>
           </div>
 
@@ -943,10 +1023,17 @@ function ItemEditor({
       onSubmit={(event) => {
         event.preventDefault();
 
-        if (busy || (cancel && reason.trim().length < 3)) {
+        if (
+          busy ||
+          (cancel &&
+            (reason.trim().length < 3 ||
+              reason.trim().length > 500)) ||
+          (!cancel &&
+            (!Number.isSafeInteger(Number(quantity)) ||
+              Number(quantity) < 1))
+        ) {
           return;
         }
-
         void onSave(
           cancel
             ? { reason: reason.trim() }

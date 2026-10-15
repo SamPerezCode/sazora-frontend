@@ -17,8 +17,19 @@ export const serviceTypeSchema = z.enum([
   "DELIVERY",
 ]);
 
+export const orderLocationSchema = z.object({
+  id,
+  code: z.string(),
+  name: z.string(),
+  locationType: z.enum(["POINT_OF_SALE", "PRODUCTION_WAREHOUSE"]),
+  isActive: z.boolean(),
+});
+
 const orderBase = z.object({
   id,
+  locationId: id,
+  businessId: id.optional(),
+  createdAt: z.iso.datetime({ offset: true }),
   restaurantTableId: id.nullable(),
   openedByMembershipId: id,
   serviceType: serviceTypeSchema,
@@ -41,6 +52,10 @@ export const orderItemSchema = z.object({
 });
 
 export const orderSchema = orderBase.extend({
+  businessId: id,
+  location: orderLocationSchema,
+  closedAt: z.iso.datetime({ offset: true }).nullable().optional(),
+  cancelledAt: z.iso.datetime({ offset: true }).nullable().optional(),
   items: z.array(orderItemSchema),
 });
 
@@ -85,6 +100,7 @@ export const ticketsResponseSchema = z.object({
             preparationStatus: z.enum([
               "PENDING",
               "IN_PREPARATION",
+              "PREPARING",
               "READY",
               "DELIVERED",
               "CANCELLED",
@@ -134,10 +150,12 @@ export type Draft = Record<
 >;
 
 export type LocalOrderDraft = OrderInput & {
+  locationId: string;
   items: Draft;
 };
 
 export type CreateOrderInput = OrderInput & {
+  locationId: string;
   items: {
     productId: string;
     quantity: number;
@@ -178,6 +196,7 @@ export function money(value: bigint): string {
 const preparationStatusSchema = z.enum([
   "PENDING",
   "IN_PREPARATION",
+  "PREPARING",
   "READY",
   "DELIVERED",
   "CANCELLED",

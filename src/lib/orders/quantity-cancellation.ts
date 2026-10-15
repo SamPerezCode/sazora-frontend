@@ -5,6 +5,7 @@ const id = z.string().regex(/^[1-9]\d*$/);
 const activePreparation = z.enum([
   "PENDING",
   "IN_PREPARATION",
+  "PREPARING",
   "READY",
 ]);
 

@@ -99,7 +99,10 @@ export async function request<T>(
       signal,
     });
 
-    payload = await response.json().catch(() => null);
+    payload =
+      response.status === 204
+        ? null
+        : await response.json().catch(() => null);
   } catch (error: unknown) {
     if (options.signal?.aborted) {
       throw error;

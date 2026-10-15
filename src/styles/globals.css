@@ -20,6 +20,7 @@
 @import "../features/inventory/production.css";
 @import "../features/employees/employees.css";
 @import "./dark-theme.css";
+@import "../components/ui/css/controls.css";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
@@ -110,10 +111,13 @@
 }
 
 :root[data-theme="dark"] {
-  --sazora-action-danger: #f09089;
-  --sazora-action-danger-hover: rgb(240 144 137 / 10%);
+  --sazora-action-danger: var(--sazora-danger);
+  --sazora-action-danger-hover: color-mix(
+    in srgb,
+    var(--sazora-danger) 10%,
+    transparent
+  );
 }
-
 /* Cierre de modales y avisos. */
 
 :root button:is(.bottom-sheet-close, .app-close-button) {

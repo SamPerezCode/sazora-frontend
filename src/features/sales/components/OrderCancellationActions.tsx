@@ -81,7 +81,7 @@ export function OrderCancellationActions({
           size="sm"
           variant="danger"
           disabled={disabled}
-          onClick={resource.discardLocal}
+          onClick={() => setMode("discard")}
         >
           <Trash2 size={16} aria-hidden="true" />
           Descartar borrador

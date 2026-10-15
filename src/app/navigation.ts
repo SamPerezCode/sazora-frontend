@@ -52,7 +52,7 @@ const navigation: readonly NavigationItem[] = [
   },
   {
     id: "sales",
-    label: "Ventas / Meseros",
+    label: "Mesas y pedidos",
     description: "Atención de mesas y gestión de órdenes.",
     icon: ChefHat,
     roles: ["ADMIN", "WAITER"],

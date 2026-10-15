@@ -1,0 +1,252 @@
+@layer base {
+  :root {
+    /* Botones */
+    --button-radius: 0.75rem;
+    --button-gap: 0.5rem;
+    --button-weight: 600;
+
+    --button-primary-background: var(--sazora-accent);
+    --button-primary-foreground: var(--sazora-on-accent);
+    --button-primary-hover: color-mix(
+      in srgb,
+      var(--button-primary-background) 92%,
+      black
+    );
+
+    --button-secondary-background: var(--sazora-surface);
+    --button-secondary-foreground: var(--sazora-heading);
+    --button-secondary-border: var(--sazora-outline);
+
+    --button-soft-background: var(--sazora-secondary);
+    --button-soft-foreground: var(--sazora-heading);
+    --button-soft-hover: color-mix(
+      in srgb,
+      var(--sazora-secondary) 88%,
+      var(--sazora-heading)
+    );
+
+    --button-shadow:
+      0 1px 2px rgb(20 32 51 / 9%), 0 2px 4px rgb(20 32 51 / 5%);
+
+    --button-focus: var(--sazora-ring, var(--sazora-accent));
+
+    /* Campos */
+    --control-radius: 0.75rem;
+    --control-border: #7a889e;
+
+    /* Tablas */
+    --table-background: var(--sazora-surface);
+    --table-heading-background: #eaf0f7;
+    --table-foreground: var(--sazora-heading);
+    --table-muted: var(--sazora-muted);
+    --table-border: var(--sazora-outline);
+    --table-row-hover: var(--sazora-subtle);
+    --table-radius: 0.85rem;
+    --table-cell-x: 1rem;
+    --table-cell-y: 0.95rem;
+    --table-font-size: 0.875rem;
+    --table-heading-size: 0.6875rem;
+  }
+
+  :root[data-theme="dark"] {
+    --button-shadow:
+      0 1px 2px rgb(0 0 0 / 12%), inset 0 1px 0 rgb(255 255 255 / 3%);
+
+    --control-border: oklch(0.62 0.035 260 / 90%);
+    --table-heading-background: var(--sazora-popover);
+  }
+}
+
+@layer components {
+  .ui-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    gap: var(--button-gap);
+    min-width: 0;
+    border: 1px solid transparent;
+    border-radius: var(--button-radius, 0.75rem);
+    font-family: inherit;
+    font-size: var(--button-font-size, 0.875rem);
+    font-weight: var(--button-weight, 600);
+    line-height: 1.25;
+    text-align: center;
+    cursor: pointer;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .ui-button > svg {
+    flex-shrink: 0;
+  }
+
+  .ui-button[data-variant="primary"] {
+    background: var(--button-primary-background);
+    color: var(--button-primary-foreground);
+    box-shadow: var(--button-shadow);
+  }
+
+  .ui-button[data-variant="secondary"] {
+    border-color: var(--button-secondary-border);
+    background: var(--button-secondary-background);
+    color: var(--button-secondary-foreground);
+  }
+
+  .ui-button[data-variant="soft"] {
+    background: var(--button-soft-background);
+    color: var(--button-soft-foreground);
+    box-shadow: var(--button-shadow);
+  }
+
+  .ui-button[data-variant="cancel"],
+  .ui-button[data-variant="danger"] {
+    border-color: var(--sazora-action-danger);
+    background: transparent;
+    color: var(--sazora-action-danger);
+    box-shadow: none;
+  }
+
+  .ui-button[data-size="md"] {
+    min-height: var(--form-control-height, 2.75rem);
+    padding: 0.65rem 1.25rem;
+  }
+
+  .ui-button[data-size="sm"] {
+    min-height: 2.5rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .ui-button[data-size="compact"] {
+    min-height: 2.25rem;
+    padding: 0.5rem 0.9rem;
+  }
+
+  .ui-button[data-size="icon"] {
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+  }
+
+  .ui-button:focus-visible {
+    outline: 2px solid var(--button-focus);
+    outline-offset: 3px;
+  }
+
+  .ui-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  @media (hover: hover) {
+    .ui-button[data-variant="primary"]:enabled:hover {
+      background: var(--button-primary-hover);
+    }
+
+    .ui-button[data-variant="secondary"]:enabled:hover {
+      background: var(--sazora-secondary);
+    }
+
+    .ui-button[data-variant="soft"]:enabled:hover {
+      background: var(--button-soft-hover);
+    }
+
+    .ui-button[data-variant="cancel"]:enabled:hover,
+    .ui-button[data-variant="danger"]:enabled:hover {
+      background: var(--sazora-action-danger-hover);
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .ui-button[data-size="md"] {
+      min-height: var(--form-control-height, 3.5rem);
+    }
+  }
+
+  @media (max-width: 47.999rem), (pointer: coarse) {
+    .ui-button[data-size="compact"],
+    .ui-button[data-size="sm"] {
+      min-height: 2.75rem;
+    }
+
+    .ui-button[data-size="icon"] {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ui-button {
+      transition: none;
+    }
+  }
+
+  /* Filtro compartido: botones en desktop, select en móvil. */
+
+  .responsive-filter {
+    min-width: 0;
+  }
+
+  .responsive-filter-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .responsive-filter-select {
+    display: none;
+  }
+
+  @media (max-width: 47.999rem) {
+    .responsive-filter-tabs {
+      display: none;
+    }
+
+    .responsive-filter-select {
+      display: block;
+    }
+  }
+}
+
+/* Tabla reutilizable. Se activa añadiendo ui-data-table. */
+
+table.ui-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--table-background);
+  color: var(--table-foreground);
+  font-size: var(--table-font-size);
+}
+
+table.ui-data-table :is(th, td) {
+  padding: var(--table-cell-y) var(--table-cell-x);
+  border-bottom: 1px solid var(--table-border);
+  vertical-align: middle;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+table.ui-data-table thead th {
+  background: var(--table-heading-background);
+  color: var(--table-muted);
+  font-size: var(--table-heading-size);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.015em;
+}
+
+table.ui-data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+table.ui-data-table tbody tr:focus-within {
+  background: var(--table-row-hover);
+}
+
+@media (hover: hover) {
+  table.ui-data-table tbody tr:hover {
+    background: var(--table-row-hover);
+  }
+}

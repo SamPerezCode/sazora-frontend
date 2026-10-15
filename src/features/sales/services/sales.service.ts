@@ -1,11 +1,9 @@
 import { z } from "zod";
 
 import { ApiError, request } from "../../../lib/http/client";
-
-import { isOperationalOrder } from "../utils/sales-board";
-
 import { productListSchema } from "../../products/schemas/product.schema";
 import { tableListResponseSchema } from "../../restaurant-tables/schemas/restaurant-table.schema";
+import type { RestaurantTable } from "../../restaurant-tables/schemas/restaurant-table.schema";
 
 import {
   cancelQuantityInputSchema,
@@ -25,77 +23,257 @@ import {
 import type {
   CreateOrderInput,
   OrderSummary,
+  Order,
 } from "../schemas/sales.schema";
 
-export async function getActiveOrders(
+import { isOperationalOrder } from "../utils/sales-board";
+
+export interface SalesLocation {
+  id: string;
+  name: string;
+  code: string;
+}
+
+export interface SalesScope {
+  businessId: string;
+  location: SalesLocation;
+}
+
+export type SalesTable = Pick<
+  RestaurantTable,
+  "id" | "name" | "code" | "capacity" | "isActive"
+> & {
+  continuityOnly?: boolean;
+};
+
+export const locationErrorCodes = new Set([
+  "LOCATION_ACCESS_DENIED",
+  "DEFAULT_LOCATION_REQUIRED",
+  "ORDER_LOCATION_REQUIRED",
+  "ORDER_LOCATION_NOT_AVAILABLE",
+  "LOCATION_NOT_POINT_OF_SALE",
+  "LOCATION_NOT_FOUND",
+]);
+
+export function assertOrderScope<
+  T extends {
+    locationId: string;
+    businessId?: string;
+  },
+>(order: T, scope: SalesScope): T {
+  if (
+    order.locationId !== scope.location.id ||
+    (order.businessId && order.businessId !== scope.businessId)
+  ) {
+    throw new ApiError(
+      403,
+      "LOCATION_ACCESS_DENIED",
+      "La orden no pertenece al punto de venta seleccionado."
+    );
+  }
+
+  return order;
+}
+
+function readOptions(token: string, signal?: AbortSignal) {
+  return {
+    accessToken: token,
+    signal,
+    cache: "no-store" as const,
+  };
+}
+
+export async function getOrdersPage(
   token: string,
+  scope: SalesScope,
+  status: Order["status"],
+  page: number,
+  signal: AbortSignal
+) {
+  const query = new URLSearchParams({
+    locationId: scope.location.id,
+    status,
+    page: String(page),
+    pageSize: "100",
+  });
+
+  const response = await request(
+    `/orders?${query}`,
+    ordersResponseSchema,
+    readOptions(token, signal)
+  );
+
+  response.data.orders.forEach((order) => {
+    assertOrderScope(order, scope);
+  });
+
+  return response.data;
+}
+
+export async function getOrdersForStatuses(
+  token: string,
+  scope: SalesScope,
+  statuses: readonly Order["status"][],
   signal: AbortSignal
 ) {
   const groups = await Promise.all(
-    (["OPEN", "CONFIRMED", "DELIVERED"] as const).map(
-      async (status) => {
-        const result: OrderSummary[] = [];
+    statuses.map(async (status) => {
+      const rows: OrderSummary[] = [];
 
-        let page = 1;
-        let totalPages: number;
+      let page = 1;
+      let totalPages: number;
 
-        do {
-          const response = await request(
-            `/orders?status=${status}&page=${page}&pageSize=100`,
-            ordersResponseSchema,
-            {
-              accessToken: token,
-              signal,
-            }
-          );
+      do {
+        signal.throwIfAborted();
 
-          result.push(...response.data.orders);
+        const data = await getOrdersPage(
+          token,
+          scope,
+          status,
+          page,
+          signal
+        );
 
-          totalPages = response.data.pagination.totalPages;
-          page++;
-        } while (page <= totalPages);
+        rows.push(
+          ...data.orders.filter((order) => order.status === status)
+        );
 
-        return result;
-      }
-    )
+        totalPages = data.pagination.totalPages;
+        page++;
+      } while (page <= totalPages);
+
+      return rows;
+    })
   );
 
   return [
     ...new Map(
       groups.flat().map((order) => [order.id, order])
     ).values(),
-  ].filter(isOperationalOrder);
+  ];
+}
+
+export async function getActiveOrders(
+  token: string,
+  signal: AbortSignal,
+  scope: SalesScope
+) {
+  const orders = await getOrdersForStatuses(
+    token,
+    scope,
+    ["OPEN", "CONFIRMED", "DELIVERED"],
+    signal
+  );
+
+  return orders.filter(isOperationalOrder);
+}
+
+export function mergeOperationalTables(
+  active: RestaurantTable[],
+  orders: OrderSummary[]
+): SalesTable[] {
+  const tables = new Map<string, SalesTable>(
+    active.map((table) => [table.id, table])
+  );
+
+  for (const order of orders) {
+    if (
+      order.serviceType !== "TABLE" ||
+      !order.restaurantTableId ||
+      tables.has(order.restaurantTableId)
+    ) {
+      continue;
+    }
+
+    tables.set(order.restaurantTableId, {
+      id: order.restaurantTableId,
+      name: order.restaurantTableName ?? "Mesa de la cuenta",
+      code: order.restaurantTableCode ?? "",
+      capacity: null,
+      isActive: false,
+      continuityOnly: true,
+    });
+  }
+
+  return [...tables.values()];
 }
 
 export async function getSales(
   token: string,
   orderId: string | null,
-  signal: AbortSignal
+  signal: AbortSignal,
+  scope: SalesScope
 ) {
-  const options = {
-    accessToken: token,
-    signal,
-  };
+  const query = new URLSearchParams({
+    locationId: scope.location.id,
+    activeOnly: "true",
+  });
 
-  const [tables, products, orders, tickets, detail] =
-    await Promise.all([
-      request("/restaurant-tables", tableListResponseSchema, options),
-      request("/products", productListSchema, options),
-      getActiveOrders(token, signal),
-      request("/kitchen-tickets", ticketsResponseSchema, options),
-      orderId
-        ? request(`/orders/${orderId}`, orderResponseSchema, options)
-        : null,
-    ]);
+  const [tables, products, orders, order] = await Promise.all([
+    request(
+      `/restaurant-tables?${query}`,
+      tableListResponseSchema,
+      readOptions(token, signal)
+    ),
+    request(
+      "/products",
+      productListSchema,
+      readOptions(token, signal)
+    ),
+    getActiveOrders(token, signal, scope),
+    orderId ? getOrder(token, orderId, scope, signal) : null,
+  ]);
+
+  tables.data.restaurantTables.forEach((table) => {
+    assertOrderScope(table, scope);
+  });
+
+  let tickets: z.infer<
+    typeof ticketsResponseSchema
+  >["data"]["kitchenTickets"] = [];
+
+  let ticketsError = "";
+
+  if (order && order.status !== "OPEN" && isOperationalOrder(order)) {
+    try {
+      const response = await request(
+        "/kitchen-tickets",
+        ticketsResponseSchema,
+        readOptions(token, signal)
+      );
+
+      tickets = response.data.kitchenTickets.filter(
+        (ticket) => ticket.orderId === order.id
+      );
+    } catch (cause) {
+      if (
+        signal.aborted ||
+        (cause instanceof ApiError &&
+          (cause.status === 401 ||
+            locationErrorCodes.has(cause.code)))
+      ) {
+        throw cause;
+      }
+
+      ticketsError =
+        "No pudimos consultar la preparación. Actualiza la cuenta para reintentar.";
+    }
+  }
 
   return {
-    tables: tables.data.restaurantTables,
+    tables: mergeOperationalTables(
+      tables.data.restaurantTables.filter((table) => table.isActive),
+      orders
+    ),
     products: products.data.products.filter(
       (product) => product.isAvailable
     ),
     orders,
-    tickets: tickets.data.kitchenTickets,
-    order: detail?.data.order ?? null,
+    order,
+    tickets,
+    ticketsError,
+    updatedAt: new Date().toISOString(),
+    location: scope.location,
   };
 }
 
@@ -126,7 +304,12 @@ export async function createOrder(
         item.quantity > 0
     );
 
-  if (!validService || !validCount || !validItems) {
+  if (
+    !/^[1-9]\d*$/.test(input.locationId) ||
+    !validService ||
+    !validCount ||
+    !validItems
+  ) {
     throw new ApiError(
       400,
       "INVALID_SALES_INPUT",
@@ -143,17 +326,35 @@ export async function createOrder(
   return response.data.order.id;
 }
 
-export async function getOrder(token: string, id: string) {
+export async function getOrder(
+  token: string,
+  id: string,
+  scope: SalesScope,
+  signal?: AbortSignal
+) {
   const response = await request(
     `/orders/${id}`,
     orderResponseSchema,
-    {
-      accessToken: token,
-    }
+    readOptions(token, signal)
   );
 
-  return response.data.order;
+  const order = assertOrderScope(response.data.order, scope);
+
+  if (
+    order.location.id !== scope.location.id ||
+    order.location.locationType !== "POINT_OF_SALE" ||
+    order.serviceType === "DELIVERY"
+  ) {
+    throw new ApiError(
+      403,
+      "LOCATION_ACCESS_DENIED",
+      "Esta cuenta no está disponible en Mesas y pedidos."
+    );
+  }
+
+  return order;
 }
+
 export async function writeOrder(
   token: string,
   path: string,

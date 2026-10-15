@@ -16,7 +16,7 @@ const WORKSPACES: readonly Workspace[] = [
   {
     id: "sales",
     role: "WAITER",
-    label: "Ventas",
+    label: "Mesas y pedidos",
     path: "/ventas",
     locationType: "POINT_OF_SALE",
     pending: false,
@@ -86,7 +86,7 @@ export function resolveSessionAccess(
     locations.find((location) => location.id === defaultLocationId) ??
     null;
 
-  const workspaces =
+  const defaultWorkspaces =
     defaultLocation && defaultLocation.isActive !== false
       ? WORKSPACES.filter(
           (workspace) =>
@@ -94,6 +94,15 @@ export function resolveSessionAccess(
             workspace.locationType === defaultLocation.locationType
         )
       : [];
+
+  const workspaces = roles.includes("WAITER")
+    ? [
+        WORKSPACES[0],
+        ...defaultWorkspaces.filter(
+          (workspace) => workspace.id !== "sales"
+        ),
+      ]
+    : defaultWorkspaces;
 
   if (isAdmin || hasGlobalAccess) {
     return {
@@ -105,6 +114,7 @@ export function resolveSessionAccess(
           ? [
               "/configuracion",
               "/mi-negocio",
+              "/ventas",
               "/productos",
               "/productos/categorias",
               "/inventario",
@@ -121,7 +131,9 @@ export function resolveSessionAccess(
 
   let issue: AccessIssue | null = null;
 
-  if (locations.length === 0) {
+  if (roles.includes("WAITER")) {
+    issue = null;
+  } else if (locations.length === 0) {
     issue = "no-locations";
   } else if (defaultLocationId === null) {
     issue = "no-default";

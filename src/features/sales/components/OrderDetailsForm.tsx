@@ -4,8 +4,7 @@ import { SelectField } from "../../../components/forms/SelectField";
 import { TextField } from "../../../components/forms/TextField";
 import { Button } from "../../../components/ui/Button";
 
-import type { RestaurantTable } from "../../restaurant-tables/schemas/restaurant-table.schema";
-
+import type { SalesTable as RestaurantTable } from "../services/sales.service";
 import type { OrderInput } from "../schemas/sales.schema";
 
 export function OrderDetailsForm({
@@ -38,15 +37,17 @@ export function OrderDetailsForm({
       className="sales-form"
       onSubmit={(event) => {
         event.preventDefault();
-
         if (
           busy ||
           serviceType === "DELIVERY" ||
-          (serviceType === "TABLE" && !tableId)
+          (serviceType === "TABLE" &&
+            (!tables.some((table) => table.id === tableId) ||
+              (count !== "" &&
+                (!Number.isSafeInteger(Number(count)) ||
+                  Number(count) < 1))))
         ) {
           return;
         }
-
         void onSave({
           serviceType,
           restaurantTableId: serviceType === "TABLE" ? tableId : null,
@@ -71,7 +72,7 @@ export function OrderDetailsForm({
           placeholder="Selecciona una mesa libre"
           options={tables.map((table) => ({
             value: table.id,
-            label: table.name,
+            label: `${table.name} · ${table.code}`,
           }))}
           onValueChange={setTableId}
         />
