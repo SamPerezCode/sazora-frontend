@@ -4,6 +4,7 @@ import { ApiError, request } from "../../../lib/http/client";
 import { productListSchema } from "../../products/schemas/product.schema";
 import { tableListResponseSchema } from "../../restaurant-tables/schemas/restaurant-table.schema";
 import type { RestaurantTable } from "../../restaurant-tables/schemas/restaurant-table.schema";
+import { getOrderKitchenTickets } from "../../kitchen-flow/kitchen-flow.service";
 
 import {
   cancelQuantityInputSchema,
@@ -18,6 +19,8 @@ import {
   ordersResponseSchema,
   savedResponseSchema,
   ticketsResponseSchema,
+  confirmOrderResponseSchema,
+  addedItemsResponseSchema,
 } from "../schemas/sales.schema";
 
 import type {
@@ -236,14 +239,11 @@ export async function getSales(
 
   if (order && order.status !== "OPEN" && isOperationalOrder(order)) {
     try {
-      const response = await request(
-        "/kitchen-tickets",
-        ticketsResponseSchema,
-        readOptions(token, signal)
-      );
-
-      tickets = response.data.kitchenTickets.filter(
-        (ticket) => ticket.orderId === order.id
+      tickets = await getOrderKitchenTickets(
+        token,
+        scope,
+        order.id,
+        signal
       );
     } catch (cause) {
       if (
@@ -440,4 +440,79 @@ export async function cancelOrderItemQuantity(
   );
 
   return response.data.adjustment;
+}
+
+export async function confirmSalesOrder(
+  token: string,
+  orderId: string,
+  scope: SalesScope
+) {
+  const response = await request(
+    `/orders/${orderId}/confirm`,
+    confirmOrderResponseSchema,
+    {
+      method: "POST",
+      accessToken: token,
+    }
+  );
+
+  const order = assertOrderScope(response.data.order, scope);
+
+  if (order.id !== orderId) {
+    throw new ApiError(
+      502,
+      "INVALID_RESPONSE",
+      "La confirmación no corresponde a esta orden."
+    );
+  }
+
+  return {
+    order,
+    kitchenTickets: response.data.kitchenTickets,
+  };
+}
+
+export async function addSalesOrderItems(
+  token: string,
+  orderId: string,
+  items: CreateOrderInput["items"]
+) {
+  const response = await request(
+    `/orders/${orderId}/items`,
+    addedItemsResponseSchema,
+    {
+      method: "POST",
+      accessToken: token,
+      body: { items },
+    }
+  );
+
+  return response.data.orderItems;
+}
+
+export async function deliverPrintOnlyOrder(
+  token: string,
+  orderId: string,
+  scope: SalesScope
+) {
+  const response = await request(
+    `/orders/${orderId}/deliver`,
+    orderResponseSchema,
+    {
+      method: "POST",
+      accessToken: token,
+    }
+  );
+
+  const order = assertOrderScope(response.data.order, scope);
+
+  if (order.id !== orderId || order.status !== "DELIVERED") {
+    throw new ApiError(
+      502,
+      "INVALID_RESPONSE",
+      "Debemos verificar el estado de entrega de esta orden."
+    );
+  }
+
+  return order;
 }

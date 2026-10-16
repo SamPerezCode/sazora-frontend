@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ApiError, request } from "../../../lib/http/client";
 import { getCategories } from "../../categories/services/category.service";
 import { getPreparationAreas } from "../../preparation-areas/services/preparation-area.service";
+import { inventorySetupSchema } from "../../inventory/services/inventory-setup";
 import {
   productIdSchema,
   productListSchema,
@@ -92,13 +93,18 @@ export async function getProductDetail(
   const validId = productIdSchema.parse(id);
 
   if (isCombo) {
-    const result = await request(
-      `/products/combos/${validId}`,
-      comboResponseSchema,
-      { accessToken, signal }
-    );
+    const combo = await getComboDetail(validId, accessToken, signal);
 
-    return result.data.product;
+    return {
+      ...combo.product,
+      isCombo: true,
+
+      components: combo.components.map((item) => ({
+        productId: item.productId,
+        productName: item.name,
+        quantity: item.quantity,
+      })),
+    };
   }
 
   const result = await request(
@@ -108,6 +114,35 @@ export async function getProductDetail(
   );
 
   return result.data.product;
+}
+
+export async function getComboDetail(
+  id: string,
+  accessToken: string,
+  signal: AbortSignal
+) {
+  const validId = productIdSchema.parse(id);
+
+  const result = await request(
+    `/products/combos/${validId}`,
+    comboResponseSchema,
+    {
+      accessToken,
+      signal,
+    }
+  );
+
+  const combo = result.data.combo;
+
+  if (combo.product.id !== validId) {
+    throw new ApiError(
+      502,
+      "INVALID_RESPONSE",
+      "El combo recibido no corresponde al solicitado."
+    );
+  }
+
+  return combo;
 }
 
 export async function saveProduct(
@@ -169,6 +204,21 @@ export async function saveProduct(
 
   const id = productIdSchema.parse(action.id);
 
+  if (action.kind === "inventory") {
+    const input = inventorySetupSchema.parse({
+      ...action.input,
+      sku: action.input.sku ?? "",
+    });
+
+    await request(`/products/${id}/inventory-setup`, savedSchema, {
+      ...options,
+      method: "POST",
+      body: input,
+    });
+
+    return;
+  }
+
   if (action.kind === "edit") {
     const input = productEditSchema.partial().parse(action.input);
 
@@ -210,7 +260,7 @@ export async function saveProduct(
       method: "PUT",
       body: form,
     });
-  } else {
+  } else if (action.kind === "remove-image") {
     await request(
       `/products/${id}/image`,
       z.union([savedSchema, z.null()]),

@@ -18,6 +18,7 @@ import { EmployeesPanel } from "../../employees/components/EmployeesPanel";
 import { OrganizationFiscalPanel } from "../components/OrganizationFiscalPanel";
 import { LocationsPanel } from "../components/LocationsPanel";
 import { BusinessSettingsPage } from "./BusinessSettingsPage";
+import { KitchenWorkflowPanel } from "../../kitchen-flow/KitchenWorkflowPanel";
 
 const sections = [
   {
@@ -149,7 +150,8 @@ export function ConfigurationPage() {
         className={
           active.group === "Operación" &&
           active.id !== "areas" &&
-          active.id !== "tables"
+          active.id !== "tables" &&
+          active.id !== "ticket"
             ? "configuration-content w-full md:max-w-4xl"
             : "configuration-content"
         }
@@ -165,6 +167,11 @@ export function ConfigurationPage() {
           <PreparationAreasPanel />
         ) : active.id === "employees" ? (
           <EmployeesPanel />
+        ) : active.id === "ticket" ? (
+          <>
+            <KitchenWorkflowPanel />
+            <BusinessSettingsPage section="ticket" />
+          </>
         ) : (
           <BusinessSettingsPage section={active.id} />
         )}

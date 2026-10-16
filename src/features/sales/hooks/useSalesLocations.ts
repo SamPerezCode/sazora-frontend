@@ -7,6 +7,8 @@ import { getLocations } from "../../business/services/organization.service";
 
 import type { SalesLocation } from "../services/sales.service";
 
+const selectedLocations = new Map<string, string>();
+
 export function assignedSalesLocations(
   session: AuthSession
 ): SalesLocation[] {
@@ -22,7 +24,7 @@ export function initialSalesLocation(
   options: SalesLocation[]
 ): string {
   if (session.authorization.roles.includes("ADMIN")) {
-    return "";
+    return options.length === 1 ? options[0].id : "";
   }
 
   const preferred =
@@ -37,12 +39,20 @@ export function initialSalesLocation(
 export function useSalesLocations(session: AuthSession) {
   const { refreshSession } = useAuth();
 
+  const selectionKey = [
+    session.business.id,
+    session.membership.id,
+    session.user.id,
+  ].join(":");
+
   const [revision, setRevision] = useState(0);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(
+    () => selectedLocations.get(selectionKey) ?? ""
+  );
   const [issue, setIssue] = useState("");
 
   const rejected = useRef(new Set<string>());
-  const selected = useRef("");
+  const selected = useRef(selectedId);
 
   const [snapshot, setSnapshot] = useState<{
     revision: number;
@@ -88,6 +98,7 @@ export function useSalesLocations(session: AuthSession) {
           : initialSalesLocation(session, options);
 
         selected.current = next;
+        selectedLocations.set(selectionKey, next);
         setSelectedId(next);
       } catch (cause) {
         if (!controller.signal.aborted) {
@@ -106,7 +117,7 @@ export function useSalesLocations(session: AuthSession) {
     void run();
 
     return () => controller.abort();
-  }, [session, isAdmin, revision]);
+  }, [session, isAdmin, revision, selectionKey]);
 
   const options =
     snapshot?.revision === revision ? snapshot.options : [];
@@ -128,6 +139,7 @@ export function useSalesLocations(session: AuthSession) {
         rejected.current.add(selected.current);
       }
 
+      selectedLocations.delete(selectionKey);
       selected.current = "";
       setSelectedId("");
       setIssue(message);
@@ -135,7 +147,7 @@ export function useSalesLocations(session: AuthSession) {
 
       void refreshSession();
     },
-    [refreshSession]
+    [refreshSession, selectionKey]
   );
 
   return {
@@ -149,6 +161,7 @@ export function useSalesLocations(session: AuthSession) {
       if (!permitted.some((option) => option.id === id)) return;
 
       selected.current = id;
+      selectedLocations.set(selectionKey, id);
       setSelectedId(id);
       setIssue("");
     },

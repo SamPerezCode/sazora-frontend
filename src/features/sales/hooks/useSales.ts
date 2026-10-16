@@ -1,4 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import {
+  addSalesOrderItems,
+  confirmSalesOrder,
+  deliverPrintOnlyOrder,
+} from "../services/sales.service";
+
+import { createKitchenPrintStore } from "../../kitchen-flow/kitchen-print.store";
+
+import { getOrderKitchenTickets } from "../../kitchen-flow/kitchen-flow.service";
+
+import { kitchenErrorMessage } from "../../kitchen-flow/kitchen-flow.schema";
+
+import { useKitchenSettings } from "../../kitchen-flow/useKitchenSettings";
 
 import { ApiError } from "../../../lib/http/client";
 import { isOperationalOrder } from "../utils/sales-board";
@@ -58,6 +78,18 @@ export type CancellationResult = {
 };
 
 const messageOf = (cause: unknown) => {
+  if (
+    cause instanceof ApiError &&
+    [
+      "ORDER_REQUIRES_KITCHEN_SCREEN",
+      "KITCHEN_SCREEN_WORKFLOW_DISABLED",
+      "ORDER_NOT_CONFIRMED",
+      "KITCHEN_TICKET_PRINT_REASON_REQUIRED",
+    ].includes(cause.code)
+  ) {
+    return kitchenErrorMessage(cause);
+  }
+
   if (cause instanceof ApiError && cause.errors.length) {
     return [
       cause.message,
@@ -250,6 +282,17 @@ export function useSales(
     [logout, onLocationLost]
   );
 
+  const kitchenSettings = useKitchenSettings(
+    token,
+    scope,
+    onLocationLost
+  );
+
+  const printing = useMemo(
+    () => createKitchenPrintStore(token, scope, reportAccessError),
+    [token, scope, reportAccessError]
+  );
+
   const refresh = useCallback(async () => {
     if (accessLost) return false;
     reader.current?.abort();
@@ -277,6 +320,7 @@ export function useSales(
       );
 
       const detail = next.order;
+      printing.remember(next.tickets);
 
       if (detail && detail.status !== "OPEN") {
         setConfirmationIds((previous) => {
@@ -342,6 +386,7 @@ export function useSales(
     accessLost,
     reportAccessError,
     setNotice,
+    printing,
   ]);
 
   useEffect(() => {
@@ -831,19 +876,53 @@ export function useSales(
     }
   }
 
+  async function recoverPrints(
+    orderId: string,
+    addedItemIds?: string[]
+  ) {
+    try {
+      const tickets = await getOrderKitchenTickets(
+        token,
+        scope,
+        orderId
+      );
+
+      printing.remember(tickets);
+
+      const affected = addedItemIds
+        ? tickets.filter((ticket) =>
+            ticket.items.some((item) =>
+              addedItemIds.includes(item.orderItemId)
+            )
+          )
+        : tickets;
+
+      await printing.sendAll(affected);
+    } catch (cause) {
+      reportAccessError(cause);
+
+      if (alive.current) {
+        setNotice(
+          "El pedido está guardado. No pudimos recuperar sus comandas para enviarlas a impresión. Actualiza la cuenta; no vuelvas a enviar el pedido. " +
+            kitchenErrorMessage(cause)
+        );
+      }
+    }
+  }
+
   async function confirm(id: string) {
     setConfirmationIds((previous) => ({
       ...previous,
       [id]: true,
     }));
 
+    let result;
+
     try {
-      await writeOrder(token, `/orders/${id}/confirm`, "POST");
-
-      clearConfirmation(id);
-
-      return "Pedido enviado correctamente.";
+      result = await confirmSalesOrder(token, id, scope);
     } catch (cause) {
+      reportAccessError(cause);
+
       let order;
 
       try {
@@ -863,6 +942,12 @@ export function useSales(
       }
 
       if (order.status !== "OPEN") {
+        clearConfirmation(id);
+
+        // Recuperación de una confirmación cuya respuesta se perdió.
+        // Nunca repetimos /confirm para resolver una impresión.
+        void recoverPrints(id);
+
         return "El pedido ya había sido confirmado correctamente.";
       }
 
@@ -876,6 +961,26 @@ export function useSales(
           detail
       );
     }
+
+    // Se acepta la orden del servidor antes de iniciar impresiones.
+    acceptOrder(result.order);
+    clearConfirmation(id);
+
+    const tickets = result.kitchenTickets.map((ticket) => ({
+      id: ticket.id,
+      orderId: result.order.id,
+      preparationAreaId: ticket.preparationAreaId,
+      preparationAreaName: "Área de preparación",
+      currentVersion: ticket.currentVersion,
+    }));
+
+    printing.remember(tickets);
+
+    // Los fallos quedan dentro del estado de impresión.
+    // No alcanzan el catch de la confirmación.
+    void printing.sendAll(tickets);
+
+    return "Pedido confirmado correctamente.";
   }
 
   function retryConfirmation() {
@@ -908,6 +1013,10 @@ export function useSales(
 
         if (order.status === "OPEN") {
           return confirm(id);
+        }
+
+        if (order.status !== "CANCELLED") {
+          void recoverPrints(id);
         }
 
         return order.status === "CANCELLED"
@@ -1632,12 +1741,18 @@ export function useSales(
 
         if (items.length) {
           try {
-            await writeOrder(
+            const added = await addSalesOrderItems(
               token,
-              `/orders/${order.id}/items`,
-              "POST",
-              { items }
+              order.id,
+              items
             );
+
+            if (order.status === "CONFIRMED") {
+              void recoverPrints(
+                order.id,
+                added.map((item) => item.id)
+              );
+            }
           } catch (cause) {
             if (
               cause instanceof ApiError &&
@@ -1723,6 +1838,8 @@ export function useSales(
             ...previous,
             [id]: {},
           }));
+
+          void recoverPrints(id);
         }
 
         uncertainBatch.current = null;
@@ -1740,6 +1857,50 @@ export function useSales(
 
       locked.current = false;
     }
+  }
+
+  function deliver() {
+    const order = data?.order;
+    const id = selected.current;
+
+    if (
+      !order ||
+      !id ||
+      order.id !== id ||
+      order.status !== "CONFIRMED" ||
+      order.kitchenWorkflowMode !== "PRINT_ONLY" ||
+      confirmationIds[id] ||
+      cancellationIds[id] ||
+      Object.keys(drafts[id] ?? {}).length > 0 ||
+      error
+    ) {
+      return Promise.resolve(false);
+    }
+
+    return run(
+      async () => {
+        const updated = await deliverPrintOnlyOrder(token, id, scope);
+
+        acceptOrder(updated);
+      },
+      "Pedido entregado. La cuenta está por cerrar.",
+      false,
+      async () => {
+        const current = await readOrder(id);
+
+        if (current.status === "DELIVERED") {
+          return "Pedido entregado. La cuenta está por cerrar.";
+        }
+
+        if (current.status === "CLOSED") {
+          return "La cuenta ya está cerrada.";
+        }
+
+        throw new RecoveryError(
+          "La entrega todavía no está confirmada. Revisa el estado de la cuenta antes de volver a marcarla como entregada."
+        );
+      }
+    );
   }
 
   return {
@@ -1764,9 +1925,12 @@ export function useSales(
     loading,
     error,
     notice,
-    clearNotice: () => setNotice(""),
     uncertain,
     needsWriteVerification,
+    kitchenSettings,
+    printing,
+    deliver,
+    clearNotice: () => setNotice(""),
     select,
     start,
     updateLocal,

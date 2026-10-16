@@ -1,29 +1,31 @@
 import { useEffect, useId, useState } from "react";
-import { ArrowLeft, RefreshCw, Search } from "lucide-react";
-
+import { ArrowLeft, Eye, RefreshCw, Search } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { SelectField } from "../../../components/forms/SelectField";
 import { Alert } from "../../../components/feedback/Alert";
-import { BottomSheet } from "../../../components/layout/BottomSheet";
 
 import { ApiError } from "../../../lib/http/client";
 
 import { ResponsiveFilter } from "../../../components/ui/ResponsiveFilter";
 
 import {
-  getOrder,
   getOrdersForStatuses,
   locationErrorCodes,
 } from "../services/sales.service";
 
 import type { SalesScope } from "../services/sales.service";
 
-import { cents, money, STATUS_LABELS } from "../schemas/sales.schema";
+import {
+  cents,
+  money,
+  SERVICE_LABELS,
+  STATUS_LABELS,
+} from "../schemas/sales.schema";
 
-import type { Order, OrderSummary } from "../schemas/sales.schema";
+import type { OrderSummary } from "../schemas/sales.schema";
 
 import { OrderStatusBadge } from "./OrderStatusBadge";
-import { OrderSummaryView } from "./OrderSummaryView";
+import { HistoryOrderDetail } from "./HistoryOrderDetail";
 
 const states = [
   "CLOSED",
@@ -93,11 +95,7 @@ export function SalesHistory({
 
         setSnapshot({
           revision,
-          rows: rows.filter(
-            (row) =>
-              row.serviceType === "TABLE" ||
-              row.serviceType === "TAKEAWAY"
-          ),
+          rows,
           error: "",
         });
       })
@@ -277,6 +275,7 @@ export function SalesHistory({
               { value: "", label: "Todas" },
               { value: "TABLE", label: "Mesa" },
               { value: "TAKEAWAY", label: "Para recoger" },
+              { value: "DELIVERY", label: "Domicilio" },
             ]}
           />
 
@@ -365,6 +364,7 @@ export function SalesHistory({
                 <col className="mp-col-status" />
                 <col className="mp-col-payment" />
                 <col className="mp-col-amount" />
+                <col className="mp-col-action" />
               </colgroup>
 
               <thead role="rowgroup">
@@ -400,6 +400,13 @@ export function SalesHistory({
                   >
                     Importe
                   </th>
+                  <th
+                    scope="col"
+                    role="columnheader"
+                    className="mp-history-action"
+                  >
+                    Acción
+                  </th>
                 </tr>
               </thead>
 
@@ -419,13 +426,11 @@ export function SalesHistory({
                             {" · "}
                             {row.serviceType === "TABLE"
                               ? (row.restaurantTableName ?? "Mesa")
-                              : "Pedido para recoger"}
+                              : SERVICE_LABELS[row.serviceType]}
                           </span>
 
                           <small>
-                            {row.serviceType === "TABLE"
-                              ? "Mesa"
-                              : "Para recoger"}
+                            {SERVICE_LABELS[row.serviceType]}
 
                             {row.customerCount !== null
                               ? ` · ${row.customerCount} personas`
@@ -456,6 +461,20 @@ export function SalesHistory({
 
                       <td className="mp-history-amount" role="cell">
                         <strong>{money(cents(row.subtotal))}</strong>
+                      </td>
+
+                      <td className="mp-history-action" role="cell">
+                        <Button
+                          variant="soft"
+                          size="compact"
+                          aria-label={`Ver detalle de la orden ${row.id}`}
+                          onClick={() => setOpened(row)}
+                        >
+                          <Eye size={16} aria-hidden="true" />
+                          <span className="hd-action-label">
+                            Ver detalle
+                          </span>
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -509,7 +528,7 @@ export function SalesHistory({
       </Button>
 
       {opened && (
-        <HistoryDetail
+        <HistoryOrderDetail
           key={opened.id}
           row={opened}
           token={token}
@@ -519,107 +538,5 @@ export function SalesHistory({
         />
       )}
     </section>
-  );
-}
-
-function HistoryDetail({
-  row,
-  token,
-  scope,
-  onClose,
-  onLocationLost,
-}: {
-  row: OrderSummary;
-  token: string;
-  scope: SalesScope;
-  onClose: () => void;
-  onLocationLost: (message: string) => void;
-}) {
-  const id = useId();
-  const [attempt, setAttempt] = useState(0);
-
-  const [snapshot, setSnapshot] = useState<{
-    attempt: number;
-    order: Order | null;
-    error: string;
-  } | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    void getOrder(token, row.id, scope, controller.signal)
-      .then((order) => {
-        if (!controller.signal.aborted) {
-          setSnapshot({
-            attempt,
-            order,
-            error: "",
-          });
-        }
-      })
-      .catch((cause: unknown) => {
-        if (controller.signal.aborted) return;
-
-        if (
-          cause instanceof ApiError &&
-          locationErrorCodes.has(cause.code)
-        ) {
-          onLocationLost(cause.message);
-        }
-
-        setSnapshot({
-          attempt,
-          order: null,
-          error:
-            cause instanceof Error
-              ? cause.message
-              : "No pudimos consultar la orden.",
-        });
-      });
-
-    return () => controller.abort();
-  }, [token, row.id, scope, attempt, onLocationLost]);
-
-  return (
-    <BottomSheet
-      id={id}
-      open
-      variant="modal"
-      title={`Orden #${row.id}`}
-      className="sales-workspace mp-workspace mp-workspace-summary"
-      onClose={onClose}
-    >
-      {snapshot?.attempt !== attempt ? (
-        <p className="mp-dialog-content" role="status">
-          Cargando cuenta…
-        </p>
-      ) : snapshot.order ? (
-        <OrderSummaryView
-          order={snapshot.order}
-          table={
-            row.restaurantTableId
-              ? {
-                  id: row.restaurantTableId,
-                  name: row.restaurantTableName ?? "Mesa",
-                  code: row.restaurantTableCode ?? "",
-                  capacity: null,
-                  isActive: false,
-                }
-              : undefined
-          }
-        />
-      ) : (
-        <div className="mp-dialog-content">
-          <Alert>{snapshot.error}</Alert>
-
-          <Button
-            variant="secondary"
-            onClick={() => setAttempt((value) => value + 1)}
-          >
-            Reintentar
-          </Button>
-        </div>
-      )}
-    </BottomSheet>
   );
 }

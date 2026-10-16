@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { kitchenWorkflowModeSchema } from "../../kitchen-flow/kitchen-flow.schema";
+
 const id = z.string().regex(/^[1-9]\d*$/);
 const moneySchema = z.string().regex(/^\d+(?:\.\d{1,2})?$/);
 
@@ -34,6 +36,7 @@ const orderBase = z.object({
   openedByMembershipId: id,
   serviceType: serviceTypeSchema,
   status: orderStatusSchema,
+  kitchenWorkflowMode: kitchenWorkflowModeSchema.nullable(),
   customerCount: z.number().int().nullable(),
   notes: z.string().nullable(),
   subtotal: moneySchema,
@@ -85,30 +88,57 @@ export const ordersResponseSchema = z.object({
   }),
 });
 
+export const salesKitchenTicketSchema = z.object({
+  id,
+  businessId: id,
+  orderId: id,
+  preparationAreaId: id,
+  preparationAreaName: z.string(),
+  currentVersion: z.number().int().positive(),
+  createdAt: z.iso.datetime({ offset: true }),
+  updatedAt: z.iso.datetime({ offset: true }),
+  items: z.array(
+    z.object({
+      id,
+      orderItemId: id,
+      preparationStatus: z.enum([
+        "PENDING",
+        "IN_PREPARATION",
+        "PREPARING",
+        "READY",
+        "DELIVERED",
+        "CANCELLED",
+      ]),
+    })
+  ),
+});
+
 export const ticketsResponseSchema = z.object({
   status: z.literal("success"),
   data: z.object({
+    kitchenTickets: z.array(salesKitchenTicketSchema),
+  }),
+});
+
+export const confirmOrderResponseSchema = z.object({
+  status: z.literal("success"),
+  data: z.object({
+    order: orderSchema,
     kitchenTickets: z.array(
       z.object({
         id,
-        orderId: id,
-        preparationAreaName: z.string(),
-        items: z.array(
-          z.object({
-            id,
-            orderItemId: id,
-            preparationStatus: z.enum([
-              "PENDING",
-              "IN_PREPARATION",
-              "PREPARING",
-              "READY",
-              "DELIVERED",
-              "CANCELLED",
-            ]),
-          })
-        ),
+        preparationAreaId: id,
+        currentVersion: z.number().int().positive(),
+        orderItemIds: z.array(id),
       })
     ),
+  }),
+});
+
+export const addedItemsResponseSchema = z.object({
+  status: z.literal("success"),
+  data: z.object({
+    orderItems: z.array(z.object({ id })),
   }),
 });
 

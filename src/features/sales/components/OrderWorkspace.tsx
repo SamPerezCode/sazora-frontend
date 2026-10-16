@@ -12,6 +12,13 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { OrderPrintPanel } from "../../kitchen-flow/OrderPrintPanel";
+
+import {
+  resolveKitchenMode,
+  WORKFLOW_LABELS,
+} from "../../kitchen-flow/kitchen-flow.schema";
+
 import { Button } from "../../../components/ui/Button";
 import { Avatar } from "../../../components/ui/Avatar";
 
@@ -54,6 +61,7 @@ export function OrderWorkspace({
     | "status"
     | "subtotal"
     | "items"
+    | "kitchenWorkflowMode"
   > & {
     id: string | null;
   };
@@ -97,6 +105,17 @@ export function OrderWorkspace({
 
   const editable = order.status === "OPEN";
   const canAdd = editable || order.status === "CONFIRMED";
+
+  const workflowMode = resolveKitchenMode(
+    order,
+    resource.kitchenSettings.data?.workflowMode ?? null
+  );
+
+  const screenWorkflow = workflowMode === "PRINT_AND_SCREEN";
+
+  const directDelivery =
+    order.status === "CONFIRMED" &&
+    order.kitchenWorkflowMode === "PRINT_ONLY";
 
   const storedDraft = order.id
     ? (resource.drafts[order.id] ?? {})
@@ -309,6 +328,12 @@ export function OrderWorkspace({
             ? ` · ${order.customerCount} personas`
             : ""}
         </span>
+
+        {workflowMode && (
+          <span className="kf-workflow-badge">
+            {WORKFLOW_LABELS[workflowMode]}
+          </span>
+        )}
 
         {editable && (
           <button
@@ -573,6 +598,16 @@ export function OrderWorkspace({
               ? "Resumen de la cuenta"
               : "Cuenta actual"}
 
+            {order.status === "CONFIRMED" && (
+              <small className="kf-workflow-badge">
+                {screenWorkflow
+                  ? "Seguimiento en cocina"
+                  : workflowMode === "PRINT_ONLY"
+                    ? "Comandas impresas"
+                    : "Modo no disponible"}
+              </small>
+            )}
+
             <span>
               {items.reduce((sum, item) => sum + item.quantity, 0) +
                 pendingCount}{" "}
@@ -645,13 +680,17 @@ export function OrderWorkspace({
 
                   {item.notes && <p>{item.notes}</p>}
 
-                  <span className="sales-line-status">
-                    {order.status === "OPEN"
-                      ? "Sin enviar"
-                      : ticket
-                        ? PREPARATION_LABELS[ticket.preparationStatus]
-                        : "Preparación no disponible"}
-                  </span>
+                  {(order.status === "OPEN" || screenWorkflow) && (
+                    <span className="sales-line-status">
+                      {order.status === "OPEN"
+                        ? "Sin enviar"
+                        : ticket
+                          ? PREPARATION_LABELS[
+                              ticket.preparationStatus
+                            ]
+                          : "Preparación no disponible"}
+                    </span>
+                  )}
 
                   <div className="sales-line-actions">
                     {editable && (
@@ -731,22 +770,23 @@ export function OrderWorkspace({
                         </>
                       )}
 
-                    {ticket?.preparationStatus === "READY" && (
-                      <Button
-                        size="sm"
-                        disabled={blocked}
-                        onClick={() =>
-                          void resource.action(
-                            `/kitchen-tickets/${ticket.ticketId}/items/${ticket.id}/status`,
-                            "PATCH",
-                            { status: "DELIVERED" }
-                          )
-                        }
-                      >
-                        <Check size={15} />
-                        Entregar
-                      </Button>
-                    )}
+                    {screenWorkflow &&
+                      ticket?.preparationStatus === "READY" && (
+                        <Button
+                          size="sm"
+                          disabled={blocked}
+                          onClick={() =>
+                            void resource.action(
+                              `/kitchen-tickets/${ticket.ticketId}/items/${ticket.id}/status`,
+                              "PATCH",
+                              { status: "DELIVERED" }
+                            )
+                          }
+                        >
+                          <Check size={15} />
+                          Entregar
+                        </Button>
+                      )}
                   </div>
 
                   {editing === item.id && canAdd && (
@@ -897,6 +937,14 @@ export function OrderWorkspace({
                 ))}
               </details>
             )}
+
+            {order.id && order.status !== "OPEN" && (
+              <OrderPrintPanel
+                orderId={order.id}
+                printing={resource.printing}
+                disabled={blocked}
+              />
+            )}
           </div>
         </aside>
 
@@ -929,6 +977,18 @@ export function OrderWorkspace({
           )}
 
           <div className="sales-footer-actions">
+            {directDelivery && (
+              <Button
+                size="sm"
+                variant="soft"
+                disabled={blocked || pendingCount > 0}
+                onClick={() => void resource.deliver()}
+              >
+                <Check size={16} aria-hidden="true" />
+                Marcar pedido como entregado
+              </Button>
+            )}
+
             {canAdd ? (
               (!order.id || pendingCount > 0) && (
                 <Button

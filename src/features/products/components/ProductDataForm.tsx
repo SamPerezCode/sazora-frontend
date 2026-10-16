@@ -8,10 +8,9 @@ import { ApiError } from "../../../lib/http/client";
 import type { Category } from "../../categories/schemas/category.schema";
 import type { PreparationArea } from "../../preparation-areas/schemas/preparation-area.schema";
 import type { Product } from "../schemas/product.schema";
-import {
-  productEditSchema,
-  inventorySetupSchema,
-} from "../schemas/product-action.schema";
+import { productEditSchema } from "../schemas/product-action.schema";
+
+import { inventorySetupSchema } from "../../inventory/services/inventory-setup";
 import type {
   ProductMutation,
   ProductEditInput,

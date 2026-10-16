@@ -5,6 +5,8 @@ import {
   productIdSchema,
 } from "./product.schema";
 
+import type { inventorySetupSchema } from "../../inventory/services/inventory-setup";
+
 const optionalText = (max: number) =>
   z
     .string()
@@ -59,21 +61,39 @@ export const componentsSchema = z
     }
   });
 
+export const comboDetailSchema = z.object({
+  product: productDetailSchema,
+
+  components: z.array(
+    z.object({
+      id: productIdSchema,
+      productId: productIdSchema,
+      sku: z.string().nullable(),
+      name: z.string(),
+      description: z.string().nullable(),
+      imageUrl: z.string().nullable(),
+
+      currentPrice: z.string().regex(/^\d+(?:\.\d{1,2})?$/),
+
+      quantity: z
+        .string()
+        .regex(/^\d+(?:\.\d+)?$/)
+        .transform(Number)
+        .pipe(z.number().finite().positive()),
+
+      isActive: z.boolean(),
+    })
+  ),
+});
+
 export const comboResponseSchema = z.object({
   status: z.literal("success"),
   data: z.object({
-    product: productDetailSchema.extend({
-      isCombo: z.literal(true),
-      components: z.array(
-        z.object({
-          productId: productIdSchema,
-          productName: z.string(),
-          quantity: z.number().finite().positive(),
-        })
-      ),
-    }),
+    combo: comboDetailSchema,
   }),
 });
+
+export type ComboDetail = z.infer<typeof comboDetailSchema>;
 
 export type ProductEditInput = z.output<typeof productEditSchema>;
 
@@ -96,6 +116,11 @@ export type ProductActionKind =
   | "inventory";
 
 export type ProductMutation =
+  | {
+      kind: "inventory";
+      id: string;
+      input: z.output<typeof inventorySetupSchema>;
+    }
   | {
       kind: "create";
       isCombo: boolean;

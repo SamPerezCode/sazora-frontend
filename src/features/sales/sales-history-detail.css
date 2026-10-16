@@ -1,0 +1,375 @@
+/* Modal histórico */
+dialog.bottom-sheet.hd-dialog,
+:root[data-theme="dark"] dialog.bottom-sheet.hd-dialog {
+  width: min(72rem, calc(100vw - 2rem));
+  max-width: none;
+  height: fit-content;
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--sazora-outline);
+  border-radius: 1rem;
+  background: var(--sazora-background);
+  color: var(--sazora-heading);
+}
+
+dialog.hd-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+dialog.hd-dialog > .bottom-sheet-heading {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 1.25rem 3.5rem 0.3rem 1.4rem;
+  background: transparent;
+  color: var(--sazora-heading);
+}
+
+dialog.hd-dialog > .bottom-sheet-heading h2 {
+  font-size: 1.25rem;
+  line-height: 1.35;
+}
+
+:root dialog.hd-dialog > .bottom-sheet-heading .bottom-sheet-close {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--sazora-muted);
+}
+
+:root
+  dialog.hd-dialog
+  > .bottom-sheet-heading
+  .bottom-sheet-close:enabled:hover {
+  background: transparent;
+  color: var(--sazora-heading);
+}
+
+.hd-subtitle {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 1.4rem 1.2rem;
+  border-bottom: 1px solid var(--sazora-outline);
+  color: var(--sazora-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.hd-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 1.2rem;
+  min-height: 0;
+  padding: 1.5rem 1.4rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.hd-main,
+.hd-kitchen {
+  min-width: 0;
+}
+
+.hd-main {
+  display: grid;
+  align-content: start;
+  gap: 1.15rem;
+}
+
+.hd-loading {
+  display: grid;
+  gap: 1rem;
+  padding: 1.4rem;
+  overflow-y: auto;
+}
+
+.hd-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--sazora-outline);
+  border-radius: 0.85rem;
+  background: var(--sazora-surface);
+}
+
+.hd-meta dt {
+  margin-bottom: 0.45rem;
+  color: var(--sazora-muted);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.hd-meta dd {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.hd-products {
+  overflow: hidden;
+  border: 1px solid var(--sazora-outline);
+  border-radius: 0.85rem;
+}
+
+.hd-products table {
+  table-layout: fixed;
+}
+
+.hd-products :is(th, td):not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.hd-products td small {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--sazora-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.hd-products tr[data-cancelled="true"] .hd-product-name {
+  text-decoration: line-through;
+}
+
+.hd-products tr[data-cancelled="true"] td small {
+  color: var(--mp-danger, var(--sazora-danger));
+}
+
+.hd-products tfoot {
+  background: var(--sazora-surface);
+}
+
+.hd-products tfoot :is(th, td) {
+  border-bottom: 0;
+  font-size: 1rem;
+}
+
+.hd-muted,
+.hd-note,
+.hd-dates {
+  margin: 0;
+  color: var(--sazora-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.hd-note p {
+  margin-top: 0.4rem;
+  white-space: pre-wrap;
+}
+
+.hd-dates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.hd-dates dd {
+  margin: 0.2rem 0 0;
+}
+
+.hd-kitchen {
+  align-self: start;
+  border-top: 1px solid var(--sazora-outline);
+}
+
+.hd-kitchen-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 1.25rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--sazora-heading);
+  text-align: left;
+  cursor: pointer;
+}
+
+.hd-kitchen-toggle > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.hd-kitchen-toggle > svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--sazora-muted);
+}
+
+.hd-kitchen-toggle small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--sazora-muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.hd-kitchen-toggle[aria-expanded="true"] > svg:last-child {
+  transform: rotate(180deg);
+}
+
+.hd-kitchen-toggle:focus-visible {
+  outline: 2px solid var(--sazora-ring, var(--sazora-accent));
+  outline-offset: 3px;
+  border-radius: 0.5rem;
+}
+
+.hd-area {
+  margin-bottom: 1.5rem;
+}
+
+.hd-area > h3 {
+  margin: 0 0 0.8rem;
+  color: var(--sazora-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.hd-version {
+  display: grid;
+  gap: 0.65rem;
+  padding-block: 0.8rem;
+}
+
+.hd-version + .hd-version {
+  border-top: 1px solid var(--sazora-outline);
+}
+
+.hd-version-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  font-size: 0.875rem;
+}
+
+.hd-copies {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+}
+
+.hd-copies > summary {
+  min-height: 2.75rem;
+  padding-block: 0.7rem;
+  cursor: pointer;
+}
+
+.hd-copy {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.8rem;
+  margin-top: 0.6rem;
+  border: 1px solid var(--sazora-outline);
+  border-radius: 0.75rem;
+  background: var(--sazora-surface);
+}
+
+.hd-notice {
+  margin-top: 1rem;
+  color: var(--sazora-heading);
+  font-size: 0.875rem;
+}
+
+/* Columna de acción del historial */
+.mp-history .mp-col-order {
+  width: 24%;
+}
+
+.mp-history .mp-col-date {
+  width: 22%;
+}
+
+.mp-history .mp-col-status {
+  width: 15%;
+}
+
+.mp-history .mp-col-payment {
+  width: 14%;
+}
+
+.mp-history .mp-col-amount {
+  width: 13%;
+}
+
+.mp-history .mp-col-action {
+  width: 12%;
+}
+
+.mp-history .mp-history-table .mp-history-action {
+  text-align: right;
+}
+
+.mp-history-action .ui-button {
+  white-space: nowrap;
+}
+
+@media (max-width: 63.999rem) {
+  .hd-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 48rem) and (max-width: 63.999rem) {
+  .mp-history-action .hd-action-label {
+    display: none;
+  }
+}
+
+@media (max-width: 47.999rem) {
+  dialog.bottom-sheet.hd-dialog {
+    width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+  }
+
+  .hd-body {
+    padding: 1rem;
+    gap: 1.5rem;
+  }
+
+  .hd-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hd-products table.ui-data-table {
+    --table-cell-x: 0.5rem;
+    --table-cell-y: 0.8rem;
+    font-size: 0.75rem;
+  }
+
+  .hd-products tfoot :is(th, td) {
+    font-size: 0.8rem;
+  }
+
+  .mp-history .mp-history-table tbody tr {
+    grid-template-areas:
+      "order date"
+      "status payment"
+      "amount action";
+  }
+
+  .mp-history .mp-history-table td.mp-history-action {
+    grid-area: action;
+    align-self: center;
+    text-align: right;
+  }
+
+  .mp-history .mp-history-table td.mp-history-amount {
+    align-self: center;
+    text-align: left;
+  }
+}

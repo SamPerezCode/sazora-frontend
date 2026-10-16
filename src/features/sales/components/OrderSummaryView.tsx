@@ -10,6 +10,7 @@ import type { Order } from "../schemas/sales.schema";
 import { cents, money } from "../schemas/sales.schema";
 import type { SalesResource } from "../hooks/useSales";
 import type { SalesTable } from "../services/sales.service";
+import { OrderPrintPanel } from "../../kitchen-flow/OrderPrintPanel";
 
 interface Props {
   order: Order;
@@ -229,6 +230,13 @@ export function OrderSummaryView({ order, table, resource }: Props) {
           </div>
 
           <p>El cierre de la cuenta no registra un pago.</p>
+          {resource && (
+            <OrderPrintPanel
+              orderId={order.id}
+              printing={resource.printing}
+              disabled={blocked}
+            />
+          )}
         </aside>
       </div>
 

@@ -124,6 +124,7 @@ export function ProductCreateForm({
     try {
       await onSave({
         kind: "create",
+        isCombo: false,
         input: result.data,
         ...(file ? { file } : {}),
       });

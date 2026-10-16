@@ -11,7 +11,7 @@ import {
   ShoppingBag,
   Store,
   Users,
-  Utensils,
+  UtensilsCrossed,
 } from "lucide-react";
 
 import { ResponsiveFilter } from "../../../components/ui/ResponsiveFilter";
@@ -33,6 +33,8 @@ import { OrderSummaryView } from "../components/OrderSummaryView";
 import { OrderStatusBadge } from "../components/OrderStatusBadge";
 import { SalesSummary } from "../components/SalesSummary";
 import { SalesHistory } from "../components/SalesHistory";
+
+import { WORKFLOW_LABELS } from "../../kitchen-flow/kitchen-flow.schema";
 
 import {
   getBoardTables,
@@ -63,13 +65,16 @@ function LocationControl({
   onChange: (id: string) => void;
   disabled?: boolean;
 }) {
+  const { session } = useAppShell();
+  const isAdmin = session.authorization.roles.includes("ADMIN");
+
   return (
     <div className="mp-location-control">
       <span className="mp-location-icon">
         <Store size={22} />
       </span>
 
-      {locations.options.length === 1 && value ? (
+      {!isAdmin && locations.options.length === 1 && value ? (
         <div>
           <small>Punto de venta</small>
           <strong>
@@ -238,6 +243,7 @@ function SalesContent({
           customerCount: draft.customerCount,
           notes: draft.notes,
           status: "OPEN" as const,
+          kitchenWorkflowMode: null,
           subtotal: "0",
           items: [],
         }
@@ -350,7 +356,9 @@ function SalesContent({
             ? "Sin enviar a cocina"
             : order.status === "DELIVERED"
               ? "Por cerrar"
-              : "Consultar preparación"}
+              : order.kitchenWorkflowMode === "PRINT_ONLY"
+                ? "Comandas impresas"
+                : "Consultar preparación"}
         </p>
 
         {pendingCount(order.id) > 0 && (
@@ -366,6 +374,35 @@ function SalesContent({
 
   return (
     <section className="mp-page sales-page sales-board">
+      {resource.kitchenSettings.loading && (
+        <p role="status">Consultando el modo de cocina…</p>
+      )}
+
+      {resource.kitchenSettings.error && (
+        <Alert>
+          <p>{resource.kitchenSettings.error}</p>
+          <Button
+            variant="soft"
+            size="compact"
+            onClick={resource.kitchenSettings.retry}
+          >
+            Reintentar configuración de cocina
+          </Button>
+        </Alert>
+      )}
+
+      {resource.kitchenSettings.data && (
+        <p className="kf-location-mode">
+          Nuevas órdenes:{" "}
+          <strong>
+            {
+              WORKFLOW_LABELS[
+                resource.kitchenSettings.data.workflowMode
+              ]
+            }
+          </strong>
+        </p>
+      )}
       {history ? (
         <SalesHistory
           token={session.accessToken}
@@ -406,7 +443,7 @@ function SalesContent({
                 }
                 onClick={() => setChooseTable(true)}
               >
-                <Utensils size={16} />
+                <UtensilsCrossed size={16} />
                 Abrir mesa
               </Button>
 
@@ -631,7 +668,7 @@ function SalesContent({
                     >
                       <div className="mp-card-line">
                         <strong>
-                          <Utensils size={21} />
+                          <UtensilsCrossed size={21} />
                           {entry.name}
                         </strong>
 
@@ -724,13 +761,19 @@ function SalesContent({
                 )
                 .map(({ table: entry }) => (
                   <Button
-                    variant="secondary"
+                    variant="soft"
+                    className="mp-table-choice"
                     key={entry.id}
                     disabled={blocked}
                     onClick={() => openTable(entry.id)}
                   >
-                    <Utensils size={18} />
-                    {entry.name}
+                    <UtensilsCrossed
+                      size={20}
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                    />
+
+                    <span>{entry.name}</span>
                   </Button>
                 ))}
             </div>
