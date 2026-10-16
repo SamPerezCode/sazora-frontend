@@ -465,3 +465,21 @@ dialog.kf-preview-dialog > .bottom-sheet-heading h2 {
   font-size: 1.35rem;
   line-height: 1.35;
 }
+
+.kf-settings .kf-location-select {
+  width: 100%;
+  max-width: 20rem;
+  min-width: 0;
+}
+
+.kf-settings .kf-location-select .select-field-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--sazora-muted);
+  text-transform: uppercase;
+}
+
+.kf-settings .kf-location-select .select-field-trigger {
+  width: 100%;
+  min-height: 2.75rem;
+}

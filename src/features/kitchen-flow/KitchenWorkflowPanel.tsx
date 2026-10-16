@@ -143,27 +143,18 @@ export function KitchenWorkflowPanel() {
           </Alert>
         ) : (
           <div className="kf-location">
-            {locations.options.length === 1 && locations.location ? (
-              <>
-                <small>Punto de venta</small>
-                <strong>
-                  {locations.location.name} ·{" "}
-                  {locations.location.code}
-                </strong>
-              </>
-            ) : (
-              <SelectField
-                label="Punto de venta"
-                value={locations.location?.id ?? ""}
-                placeholder="Selecciona un punto de venta"
-                disabled={settings.saving}
-                options={locations.options.map((location) => ({
-                  value: location.id,
-                  label: `${location.name} · ${location.code}`,
-                }))}
-                onValueChange={changeLocation}
-              />
-            )}
+            <SelectField
+              label="Punto de venta"
+              className="kf-location-select"
+              value={locations.location?.id ?? ""}
+              placeholder="Selecciona un punto de venta"
+              disabled={settings.saving}
+              options={locations.options.map((location) => ({
+                value: location.id,
+                label: `${location.name} · ${location.code}`,
+              }))}
+              onValueChange={changeLocation}
+            />
 
             <p>
               La configuración se aplica únicamente a este punto de

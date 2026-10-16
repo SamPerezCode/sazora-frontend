@@ -857,7 +857,7 @@ function SalesContent({
               ? "¿Cambiar de punto de venta?"
               : "¿Descartar este borrador?"
           }
-          className="mp-dialog"
+          className="mp-dialog app-confirm-dialog"
           busy={resource.busy}
           onClose={() => setLeaving(null)}
         >

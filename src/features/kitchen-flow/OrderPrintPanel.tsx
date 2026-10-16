@@ -379,7 +379,7 @@ function PrintPanelContent({
           open
           variant="modal"
           title="Reimprimir comanda"
-          className="kf-dialog"
+          className="kf-dialog app-confirm-dialog"
           busy={copyBusy}
           onClose={() => setCopy(null)}
         >

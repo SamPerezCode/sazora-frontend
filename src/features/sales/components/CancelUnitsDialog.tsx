@@ -144,7 +144,7 @@ export function CancelUnitsDialog({
       open
       variant="modal"
       title="Cancelar unidades"
-      className="sales-quantity-dialog"
+      className="sales-quantity-dialog app-confirm-dialog"
       busy={resource.busy}
       onClose={onClose}
     >
