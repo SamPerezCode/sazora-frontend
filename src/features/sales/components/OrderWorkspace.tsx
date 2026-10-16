@@ -264,6 +264,7 @@ export function OrderWorkspace({
             <div className="sales-form-actions">
               <Button
                 variant="secondary"
+                data-dialog-initial-focus
                 disabled={resource.busy}
                 onClick={() => setConfirmDelivery(false)}
               >
@@ -291,7 +292,9 @@ export function OrderWorkspace({
           open
           variant="modal"
           title="Datos de la cuenta"
-          className="mp-dialog"
+          className={
+            editable ? "mp-dialog" : "mp-dialog app-confirm-dialog"
+          }
           busy={resource.busy}
           onClose={() => setShowDetails(false)}
         >
@@ -831,17 +834,13 @@ export function OrderWorkspace({
 
                   {editing === item.id && canAdd && (
                     <BottomSheet
-                      id={`${accountId}-item`}
+                      id={accountId + "-deliver"}
                       open
                       variant="modal"
-                      title={
-                        editable
-                          ? "Editar producto"
-                          : "Cancelar producto"
-                      }
-                      className="mp-dialog"
+                      title="¿Marcar esta orden como entregada?"
+                      className="app-confirm-dialog"
                       busy={resource.busy}
-                      onClose={() => setEditing(null)}
+                      onClose={() => setConfirmDelivery(false)}
                     >
                       <div className="mp-dialog-content">
                         <ItemEditor

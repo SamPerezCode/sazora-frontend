@@ -139,3 +139,154 @@
     }
   }
 }
+
+/* Confirmaciones: mismo fondo que la vista previa de comanda. */
+:root dialog.bottom-sheet.bottom-sheet-modal.app-confirm-dialog,
+:root[data-theme="dark"]
+  dialog.bottom-sheet.bottom-sheet-modal.app-confirm-dialog {
+  width: min(32rem, calc(100vw - 2rem));
+  max-width: 32rem;
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  border: 1px solid var(--sazora-outline);
+  border-radius: 1rem;
+
+  background: var(--sazora-background);
+  color: var(--sazora-heading);
+}
+
+/* Título integrado al fondo, sin franja de color. */
+:root dialog.bottom-sheet.app-confirm-dialog > .bottom-sheet-heading {
+  margin: 0;
+  padding: 1.5rem 3.75rem 0.75rem 1.5rem;
+
+  border: 0;
+  background: transparent;
+  color: var(--sazora-heading);
+  box-shadow: none;
+}
+
+:root
+  dialog.bottom-sheet.app-confirm-dialog
+  > .bottom-sheet-heading
+  h2 {
+  margin: 0;
+  min-width: 0;
+
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.35;
+
+  color: var(--sazora-heading);
+  overflow-wrap: anywhere;
+}
+
+/* Contenido y formulario sobre el mismo fondo. */
+:root
+  dialog.bottom-sheet.app-confirm-dialog
+  > :is(.mp-dialog-content, .sales-form, .kf-dialog-content) {
+  display: grid;
+  gap: 1rem;
+
+  margin: 0;
+  padding: 0.5rem 1.5rem 1.5rem;
+  max-height: none;
+  overflow: visible;
+
+  background: transparent;
+  color: var(--sazora-heading);
+}
+
+:root
+  dialog.bottom-sheet.app-confirm-dialog
+  > :is(.mp-dialog-content, .sales-form, .kf-dialog-content)
+  > p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* X discreta en la esquina; conserva un área de clic de 44 px. */
+:root
+  dialog.bottom-sheet.app-confirm-dialog
+  > .bottom-sheet-heading
+  .bottom-sheet-close {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+
+  border: 0;
+  border-radius: 0.75rem;
+  background: transparent;
+  color: var(--sazora-muted);
+  box-shadow: none;
+}
+
+:root
+  dialog.bottom-sheet.app-confirm-dialog
+  > .bottom-sheet-heading
+  .bottom-sheet-close:enabled:hover {
+  background: transparent;
+  color: var(--sazora-heading);
+}
+
+/* El foco sigue siendo visible al navegar con teclado. */
+:root
+  dialog.bottom-sheet.app-confirm-dialog
+  > .bottom-sheet-heading
+  .bottom-sheet-close:focus-visible {
+  outline: 2px solid var(--sazora-accent);
+  outline-offset: -3px;
+}
+
+:root
+  dialog.bottom-sheet.app-confirm-dialog
+  > .bottom-sheet-heading
+  .bottom-sheet-close:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:root
+  dialog.bottom-sheet.app-confirm-dialog
+  :is(.sales-form-actions, .kf-actions) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+:root
+  dialog.bottom-sheet.app-confirm-dialog
+  :is(.sales-form-actions, .kf-actions)
+  > button {
+  min-height: 2.75rem;
+}
+
+@media (max-width: 480px) {
+  :root
+    dialog.bottom-sheet.app-confirm-dialog
+    > .bottom-sheet-heading {
+    padding-left: 1rem;
+  }
+
+  :root
+    dialog.bottom-sheet.app-confirm-dialog
+    > :is(.mp-dialog-content, .sales-form, .kf-dialog-content) {
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+
+  :root
+    dialog.bottom-sheet.app-confirm-dialog
+    :is(.sales-form-actions, .kf-actions)
+    > button {
+    flex: 1 1 100%;
+  }
+}

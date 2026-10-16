@@ -201,7 +201,7 @@
     flex-direction: column;
   }
 
-  .sales-workspace .bottom-sheet-heading {
+  .sales-workspace > .bottom-sheet-heading {
     flex-shrink: 0;
     margin: 0;
     padding: 0.75rem 1rem;
@@ -209,7 +209,7 @@
     color: var(--sales-on-primary);
   }
 
-  .sales-workspace .bottom-sheet-heading h2 {
+  .sales-workspace > .bottom-sheet-heading h2 {
     font-size: 1.5rem;
   }
 
@@ -631,7 +631,7 @@
       border: 1px solid var(--sazora-outline);
     }
 
-    .sales-workspace .bottom-sheet-heading {
+    .sales-workspace > .bottom-sheet-heading {
       padding: 1rem 1.5rem;
     }
 

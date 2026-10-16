@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Trash2 } from "lucide-react";
-
+import { Trash2, X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 
 import type { Order } from "../schemas/sales.schema";
@@ -130,7 +129,7 @@ export function OrderCancellationActions({
       {modalVisible && (
         <dialog
           ref={dialogRef}
-          className="bottom-sheet bottom-sheet-modal sales-cancellation-dialog"
+          className="bottom-sheet bottom-sheet-modal sales-cancellation-dialog app-confirm-dialog"
           aria-labelledby={titleId}
           aria-describedby={textId}
           aria-busy={resource.busy || undefined}
@@ -147,6 +146,16 @@ export function OrderCancellationActions({
                   ? "¿Cancelar toda la orden?"
                   : "¿Cancelar la orden pendiente?"}
             </h2>
+
+            <button
+              type="button"
+              className="bottom-sheet-close"
+              aria-label="Cerrar confirmación"
+              disabled={resource.busy}
+              onClick={close}
+            >
+              <X aria-hidden="true" size={18} strokeWidth={1.75} />
+            </button>
           </div>
 
           <form
