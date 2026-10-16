@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { Alert } from "../../../components/feedback/Alert";
-import { LoadingState } from "../../../components/feedback/LoadingState";
+import { ListSkeleton } from "../../../components/feedback/ListSkeleton";
 import { BottomSheet } from "../../../components/layout/BottomSheet";
 import { Button } from "../../../components/ui/Button";
 import { useAppShell } from "../../../app/layout/shell-context";
@@ -200,9 +200,7 @@ function ProductsContent({ session }: { session: AuthSession }) {
 
   return (
     <div className="products-page">
-      {resource.loading && (
-        <LoadingState message="Cargando productos…" />
-      )}
+      {resource.loading && <ListSkeleton variant="products" />}
 
       {resource.error && (
         <Alert>

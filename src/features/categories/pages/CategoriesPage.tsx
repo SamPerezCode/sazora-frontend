@@ -3,7 +3,7 @@ import { Tags } from "lucide-react";
 import { CategoryList } from "../components/CategoryList";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { Alert } from "../../../components/feedback/Alert";
-import { LoadingState } from "../../../components/feedback/LoadingState";
+import { ListSkeleton } from "../../../components/feedback/ListSkeleton";
 import { BottomSheet } from "../../../components/layout/BottomSheet";
 import { Button } from "../../../components/ui/Button";
 
@@ -147,9 +147,7 @@ function CategoriesContent({ session }: { session: AuthSession }) {
           </span>
         )}
 
-        {resource.loading && (
-          <LoadingState message="Cargando categorías…" />
-        )}
+        {resource.loading && <ListSkeleton variant="categories" />}
 
         {resource.error && (
           <Alert>
