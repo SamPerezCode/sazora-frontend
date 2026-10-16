@@ -1,26 +1,68 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export function useKitchenSound() {
-  const [enabled, setEnabled] = useState(false);
-  const [error, setError] = useState("");
+export function useKitchenSound(userKey: string) {
+  const storageKey = "sazora:kitchen-sound:" + userKey;
 
+  const [enabled, setEnabled] = useState(() => {
+    try {
+      return localStorage.getItem(storageKey) === "on";
+    } catch {
+      return false;
+    }
+  });
+
+  const [error, setError] = useState("");
   const context = useRef<AudioContext | null>(null);
   const active = useRef(false);
-  const last = useRef(0);
+  const preferred = useRef(enabled);
   const mounted = useRef(false);
+  const last = useRef(0);
 
   useEffect(() => {
+    let live = true;
     mounted.current = true;
+    active.current = false;
+
+    async function unlock() {
+      if (!preferred.current || !live) return;
+
+      try {
+        const audio = context.current ?? new AudioContext();
+        context.current = audio;
+
+        await audio.resume();
+
+        if (!live) return;
+
+        active.current = audio.state === "running";
+
+        setError(
+          active.current
+            ? ""
+            : "Pulsa Sonido para habilitar el audio."
+        );
+      } catch {
+        if (live) {
+          setError("El navegador no permitió activar el sonido.");
+        }
+      }
+    }
+
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
 
     return () => {
+      live = false;
       mounted.current = false;
       active.current = false;
 
-      if (context.current) {
-        void context.current.close().catch(() => {});
-      }
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
 
+      const audio = context.current;
       context.current = null;
+
+      if (audio) void audio.close().catch(() => {});
     };
   }, []);
 
@@ -62,26 +104,34 @@ export function useKitchenSound() {
   }, []);
 
   async function toggle() {
-    if (active.current) {
-      active.current = false;
-      setEnabled(false);
-      return;
-    }
+    const next = !preferred.current;
+
+    preferred.current = next;
+    active.current = false;
+    setEnabled(next);
+    setError("");
 
     try {
-      if (!context.current) {
-        context.current = new AudioContext();
+      localStorage.setItem(storageKey, next ? "on" : "off");
+    } catch {
+      // La preferencia sigue disponible durante esta sesión.
+    }
+
+    if (!next) return;
+
+    try {
+      const audio = context.current ?? new AudioContext();
+      context.current = audio;
+
+      await audio.resume();
+
+      if (
+        mounted.current &&
+        preferred.current &&
+        context.current === audio
+      ) {
+        active.current = audio.state === "running";
       }
-
-      await context.current.resume();
-
-      if (!mounted.current) return;
-
-      active.current = true;
-      setEnabled(true);
-      setError("");
-
-      play("new");
     } catch {
       if (mounted.current) {
         setError("El navegador no permitió activar el sonido.");

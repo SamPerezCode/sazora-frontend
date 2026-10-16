@@ -22,6 +22,8 @@ import {
   nextItemStatus,
   nextTicketStatus,
   serviceLabel,
+  canKitchenTransition,
+  mutationKey,
 } from "../utils/kitchen.utils";
 
 export function KitchenTicketStatusBadge({
@@ -80,14 +82,20 @@ export function KitchenTicketItem({
   item,
   ticketId,
   disabled,
+  permissions,
   onAction,
 }: {
   item: KitchenItem;
   ticketId: string;
   disabled: boolean;
+  permissions: { prepare: boolean; deliver: boolean };
   onAction: (action: KitchenMutation) => void;
 }) {
-  const next = nextItemStatus(item);
+  const target = nextItemStatus(item);
+  const next =
+    target && canKitchenTransition(target, permissions)
+      ? target
+      : null;
 
   return (
     <li
@@ -112,7 +120,10 @@ export function KitchenTicketItem({
       {next && (
         <Button
           size="sm"
-          variant={next === "READY" ? "primary" : "secondary"}
+          variant={
+            next === "IN_PREPARATION" ? "secondary" : "primary"
+          }
+          data-delivery={next === "DELIVERED"}
           disabled={disabled}
           onClick={() =>
             onAction({
@@ -122,13 +133,17 @@ export function KitchenTicketItem({
             })
           }
         >
-          {next === "READY" ? (
-            <Check size={14} />
-          ) : (
+          {next === "IN_PREPARATION" ? (
             <Flame size={14} />
+          ) : (
+            <Check size={14} />
           )}
 
-          {next === "READY" ? "Listo" : "Comenzar"}
+          {next === "DELIVERED"
+            ? "Entregar"
+            : next === "READY"
+              ? "Listo"
+              : "Comenzar"}
         </Button>
       )}
     </li>
@@ -138,13 +153,17 @@ export function KitchenTicketItem({
 export function KitchenTicketCard({
   ticket,
   now,
-  busy,
+  pending,
+  permissions,
+  highlighted,
   disabled,
   onAction,
 }: {
   ticket: KitchenTicket;
   now: number;
-  busy: boolean;
+  pending: string[];
+  permissions: { prepare: boolean; deliver: boolean };
+  highlighted: boolean;
   disabled: boolean;
   onAction: (action: KitchenMutation) => void;
 }) {
@@ -155,7 +174,15 @@ export function KitchenTicketCard({
         ? ShoppingBag
         : UtensilsCrossed;
 
-  const next = nextTicketStatus(ticket);
+  const busy = pending.some((key) => key.startsWith(ticket.id + ":"));
+
+  const bulkBusy = pending.includes(ticket.id + ":all");
+  const target = nextTicketStatus(ticket);
+
+  const next =
+    target && canKitchenTransition(target, permissions)
+      ? target
+      : null;
 
   return (
     <article
@@ -163,6 +190,7 @@ export function KitchenTicketCard({
       data-status={ticket.status}
       data-delayed={isDelayed(ticket, now)}
       aria-busy={busy}
+      data-highlighted={highlighted}
     >
       <h3>
         <Icon size={17} />
@@ -177,11 +205,9 @@ export function KitchenTicketCard({
           Comanda #{ticket.id} · {ticket.preparationAreaName}
           {" · "}
           {clockTime(ticket.createdAt)}
-          {ticket.currentVersion > 1 && (
-            <span className="block mt-1 text-accent">
-              Comanda modificada · Versión {ticket.currentVersion}
-            </span>
-          )}
+          <span className="block mt-1 text-accent">
+            Versión {ticket.currentVersion}
+          </span>
         </p>
 
         <KitchenElapsedTime ticket={ticket} now={now} />
@@ -202,7 +228,17 @@ export function KitchenTicketCard({
               key={item.id}
               item={item}
               ticketId={ticket.id}
-              disabled={disabled || busy}
+              permissions={permissions}
+              disabled={
+                disabled ||
+                bulkBusy ||
+                pending.includes(
+                  mutationKey({
+                    ticketId: ticket.id,
+                    itemId: item.id,
+                  })
+                )
+              }
               onAction={onAction}
             />
           ))}
@@ -212,8 +248,11 @@ export function KitchenTicketCard({
         <Button
           className="kitchen-ticket-bulk"
           size="sm"
-          variant={next === "READY" ? "primary" : "secondary"}
-          loading={busy}
+          variant={
+            next === "IN_PREPARATION" ? "secondary" : "primary"
+          }
+          data-delivery={next === "DELIVERED"}
+          loading={bulkBusy}
           disabled={disabled || busy}
           onClick={() =>
             onAction({
@@ -222,13 +261,17 @@ export function KitchenTicketCard({
             })
           }
         >
-          {next === "READY" ? (
-            <Check size={15} />
-          ) : (
+          {next === "IN_PREPARATION" ? (
             <Flame size={15} />
+          ) : (
+            <Check size={15} />
           )}
 
-          {next === "READY" ? "Marcar todo listo" : "Comenzar todo"}
+          {next === "DELIVERED"
+            ? "Marcar entregado"
+            : next === "READY"
+              ? "Marcar todo listo"
+              : "Comenzar todo"}
         </Button>
       )}
 

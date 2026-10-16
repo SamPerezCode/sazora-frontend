@@ -1,27 +1,42 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { z } from "zod";
 import { ApiError } from "../../../lib/http/client";
 import { acquireSessionSocket } from "../../../lib/realtime/session-socket";
 import type { ConnectionStatus } from "../../../lib/realtime/session-socket";
 import type { AuthSession } from "../../auth/types/auth.types";
 import { useAuth } from "../../auth/hooks/useAuth";
+
 import { getPreparationAreas } from "../../preparation-areas/services/preparation-area.service";
 import type { PreparationArea } from "../../preparation-areas/schemas/preparation-area.schema";
-import { kitchenEvents } from "../schemas/kitchen.schema";
+
+import { getKitchenSettings } from "../../kitchen-flow/kitchen-flow.service";
+import type { LocationKitchenSettings } from "../../kitchen-flow/kitchen-flow.schema";
+import type { SalesScope } from "../../sales/services/sales.service";
+
+import {
+  kitchenEventNames,
+  kitchenEventSchema,
+} from "../schemas/kitchen.schema";
+
 import type {
-  KitchenTicket,
   KitchenMutation,
   KitchenNotice,
+  KitchenTicket,
 } from "../schemas/kitchen.schema";
+
 import {
   getKitchenTickets,
   updateKitchenStatus,
+  kitchenMessage,
 } from "../services/kitchen.service";
+
 import {
   isActiveItem,
   mergeKitchenItems,
   nextItemStatus,
   nextTicketStatus,
+  kitchenPermissions,
+  canKitchenTransition,
+  mutationKey,
   serviceLabel,
   KITCHEN_DEBOUNCE_MS,
   KITCHEN_POLL_MS,
@@ -30,9 +45,11 @@ import {
 type Snapshot = {
   tickets: KitchenTicket[];
   areas: PreparationArea[];
+  settings: LocationKitchenSettings | null;
   area: string;
   notices: KitchenNotice[];
   pending: string[];
+  highlighted: string[];
   connection: ConnectionStatus;
   paused: boolean;
   loading: boolean;
@@ -55,9 +72,11 @@ type Runtime = {
 const initial: Snapshot = {
   tickets: [],
   areas: [],
+  settings: null,
   area: "",
   notices: [],
   pending: [],
+  highlighted: [],
   connection: "connecting",
   paused: false,
   loading: true,
@@ -72,37 +91,43 @@ const initial: Snapshot = {
 
 export function useKitchen(
   session: AuthSession,
+  scope: SalesScope,
   play: (kind: "new" | "cancel") => void
 ) {
   const { logout } = useAuth();
   const [state, setState] = useState<Snapshot>(initial);
   const runtime = useRef<Runtime | null>(null);
 
-  const token = session.accessToken;
+  const { accessToken: token } = session;
   const businessId = session.business.id;
   const membershipId = session.membership.id;
   const userId = session.user.id;
 
+  const { prepare, deliver } = kitchenPermissions(
+    session.authorization.roles
+  );
+
   useEffect(() => {
     let live = true;
     let area = "";
-    let tickets: KitchenTicket[] = [];
     let paused = false;
-    let denied = false;
     let synchronized = false;
     let revision = 0;
-    let repeat = false;
-    let readError = "";
-    let areaError = "";
+    let queued = false;
+    let forceQueued = false;
 
+    let tickets: KitchenTicket[] = [];
+    let areas: PreparationArea[] = [];
     let reader: AbortController | null = null;
-    let areaReader: AbortController | null = null;
+
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let messageTimer: ReturnType<typeof setTimeout> | undefined;
 
     const writes = new Map<string, AbortController>();
-    const removedOrders = new Set<string>();
-    const knownTickets = new Map<string, KitchenTicket>();
     const seen = new Set<string>();
+    const expirations = new Set<ReturnType<typeof setTimeout>>();
+    const known = new Map<string, KitchenTicket>();
+    const sounds = new Set<string>();
 
     const lease = acquireSessionSocket({
       accessToken: token,
@@ -111,8 +136,6 @@ export function useKitchen(
       userId,
     });
 
-    let connection = lease.getStatus();
-
     function patch(values: Partial<Snapshot>) {
       if (live) {
         setState((previous) => ({ ...previous, ...values }));
@@ -120,571 +143,411 @@ export function useKitchen(
     }
 
     function commit(next: KitchenTicket[]) {
-      next.forEach((ticket) => {
-        knownTickets.delete(ticket.id);
-        knownTickets.set(ticket.id, ticket);
-      });
-
-      while (knownTickets.size > 500) {
-        knownTickets.delete(knownTickets.keys().next().value!);
-      }
-
-      tickets = next.filter(
-        (ticket) =>
-          !removedOrders.has(ticket.orderId) &&
-          ticket.items.some(isActiveItem)
+      tickets = next.filter((ticket) =>
+        ticket.items.some(isActiveItem)
       );
+
+      tickets.forEach((ticket) => known.set(ticket.id, ticket));
+
+      while (known.size > 500) {
+        known.delete(known.keys().next().value!);
+      }
 
       patch({ tickets });
     }
 
-    function invalidate() {
-      revision++;
-      synchronized = false;
-      patch({ synchronized: false });
+    function message(text: string) {
+      clearTimeout(messageTimer);
+      patch({ actionMessage: text });
+
+      messageTimer = setTimeout(
+        () => patch({ actionMessage: "" }),
+        7000
+      );
     }
 
-    function schedule() {
-      if (paused || denied) return;
+    function expire(operation: () => void) {
+      const handle = setTimeout(() => {
+        expirations.delete(handle);
+        if (live) operation();
+      }, 12_000);
 
-      clearTimeout(timer);
+      expirations.add(handle);
+    }
+
+    function schedule(force = false) {
+      if (!live || (paused && !force)) return;
+
+      forceQueued ||= force;
+
+      if (timer !== undefined) return;
 
       timer = setTimeout(() => {
-        void refresh();
+        timer = undefined;
+        const requestedForce = forceQueued;
+        forceQueued = false;
+        void refresh(requestedForce);
       }, KITCHEN_DEBOUNCE_MS);
     }
 
-    async function loadAreas() {
-      if (areaReader || denied) return;
-
-      const controller = new AbortController();
-      areaReader = controller;
-
-      try {
-        const areas = await getPreparationAreas(
-          token,
-          controller.signal
-        );
-
-        if (!live || controller.signal.aborted) return;
-
-        if (areas.some((item) => item.businessId !== businessId)) {
-          throw new Error(
-            "No pudimos verificar las áreas del negocio."
-          );
-        }
-
-        areaError = "";
-
-        patch({
-          areas: [...areas].sort(
-            (a, b) => a.displayOrder - b.displayOrder
-          ),
-          areaError: "",
-          areasLoaded: true,
-        });
-      } catch (cause) {
-        if (live && !controller.signal.aborted) {
-          areaError =
-            cause instanceof Error
-              ? cause.message
-              : "No pudimos cargar las áreas.";
-
-          patch({ areaError });
-        }
-      } finally {
-        if (areaReader === controller) {
-          areaReader = null;
-        }
-      }
-    }
-
     async function refresh(force = false) {
-      if (!live || denied || (paused && !force)) return;
+      if (
+        !live ||
+        (paused && !force) ||
+        lease.getStatus() === "rejected"
+      ) {
+        return;
+      }
 
       if (reader || writes.size) {
-        repeat = true;
+        queued = true;
+        forceQueued ||= force;
         return;
       }
 
       const controller = new AbortController();
-      const requestedRevision = revision;
-
       reader = controller;
-      repeat = false;
+
+      const expected = revision;
+      queued = false;
 
       patch({ refreshing: true });
 
       try {
-        const result = await getKitchenTickets(
-          token,
-          area,
-          controller.signal
-        );
+        const [settingsResult, areasResult, ticketsResult] =
+          await Promise.allSettled([
+            getKitchenSettings(token, scope, controller.signal),
+            getPreparationAreas(token, controller.signal, {
+              locationId: scope.location.id,
+              activeOnly: true,
+            }),
+            getKitchenTickets(token, scope, area, controller.signal),
+          ]);
 
         if (!live || controller.signal.aborted) return;
 
-        if (requestedRevision !== revision) {
-          repeat = true;
+        if (expected !== revision) {
+          queued = true;
           return;
         }
 
-        const invalidScope = result.some(
-          (ticket) =>
-            ticket.businessId !== businessId ||
-            (area !== "" && ticket.preparationAreaId !== area)
+        const failures = [
+          settingsResult,
+          areasResult,
+          ticketsResult,
+        ].filter((result) => result.status === "rejected");
+
+        const accessFailure = failures.find(
+          (result) =>
+            result.reason instanceof ApiError &&
+            (result.reason.status === 401 ||
+              [
+                "LOCATION_ACCESS_DENIED",
+                "LOCATION_NOT_FOUND",
+                "LOCATION_INACTIVE",
+                "LOCATION_NOT_POINT_OF_SALE",
+              ].includes(result.reason.code))
         );
 
-        if (invalidScope) {
-          throw new Error(
-            "No pudimos verificar las comandas recibidas."
-          );
-        }
-
-        commit(result);
-
-        readError = "";
-        synchronized = true;
-
-        patch({
-          error: "",
-          loading: false,
-          synchronized: true,
-          lastUpdated: Date.now(),
-        });
-      } catch (cause) {
-        if (live && !controller.signal.aborted) {
-          readError =
-            cause instanceof Error
-              ? cause.message
-              : "No pudimos actualizar las comandas.";
-
+        if (accessFailure) {
+          known.clear();
+          commit([]);
           synchronized = false;
 
-          if (cause instanceof ApiError && cause.status === 403) {
-            denied = true;
-            commit([]);
-          }
-
           patch({
-            error: readError,
+            settings: null,
+            areas: [],
             loading: false,
             synchronized: false,
+            error: kitchenMessage(accessFailure.reason),
+          });
+
+          return;
+        }
+
+        if (settingsResult.status === "fulfilled") {
+          patch({ settings: settingsResult.value });
+        }
+
+        if (areasResult.status === "fulfilled") {
+          areas = areasResult.value
+            .filter(
+              (value) =>
+                value.businessId === businessId &&
+                value.isActive &&
+                value.locations.some(
+                  (location) =>
+                    location.id === scope.location.id &&
+                    location.isActive
+                )
+            )
+            .sort((a, b) => a.displayOrder - b.displayOrder);
+
+          patch({
+            areas,
+            areaError: "",
+            areasLoaded: true,
+          });
+
+          if (area && !areas.some((value) => value.id === area)) {
+            area = "";
+            revision++;
+            commit([]);
+            synchronized = false;
+
+            patch({
+              area,
+              loading: true,
+              lastUpdated: null,
+              synchronized: false,
+            });
+
+            queued = true;
+            return;
+          }
+        } else {
+          patch({
+            areaError: kitchenMessage(areasResult.reason),
           });
         }
+
+        if (ticketsResult.status === "fulfilled") {
+          commit(ticketsResult.value);
+
+          const hasNew = tickets.some((ticket) =>
+            sounds.has(ticket.orderId)
+          );
+
+          sounds.clear();
+
+          if (hasNew) play("new");
+
+          patch({ lastUpdated: Date.now() });
+        }
+
+        const failure =
+          ticketsResult.status === "rejected"
+            ? ticketsResult
+            : settingsResult.status === "rejected"
+              ? settingsResult
+              : null;
+
+        synchronized = !failure;
+
+        patch({
+          loading: false,
+          synchronized,
+          error: failure ? kitchenMessage(failure.reason) : "",
+        });
       } finally {
         if (reader === controller) {
           reader = null;
           patch({ refreshing: false });
 
-          if (repeat) schedule();
+          if (queued) schedule(forceQueued);
         }
       }
     }
 
-    function notice(value: KitchenNotice) {
-      if (!live) return;
+    function onEvent(
+      name: (typeof kitchenEventNames)[number],
+      raw: unknown
+    ) {
+      if (!live || lease.getStatus() !== "connected") return;
 
-      setState((previous) => ({
-        ...previous,
-        notices: previous.notices.some((item) => item.id === value.id)
-          ? previous.notices
-          : [...previous.notices, value],
-      }));
-    }
+      const result = kitchenEventSchema.safeParse(raw);
+      if (!result.success) return;
 
-    function unique(key: string) {
-      if (seen.has(key)) return false;
+      const event = result.data;
 
-      seen.add(key);
+      if (
+        event.businessId !== businessId ||
+        event.locationId !== scope.location.id
+      ) {
+        return;
+      }
+
+      // El evento invalida la lectura; nunca inserta tarjetas.
+      revision++;
+      schedule();
+
+      const eventKey = name + ":" + JSON.stringify(raw);
+
+      if (seen.has(eventKey)) return;
+
+      seen.add(eventKey);
 
       if (seen.size > 1000) {
         seen.delete(seen.values().next().value!);
       }
 
-      return true;
-    }
-
-    function replaceStatus(
-      ticketId: string,
-      itemId: string,
-      status: KitchenTicket["items"][number]["preparationStatus"],
-      at: string
-    ) {
-      commit(
-        tickets.map((ticket) => {
-          if (ticket.id !== ticketId) return ticket;
-
-          const item = ticket.items.find(
-            (candidate) => candidate.id === itemId
+      const ticket = event.kitchenTicketId
+        ? known.get(event.kitchenTicketId)
+        : [...known.values()].find(
+            (value) => value.orderId === event.orderId
           );
 
-          if (!item) return ticket;
-
-          return mergeKitchenItems(ticket, [
-            {
-              ...item,
-              preparationStatus: status,
-              updatedAt: at,
-            },
-          ]);
-        })
+      const item = ticket?.items.find(
+        (value) => value.id === event.kitchenTicketItemId
       );
+
+      const relevant =
+        !area || !ticket || ticket.preparationAreaId === area;
+
+      const addition =
+        name === "order:items-added" &&
+        event.orderStatus === "CONFIRMED";
+
+      const quantity =
+        name === "order:item-quantity-cancelled" &&
+        event.cancelledQuantity !== undefined &&
+        event.remainingQuantity !== undefined;
+
+      const cancellation =
+        name === "order:item-cancelled" ||
+        quantity ||
+        (name === "order:status-updated" &&
+          event.status === "CANCELLED");
+
+      if (name === "order:confirmed" || addition) {
+        sounds.add(event.orderId);
+      }
+
+      if (cancellation && relevant) {
+        play("cancel");
+      }
+
+      if (!(addition || cancellation) || !relevant) return;
+
+      if (
+        addition &&
+        area &&
+        event.orderItems &&
+        !event.orderItems.some(
+          (value) => value.preparationAreaId === area
+        )
+      ) {
+        return;
+      }
+
+      const notice: KitchenNotice = {
+        id: eventKey,
+        orderId: event.orderId,
+        ticketId: event.kitchenTicketId,
+        areaId: ticket?.preparationAreaId,
+        label: ticket ? serviceLabel(ticket) : "Orden",
+        kind: addition
+          ? "addition"
+          : quantity
+            ? "quantity-cancelled"
+            : name === "order:status-updated"
+              ? "order-cancelled"
+              : "item-cancelled",
+        reason: event.cancellationReason,
+        productName: item?.productName,
+        quantity: quantity ? event.cancelledQuantity : item?.quantity,
+        remainingQuantity: event.remainingQuantity,
+      };
+
+      setState((previous) => ({
+        ...previous,
+        notices: [...previous.notices, notice],
+        highlighted: addition
+          ? [...new Set([...previous.highlighted, event.orderId])]
+          : previous.highlighted,
+      }));
+
+      if (addition) {
+        expire(() =>
+          setState((previous) => ({
+            ...previous,
+            notices: previous.notices.filter(
+              (value) => value.id !== eventKey
+            ),
+            highlighted: previous.highlighted.filter(
+              (id) => id !== event.orderId
+            ),
+          }))
+        );
+      }
     }
 
-    const cleanups: (() => void)[] = [];
-
-    function listen<T>(
-      name: string,
-      schema: z.ZodType<T>,
-      handler: (payload: T) => void
-    ) {
-      const listener = (raw: unknown) => {
-        if (connection !== "connected" || !live) return;
-
-        const parsed = schema.safeParse(raw);
-
-        if (!parsed.success) return;
-
-        const payload = parsed.data as T & {
-          businessId: string;
-        };
-
-        if (payload.businessId !== businessId) return;
-
-        handler(payload);
-      };
+    const listeners = kitchenEventNames.map((name) => {
+      const listener = (raw: unknown) => onEvent(name, raw);
 
       lease.socket.on(name, listener);
 
-      cleanups.push(() => {
-        lease.socket.off(name, listener);
-      });
-    }
+      return () => lease.socket.off(name, listener);
+    });
 
-    listen(
-      "order:confirmed",
-      kitchenEvents["order:confirmed"],
-      (payload) => {
-        if (
-          area &&
-          !payload.kitchenTickets.some(
-            (ticket) => ticket.preparationAreaId === area
-          )
-        ) {
-          return;
-        }
+    function connectionChanged(connection: ConnectionStatus) {
+      patch({ connection });
 
-        removedOrders.delete(payload.orderId);
-
-        if (
-          unique(
-            "confirmed:" + payload.orderId + ":" + payload.confirmedAt
-          )
-        ) {
-          play("new");
-        }
-
-        invalidate();
-        schedule();
-      }
-    );
-
-    listen(
-      "order:items-added",
-      kitchenEvents["order:items-added"],
-      (payload) => {
-        if (payload.orderStatus !== "CONFIRMED") return;
-
-        removedOrders.delete(payload.orderId);
-
-        const items = payload.orderItems.filter(
-          (item) => !area || item.preparationAreaId === area
-        );
-
-        if (!items.length) return;
-
-        const key =
-          "addition:" +
-          payload.orderId +
-          ":" +
-          items
-            .map((item) => item.id)
-            .sort()
-            .join(",");
-
-        if (unique(key)) {
-          notice({
-            id: key,
-            kind: "addition",
-            orderId: payload.orderId,
-            areaId: area || undefined,
-            label: "Nueva adición",
-          });
-
-          play("new");
-        }
-
-        invalidate();
-        schedule();
-      }
-    );
-
-    listen(
-      "kitchen-ticket:item-status-updated",
-      kitchenEvents["kitchen-ticket:item-status-updated"],
-      (payload) => {
-        replaceStatus(
-          payload.kitchenTicketId,
-          payload.kitchenTicketItemId,
-          payload.preparationStatus,
-          payload.updatedAt
-        );
-
-        invalidate();
-        schedule();
-      }
-    );
-
-    listen(
-      "order:item-cancelled",
-      kitchenEvents["order:item-cancelled"],
-      (payload) => {
-        const ticket = knownTickets.get(payload.kitchenTicketId);
-
-        const item = ticket?.items.find(
-          (value) => value.id === payload.kitchenTicketItemId
-        );
-
-        const key =
-          "cancel:" +
-          payload.kitchenTicketItemId +
-          ":" +
-          payload.cancelledAt;
-
-        if (unique(key)) {
-          notice({
-            id: key,
-            kind: "item-cancelled",
-            orderId: payload.orderId,
-            ticketId: payload.kitchenTicketId,
-            areaId: ticket?.preparationAreaId,
-            label: ticket
-              ? serviceLabel(ticket)
-              : "Producto cancelado",
-            productName: item?.productName,
-            quantity: item?.quantity,
-            reason: payload.cancellationReason,
-          });
-
-          play("cancel");
-        }
-
-        replaceStatus(
-          payload.kitchenTicketId,
-          payload.kitchenTicketItemId,
-          "CANCELLED",
-          payload.cancelledAt
-        );
-
-        invalidate();
-        schedule();
-      }
-    );
-
-    listen(
-      "order:status-updated",
-      kitchenEvents["order:status-updated"],
-      (payload) => {
-        if (payload.status === "CANCELLED") {
-          const ticket = [...knownTickets.values()].find(
-            (item) => item.orderId === payload.orderId
-          );
-
-          const key =
-            "order-cancel:" +
-            payload.orderId +
-            ":" +
-            payload.changedAt;
-
-          if (unique(key)) {
-            notice({
-              id: key,
-              kind: "order-cancelled",
-              orderId: payload.orderId,
-              label: ticket
-                ? serviceLabel(ticket)
-                : "Orden cancelada",
-            });
-
-            play("cancel");
-          }
-        }
-
-        if (payload.status === "CONFIRMED") {
-          removedOrders.delete(payload.orderId);
-        }
-
-        if (
-          ["CANCELLED", "CLOSED", "DELIVERED"].includes(
-            payload.status
-          )
-        ) {
-          removedOrders.add(payload.orderId);
-          commit(tickets);
-        }
-
-        invalidate();
-        schedule();
-      }
-    );
-
-    listen(
-      "order:item-quantity-cancelled",
-      kitchenEvents["order:item-quantity-cancelled"],
-      (payload) => {
-        const known = knownTickets.get(payload.kitchenTicketId);
-
-        const product = known?.items.find(
-          (item) => item.id === payload.kitchenTicketItemId
-        );
-
-        const key =
-          "quantity:" +
-          payload.orderItemId +
-          ":" +
-          payload.kitchenTicketVersion +
-          ":" +
-          payload.adjustedAt;
-
-        if (
-          unique(key) &&
-          (!area || !known || known.preparationAreaId === area)
-        ) {
-          notice({
-            id: key,
-            kind: "quantity-cancelled",
-            orderId: payload.orderId,
-            ticketId: payload.kitchenTicketId,
-            areaId: known?.preparationAreaId,
-            label: known
-              ? serviceLabel(known)
-              : "Cantidad modificada",
-            productName: product?.productName,
-            quantity: payload.cancelledQuantity,
-            remainingQuantity: payload.remainingQuantity,
-            reason: payload.cancellationReason,
-          });
-
-          play("cancel");
-        }
-
-        commit(
-          tickets.map((ticket) => {
-            if (
-              ticket.id !== payload.kitchenTicketId ||
-              ticket.orderId !== payload.orderId ||
-              payload.kitchenTicketVersion < ticket.currentVersion
-            ) {
-              return ticket;
-            }
-
-            const item = ticket.items.find(
-              (value) =>
-                value.id === payload.kitchenTicketItemId &&
-                value.orderItemId === payload.orderItemId
-            );
-
-            if (!item || !isActiveItem(item)) {
-              return ticket;
-            }
-
-            return {
-              ...mergeKitchenItems(ticket, [
-                {
-                  ...item,
-                  quantity: payload.remainingQuantity,
-                  updatedAt: payload.adjustedAt,
-                },
-              ]),
-              currentVersion: Math.max(
-                ticket.currentVersion,
-                payload.kitchenTicketVersion
-              ),
-            };
-          })
-        );
-
-        invalidate();
-        schedule();
-      }
-    );
-
-    function onConnection(next: ConnectionStatus) {
-      connection = next;
-      patch({ connection: next });
-
-      if (next === "rejected") {
-        denied = true;
-
+      if (connection === "rejected") {
         reader?.abort();
-        areaReader?.abort();
-
         writes.forEach((controller) => controller.abort());
-
+        known.clear();
         commit([]);
         logout();
-      } else if (next === "connected") {
-        invalidate();
+      } else if (connection === "connected") {
+        // La conexión compartida publica "connected" después de session:ready.
+        revision++;
         schedule();
       }
     }
 
-    const unsubscribe = lease.subscribe(onConnection);
-    onConnection(lease.getStatus());
+    const unsubscribe = lease.subscribe(connectionChanged);
 
     async function mutate(action: KitchenMutation) {
+      const key = mutationKey(action);
+      const bulkKey = action.ticketId + ":all";
+
       if (
         !live ||
-        denied ||
         paused ||
         !synchronized ||
-        writes.has(action.ticketId)
+        writes.has(key) ||
+        writes.has(bulkKey) ||
+        (!action.itemId &&
+          [...writes.keys()].some((value) =>
+            value.startsWith(action.ticketId + ":")
+          )) ||
+        !canKitchenTransition(action.status, { prepare, deliver })
       ) {
         return;
       }
 
       const ticket = tickets.find(
-        (item) => item.id === action.ticketId
+        (value) => value.id === action.ticketId
       );
 
       const item = ticket?.items.find(
         (value) => value.id === action.itemId
       );
 
-      const next = ticket
-        ? action.itemId
+      const next = !ticket
+        ? null
+        : action.itemId
           ? item
             ? nextItemStatus(item)
             : null
-          : nextTicketStatus(ticket)
-        : null;
+          : nextTicketStatus(ticket);
 
-      if (next !== action.status) {
-        patch({ actionMessage: "" });
-        invalidate();
-        schedule();
+      if (!ticket || next !== action.status) {
+        schedule(true);
         return;
       }
 
       const controller = new AbortController();
 
-      writes.set(action.ticketId, controller);
-      invalidate();
+      writes.set(key, controller);
+      revision++;
+      reader?.abort();
+      reader = null;
 
       patch({
         pending: [...writes.keys()],
-        actionMessage: "",
+        refreshing: false,
       });
 
       try {
@@ -696,76 +559,82 @@ export function useKitchen(
 
         if (!live || controller.signal.aborted) return;
 
-        if (result.orderId !== ticket!.orderId) {
-          throw new Error("No pudimos verificar la respuesta.");
+        if (
+          result.orderId !== ticket.orderId ||
+          result.items.some(
+            (value) =>
+              !ticket.items.some(
+                (old) =>
+                  old.id === value.id &&
+                  old.orderItemId === value.orderItemId
+              )
+          ) ||
+          (action.itemId &&
+            (result.items.length !== 1 ||
+              result.items[0].id !== action.itemId))
+        ) {
+          throw new Error(
+            "No pudimos verificar la respuesta. Actualiza antes de reintentar."
+          );
         }
 
         commit(
           tickets.map((value) =>
-            value.id === action.ticketId
+            value.id === ticket.id
               ? mergeKitchenItems(value, result.items)
               : value
           )
         );
 
-        patch({ actionMessage: "" });
+        message(
+          action.status === "DELIVERED"
+            ? "Entrega registrada."
+            : "Preparación actualizada."
+        );
       } catch (cause) {
         if (live && !controller.signal.aborted) {
-          const changed =
-            cause instanceof ApiError &&
-            [
-              "INVALID_KITCHEN_STATUS_TRANSITION",
-              "INVALID_KITCHEN_TICKET_STATUS_TRANSITION",
-            ].includes(cause.code);
-
-          patch({
-            actionMessage:
-              (changed
-                ? "El estado pudo cambiar en otro dispositivo. "
-                : "") +
-              (cause instanceof Error
-                ? cause.message
-                : "No pudimos actualizar."),
-          });
+          synchronized = false;
+          patch({ synchronized: false });
+          message(kitchenMessage(cause));
         }
       } finally {
-        writes.delete(action.ticketId);
+        writes.delete(key);
 
         if (live) {
           patch({ pending: [...writes.keys()] });
-          invalidate();
-          void refresh();
+          revision++;
+          void refresh(true);
         }
       }
     }
 
     runtime.current = {
       refresh() {
-        denied = connection === "rejected";
-
-        if (areaError) void loadAreas();
-
         void refresh(true);
       },
 
       selectArea(id) {
-        if (writes.size || id === area) return;
+        if (
+          writes.size ||
+          id === area ||
+          (id && !areas.some((value) => value.id === id))
+        ) {
+          return;
+        }
 
         area = id;
-        invalidate();
-
+        revision++;
         reader?.abort();
         reader = null;
-        repeat = false;
-        tickets = [];
+        synchronized = false;
+        commit([]);
 
         patch({
           area,
-          tickets: [],
           loading: true,
-          refreshing: false,
           lastUpdated: null,
           error: "",
+          synchronized: false,
         });
 
         void refresh(true);
@@ -775,12 +644,15 @@ export function useKitchen(
         if (writes.size) return;
 
         paused = !paused;
-        patch({ paused });
+        revision++;
+        reader?.abort();
+        reader = null;
+        clearTimeout(timer);
+        timer = undefined;
 
-        if (!paused) {
-          invalidate();
-          void refresh();
-        }
+        patch({ paused, refreshing: false });
+
+        if (!paused) void refresh(true);
       },
 
       mutate(action) {
@@ -789,33 +661,29 @@ export function useKitchen(
     };
 
     const poll = setInterval(() => {
-      if (connection !== "connected" || readError) {
-        void refresh();
-      }
+      void refresh();
     }, KITCHEN_POLL_MS);
 
-    const focus = () => {
-      void refresh();
-    };
+    const focus = () => schedule();
 
     window.addEventListener("focus", focus);
     window.addEventListener("online", focus);
 
-    void loadAreas();
-    void refresh();
+    connectionChanged(lease.getStatus());
+    schedule();
 
     return () => {
       live = false;
       runtime.current = null;
 
       clearTimeout(timer);
+      clearTimeout(messageTimer);
       clearInterval(poll);
+      expirations.forEach(clearTimeout);
 
       reader?.abort();
-      areaReader?.abort();
-
       writes.forEach((controller) => controller.abort());
-      cleanups.forEach((cleanup) => cleanup());
+      listeners.forEach((cleanup) => cleanup());
 
       unsubscribe();
       lease.release();
@@ -823,7 +691,17 @@ export function useKitchen(
       window.removeEventListener("focus", focus);
       window.removeEventListener("online", focus);
     };
-  }, [token, businessId, membershipId, userId, logout, play]);
+  }, [
+    token,
+    businessId,
+    membershipId,
+    userId,
+    scope,
+    prepare,
+    deliver,
+    logout,
+    play,
+  ]);
 
   const refresh = useCallback(() => runtime.current?.refresh(), []);
 
@@ -845,12 +723,13 @@ export function useKitchen(
   const dismiss = useCallback((id: string) => {
     setState((previous) => ({
       ...previous,
-      notices: previous.notices.filter((item) => item.id !== id),
+      notices: previous.notices.filter((notice) => notice.id !== id),
     }));
   }, []);
 
   return {
     ...state,
+    permissions: { prepare, deliver },
     refresh,
     selectArea,
     togglePause,

@@ -9,6 +9,32 @@ import type { SalesLocation } from "../services/sales.service";
 
 const selectedLocations = new Map<string, string>();
 
+function readSelection(key: string): string {
+  const cached = selectedLocations.get(key);
+
+  if (cached !== undefined) return cached;
+
+  try {
+    return sessionStorage.getItem("sazora:pos:" + key) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function saveSelection(key: string, id: string) {
+  selectedLocations.set(key, id);
+
+  try {
+    if (id) {
+      sessionStorage.setItem("sazora:pos:" + key, id);
+    } else {
+      sessionStorage.removeItem("sazora:pos:" + key);
+    }
+  } catch {
+    // La selección sigue disponible en memoria.
+  }
+}
+
 export function assignedSalesLocations(
   session: AuthSession
 ): SalesLocation[] {
@@ -46,8 +72,8 @@ export function useSalesLocations(session: AuthSession) {
   ].join(":");
 
   const [revision, setRevision] = useState(0);
-  const [selectedId, setSelectedId] = useState(
-    () => selectedLocations.get(selectionKey) ?? ""
+  const [selectedId, setSelectedId] = useState(() =>
+    readSelection(selectionKey)
   );
   const [issue, setIssue] = useState("");
 
@@ -98,7 +124,7 @@ export function useSalesLocations(session: AuthSession) {
           : initialSalesLocation(session, options);
 
         selected.current = next;
-        selectedLocations.set(selectionKey, next);
+        saveSelection(selectionKey, next);
         setSelectedId(next);
       } catch (cause) {
         if (!controller.signal.aborted) {
@@ -139,7 +165,7 @@ export function useSalesLocations(session: AuthSession) {
         rejected.current.add(selected.current);
       }
 
-      selectedLocations.delete(selectionKey);
+      saveSelection(selectionKey, "");
       selected.current = "";
       setSelectedId("");
       setIssue(message);
@@ -161,7 +187,7 @@ export function useSalesLocations(session: AuthSession) {
       if (!permitted.some((option) => option.id === id)) return;
 
       selected.current = id;
-      selectedLocations.set(selectionKey, id);
+      saveSelection(selectionKey, id);
       setSelectedId(id);
       setIssue("");
     },

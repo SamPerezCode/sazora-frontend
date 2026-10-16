@@ -144,7 +144,11 @@ export function KitchenColumn({
               key={ticket.id}
               ticket={ticket}
               now={now}
-              busy={resource.pending.includes(ticket.id)}
+              pending={resource.pending}
+              permissions={resource.permissions}
+              highlighted={resource.highlighted.includes(
+                ticket.orderId
+              )}
               disabled={resource.paused || !resource.synchronized}
               onAction={resource.mutate}
             />
@@ -182,7 +186,7 @@ export function KitchenBoard({
   now: number;
 }) {
   return (
-    <div className="kitchen-board">
+    <div className="kitchen-board" aria-busy={resource.refreshing}>
       {columns.map((column) => (
         <KitchenColumn
           key={column.status}

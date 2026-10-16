@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Wifi,
   WifiOff,
+  CircleCheck,
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { SelectField } from "../../../components/forms/SelectField";
@@ -20,8 +21,8 @@ type Resource = ReturnType<typeof useKitchen>;
 const labels: Record<ConnectionStatus, string> = {
   connecting: "Conectando",
   connected: "En línea",
-  reconnecting: "Reconectando",
-  disconnected: "Sin conexión en tiempo real",
+  reconnecting: "Reconectando…",
+  disconnected: "Sin conexión",
   rejected: "Autenticación rechazada",
 };
 
@@ -35,14 +36,21 @@ export function KitchenConnectionStatus({
   return (
     <p
       className="kitchen-connection"
-      data-online={resource.connection === "connected"}
+      role="status"
+      aria-live="polite"
+      data-online={
+        resource.connection === "connected" && !resource.error
+      }
     >
       <Icon size={14} aria-hidden="true" />
 
-      {labels[resource.connection]}
+      {resource.error ? "Sin conexión" : labels[resource.connection]}
 
       {resource.lastUpdated !== null && (
-        <span> · Actualizado {clockTime(resource.lastUpdated)}</span>
+        <span>
+          {" · Actualizado "}
+          {new Date(resource.lastUpdated).toLocaleTimeString("es-CO")}
+        </span>
       )}
     </p>
   );
@@ -58,13 +66,17 @@ export function PreparationAreaSelector({
       label="Área de preparación"
       hideLabel
       value={resource.area}
-      disabled={resource.pending.length > 0}
+      disabled={
+        resource.pending.length > 0 ||
+        !resource.areasLoaded ||
+        !!resource.areaError
+      }
       onValueChange={resource.selectArea}
       options={[
         { value: "", label: "Todas las áreas" },
         ...resource.areas.map((area) => ({
           value: area.id,
-          label: area.name + (area.isActive ? "" : " · Inactiva"),
+          label: area.name,
         })),
       ]}
     />
@@ -144,6 +156,16 @@ export function KitchenHeader({
           {sound.enabled ? <Bell size={15} /> : <BellOff size={15} />}
           Sonido
         </Button>
+
+        <span
+          tabIndex={0}
+          title="El historial de comandas se consulta desde el historial de órdenes."
+        >
+          <Button size="sm" variant="secondary" disabled>
+            <CircleCheck size={15} />
+            Terminadas
+          </Button>
+        </span>
 
         <Button
           size="sm"

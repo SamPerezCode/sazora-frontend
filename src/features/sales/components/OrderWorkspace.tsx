@@ -71,6 +71,7 @@ export function OrderWorkspace({
   const [category, setCategory] = useState("");
   const [showAccount, setShowAccount] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [confirmDelivery, setConfirmDelivery] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [partialItemId, setPartialItemId] = useState<string | null>(
     null
@@ -245,6 +246,45 @@ export function OrderWorkspace({
 
   return (
     <div className="sales-order-body">
+      {confirmDelivery && directDelivery && (
+        <BottomSheet
+          id={accountId + "-deliver"}
+          open
+          variant="modal"
+          title="¿Marcar esta orden como entregada?"
+          busy={resource.busy}
+          onClose={() => setConfirmDelivery(false)}
+        >
+          <div className="mp-dialog-content">
+            <p>
+              Se marcarán como entregados todos los productos activos
+              de la orden.
+            </p>
+
+            <div className="sales-form-actions">
+              <Button
+                variant="secondary"
+                disabled={resource.busy}
+                onClick={() => setConfirmDelivery(false)}
+              >
+                Volver
+              </Button>
+
+              <Button
+                disabled={blocked || pendingCount > 0}
+                loading={resource.busy}
+                onClick={async () => {
+                  const delivered = await resource.deliver();
+                  if (delivered) setConfirmDelivery(false);
+                }}
+              >
+                Marcar entregada
+              </Button>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
+
       {showDetails && editable && (
         <BottomSheet
           id={`${accountId}-details`}
@@ -603,7 +643,7 @@ export function OrderWorkspace({
                 {screenWorkflow
                   ? "Seguimiento en cocina"
                   : workflowMode === "PRINT_ONLY"
-                    ? "Comandas impresas"
+                    ? "Solo comandas impresas"
                     : "Modo no disponible"}
               </small>
             )}
@@ -982,7 +1022,7 @@ export function OrderWorkspace({
                 size="sm"
                 variant="soft"
                 disabled={blocked || pendingCount > 0}
-                onClick={() => void resource.deliver()}
+                onClick={() => setConfirmDelivery(true)}
               >
                 <Check size={16} aria-hidden="true" />
                 Marcar pedido como entregado

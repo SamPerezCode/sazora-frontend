@@ -1,7 +1,8 @@
 import { ApiError, request } from "../../lib/http/client";
 
 import type { SalesScope } from "../sales/services/sales.service";
-import { ticketsResponseSchema } from "../sales/schemas/sales.schema";
+import { getOrder } from "../sales/services/sales.service";
+import { getOrderKitchenHistory } from "../sales/services/sales-history.service";
 
 import {
   initialPrintBody,
@@ -96,22 +97,22 @@ export async function getOrderKitchenTickets(
   orderId: string,
   signal?: AbortSignal
 ) {
-  // El contrato actual no admite locationId ni orderId como query.
-  const response = await request(
-    "/kitchen-tickets",
-    ticketsResponseSchema,
-    {
-      accessToken: token,
-      cache: "no-store",
-      signal,
-    }
-  );
+  const readSignal = signal ?? new AbortController().signal;
 
-  return response.data.kitchenTickets.filter(
-    (ticket) =>
-      ticket.businessId === scope.businessId &&
-      ticket.orderId === orderId
-  );
+  // El listado activo de Cocina excluye PRINT_ONLY y comandas terminadas.
+  // El historial real conserva las comandas de ambos modos.
+  const [order, history] = await Promise.all([
+    getOrder(token, orderId, scope, readSignal),
+    getOrderKitchenHistory(token, scope, orderId, readSignal),
+  ]);
+
+  if (order.id !== history.orderId) invalidResponse();
+
+  return history.tickets.map((ticket) => ({
+    ...ticket,
+    businessId: order.businessId,
+    orderId: order.id,
+  }));
 }
 
 function verifyPrint(

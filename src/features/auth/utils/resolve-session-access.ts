@@ -82,6 +82,13 @@ export function resolveSessionAccess(
 
   const isAdmin = roles.includes("ADMIN");
 
+  const kitchenPaths = roles.some(
+    (role) =>
+      role === "ADMIN" || role === "KITCHEN" || role === "WAITER"
+  )
+    ? ["/cocina"]
+    : [];
+
   const defaultLocation =
     locations.find((location) => location.id === defaultLocationId) ??
     null;
@@ -110,6 +117,7 @@ export function resolveSessionAccess(
       home: "/panel",
       allowedPaths: [
         "/panel",
+        ...kitchenPaths,
         ...(isAdmin
           ? [
               "/configuracion",
@@ -149,7 +157,7 @@ export function resolveSessionAccess(
     return {
       kind: "blocked",
       home: "/acceso",
-      allowedPaths: ["/acceso"],
+      allowedPaths: ["/acceso", ...kitchenPaths],
       workspaces: [],
       entryWorkspaces: [],
       defaultLocation,
@@ -172,6 +180,7 @@ export function resolveSessionAccess(
     kind: choose ? "choose" : "single",
     home: choose ? "/espacios" : entryWorkspaces[0].path,
     allowedPaths: [
+      ...kitchenPaths,
       ...workspaces.map((workspace) => workspace.path),
       ...(choose ? ["/espacios"] : []),
     ],

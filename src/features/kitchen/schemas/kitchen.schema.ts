@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import { quantityCancelledEventSchema } from "../../../lib/orders/quantity-cancellation";
-
 export const kitchenId = z.string().regex(/^[1-9]\d*$/);
 
 const date = z.iso.datetime({ offset: true });
@@ -40,6 +38,10 @@ export const kitchenTicketSchema = z.object({
   id: kitchenId,
   businessId: kitchenId,
   orderId: kitchenId,
+  locationId: kitchenId,
+  locationCode: z.string(),
+  locationName: z.string(),
+  kitchenWorkflowMode: z.enum(["PRINT_ONLY", "PRINT_AND_SCREEN"]),
   preparationAreaId: kitchenId,
   preparationAreaName: z.string(),
   serviceType: z.enum(["TABLE", "TAKEAWAY", "DELIVERY"]),
@@ -56,6 +58,7 @@ export const kitchenTicketSchema = z.object({
 export const ticketsResponse = z.object({
   status: z.literal("success"),
   data: z.object({
+    locationId: kitchenId,
     kitchenTickets: z.array(kitchenTicketSchema),
   }),
 });
@@ -78,74 +81,40 @@ export const ticketMutationResponse = z.object({
   }),
 });
 
-const orderStatus = z.enum([
-  "OPEN",
-  "CONFIRMED",
-  "DELIVERED",
-  "CLOSED",
-  "CANCELLED",
-]);
-
-export const kitchenEvents = {
-  "order:item-quantity-cancelled": quantityCancelledEventSchema,
-  "order:confirmed": z.object({
-    businessId: kitchenId,
-    orderId: kitchenId,
-    confirmedAt: date,
-    status: z.literal("CONFIRMED"),
-
-    kitchenTickets: z.array(
+// Los eventos invalidan HTTP; sus campos opcionales alimentan los avisos.
+export const kitchenEventSchema = z.object({
+  businessId: kitchenId,
+  locationId: kitchenId,
+  orderId: kitchenId,
+  status: z.string().optional(),
+  orderStatus: z.string().optional(),
+  kitchenTicketId: kitchenId.optional(),
+  kitchenTicketItemId: kitchenId.optional(),
+  cancellationReason: z.string().nullable().optional(),
+  cancelledQuantity: z.number().int().positive().optional(),
+  remainingQuantity: z.number().int().nonnegative().optional(),
+  orderItems: z
+    .array(
       z.object({
         id: kitchenId,
         preparationAreaId: kitchenId,
-        currentVersion: z.number(),
-        orderItemIds: z.array(kitchenId),
       })
-    ),
-  }),
+    )
+    .optional(),
+});
 
-  "order:items-added": z.object({
-    businessId: kitchenId,
-    orderId: kitchenId,
-    orderStatus,
-    orderItems: z.array(
-      z.object({
-        id: kitchenId,
-        preparationAreaId: kitchenId,
-        createdAt: date,
-      })
-    ),
-  }),
-
-  "kitchen-ticket:item-status-updated": z.object({
-    businessId: kitchenId,
-    orderId: kitchenId,
-    kitchenTicketId: kitchenId,
-    kitchenTicketItemId: kitchenId,
-    preparationStatus: itemStatusSchema,
-    updatedAt: date,
-  }),
-
-  "order:item-cancelled": z.object({
-    businessId: kitchenId,
-    orderId: kitchenId,
-    orderItemId: kitchenId,
-    kitchenTicketId: kitchenId,
-    kitchenTicketItemId: kitchenId,
-    kitchenTicketVersion: z.number().int().nonnegative(),
-    preparationStatus: z.literal("CANCELLED"),
-    cancellationReason: z.string().nullable(),
-    cancelledAt: date,
-  }),
-
-  "order:status-updated": z.object({
-    businessId: kitchenId,
-    orderId: kitchenId,
-    status: orderStatus,
-    previousStatus: orderStatus,
-    changedAt: date,
-  }),
-};
+export const kitchenEventNames = [
+  "order:created",
+  "order:confirmed",
+  "order:items-added",
+  "order:item-updated",
+  "order:item-removed",
+  "order:item-cancelled",
+  "order:item-quantity-cancelled",
+  "order:updated",
+  "order:status-updated",
+  "kitchen-ticket:item-status-updated",
+] as const;
 
 export type KitchenTicket = z.infer<typeof kitchenTicketSchema>;
 export type KitchenItem = z.infer<typeof kitchenItemSchema>;
@@ -154,7 +123,7 @@ export type KitchenStatus = KitchenTicket["status"];
 export type KitchenMutation = {
   ticketId: string;
   itemId?: string;
-  status: "IN_PREPARATION" | "READY";
+  status: "IN_PREPARATION" | "READY" | "DELIVERED";
 };
 
 export type KitchenNotice = {
