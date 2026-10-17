@@ -8,6 +8,7 @@ import { SalesPage } from "../../features/sales/pages/SalesPage";
 import { KitchenPage } from "../../features/kitchen/pages/KitchenPage";
 import { InventoryPage } from "../../features/inventory/pages/InventoryPage";
 import { ConfigurationPage } from "../../features/business/pages/ConfigurationPage";
+import { ReportsPage } from "../../features/reports/ReportsPage";
 import { AppShell } from "../layout/AppShell";
 import {
   GuestOnly,
@@ -29,6 +30,7 @@ export function AppRouter() {
           <Route element={<RequireAccess />}>
             <Route element={<AppShell />}>
               <Route path="/panel" element={<DashboardPage />} />
+              <Route path="/estadisticas" element={<ReportsPage />} />
               <Route path="/ventas" element={<SalesPage />} />
               <Route path="/cocina" element={<KitchenPage />} />
               <Route path="/inventario" element={<InventoryPage />} />

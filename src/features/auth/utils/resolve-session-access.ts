@@ -126,6 +126,7 @@ export function resolveSessionAccess(
               "/productos",
               "/productos/categorias",
               "/inventario",
+              "/estadisticas",
             ]
           : []),
         ...workspaces.map((workspace) => workspace.path),

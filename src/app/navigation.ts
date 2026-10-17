@@ -114,12 +114,14 @@ const navigation: readonly NavigationItem[] = [
   },
   {
     id: "statistics",
-    label: "Estadísticas",
-    description: "Indicadores de la operación.",
+    label: "Dashboard e informes",
+    description:
+      "Resumen, ventas, cancelaciones y operación de cocina.",
     icon: ChartNoAxesColumnIncreasing,
     roles: ["ADMIN"],
     group: "main",
-    status: "planned",
+    status: "ready",
+    to: "/estadisticas",
   },
   {
     id: "public-menu",

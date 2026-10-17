@@ -8,6 +8,8 @@ import {
 
 import { ChevronDown, Copy, Eye, Printer } from "lucide-react";
 
+import type { ReactNode } from "react";
+
 import { useAppShell } from "../../../app/layout/shell-context";
 import { ApiError } from "../../../lib/http/client";
 import { useTimedMessage } from "../../../hooks/useTimedMessage";
@@ -54,11 +56,24 @@ import { OrderStatusBadge } from "./OrderStatusBadge";
 import "../sales-history-detail.css";
 
 interface Props {
-  row: OrderSummary;
+  row: Pick<
+    OrderSummary,
+    | "id"
+    | "serviceType"
+    | "restaurantTableId"
+    | "restaurantTableName"
+    | "restaurantTableCode"
+  >;
+
   token: string;
   scope: SalesScope;
   onClose: () => void;
   onLocationLost: (message: string) => void;
+
+  readOnly?: boolean;
+  context?: ReactNode;
+  formatAmount?: (value: string) => string;
+  formatDate?: (value: string) => string;
 }
 
 interface DetailState {
@@ -122,6 +137,10 @@ function HistoryDetailContent({
   scope,
   onClose,
   onLocationLost,
+  readOnly = false,
+  context,
+  formatAmount = (value) => money(cents(value)),
+  formatDate = printDate,
 }: Props) {
   const id = useId();
   const { session } = useAppShell();
@@ -132,9 +151,11 @@ function HistoryDetailContent({
   const reader = useRef<AbortController | null>(null);
   const historyLock = useRef(false);
 
-  const canReprint = session.authorization.roles.some((role) =>
-    ["ADMIN", "WAITER", "KITCHEN"].includes(role)
-  );
+  const canReprint =
+    !readOnly &&
+    session.authorization.roles.some((role) =>
+      ["ADMIN", "WAITER", "KITCHEN"].includes(role)
+    );
 
   const reportAccess = useCallback(
     (cause: unknown) => {
@@ -367,7 +388,7 @@ function HistoryDetailContent({
         <>
           <p className="hd-subtitle">
             {service} · {order.location.name} ·{" "}
-            {printDate(order.createdAt)}
+            {formatDate(order.createdAt)}
           </p>
 
           <div className="hd-body">
@@ -375,6 +396,7 @@ function HistoryDetailContent({
               className="hd-main"
               aria-label="Detalle de la orden"
             >
+              {context}
               <dl className="hd-meta">
                 <div>
                   <dt>Estado</dt>
@@ -465,10 +487,10 @@ function HistoryDetailContent({
                         </td>
 
                         <td>{item.quantity} ×</td>
-                        <td>{money(cents(item.unitPrice))}</td>
+                        <td>{formatAmount(item.unitPrice)}</td>
                         <td>
                           <strong>
-                            {money(cents(item.lineTotal))}
+                            {formatAmount(item.lineTotal)}
                           </strong>
                         </td>
                       </tr>
@@ -490,7 +512,7 @@ function HistoryDetailContent({
                       </th>
                       <td>
                         <strong>
-                          {money(cents(order.subtotal))}
+                          {formatAmount(order.subtotal)}
                         </strong>
                       </td>
                     </tr>
@@ -513,7 +535,7 @@ function HistoryDetailContent({
                     value ? (
                       <div key={label}>
                         <dt>{label}</dt>
-                        <dd>{printDate(value)}</dd>
+                        <dd>{formatDate(value)}</dd>
                       </div>
                     ) : null
                   )}
@@ -523,7 +545,7 @@ function HistoryDetailContent({
               <p className="hd-muted">
                 {canReprint
                   ? "La información de la orden no puede modificarse. Las comandas pueden reimprimirse con autorización."
-                  : "Consulta en modo de lectura."}
+                  : "Consulta administrativa en modo de solo lectura."}
               </p>
             </section>
 

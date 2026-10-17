@@ -92,6 +92,19 @@ export function RequireAccess() {
 
   const path = pathname.replace(/\/+$/, "") || "/";
 
+  if (
+    path === "/estadisticas" &&
+    !state.session.authorization.roles.includes("ADMIN")
+  ) {
+    return (
+      <main className="p-6">
+        <Alert>
+          No tienes permisos para consultar estos informes.
+        </Alert>
+      </main>
+    );
+  }
+
   return access.allowedPaths.includes(path) ? (
     <Outlet />
   ) : (
