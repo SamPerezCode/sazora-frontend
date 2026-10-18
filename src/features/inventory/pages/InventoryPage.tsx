@@ -31,6 +31,7 @@ import { InventoryConsumption } from "../components/InventoryConsumption";
 import { InventoryProduction } from "../components/InventoryProduction";
 import { ProductInventorySetupDialog } from "../components/ProductInventorySetupDialog";
 import { useInventoryRealtime } from "../../../hooks/useInventoryRealtime";
+import { InventoryLocationPage } from "./InventoryLocationPage";
 
 import {
   dayKey,
@@ -49,11 +50,53 @@ import {
 
 export function InventoryPage() {
   const { session } = useAppShell();
+  const [params, setParams] = useSearchParams();
+
+  const tab = params.get("tab");
+
+  const legacy =
+    tab === "consumption" ||
+    params.has("productId") ||
+    params.has("setupProductId");
+
+  const key =
+    session.business.id +
+    ":" +
+    session.membership.id +
+    ":" +
+    session.accessToken;
+
+  if (!legacy) {
+    return <InventoryLocationPage key={key} />;
+  }
 
   return (
-    <InventoryScreen
-      key={session.business.id + ":" + session.membership.id}
-    />
+    <div className="grid min-w-0 gap-4">
+      <div>
+        <Button
+          variant="soft"
+          onClick={() =>
+            setParams((previous) => {
+              const next = new URLSearchParams(previous);
+
+              [
+                "tab",
+                "productId",
+                "setupProductId",
+                "intent",
+                "itemId",
+              ].forEach((name) => next.delete(name));
+
+              return next;
+            })
+          }
+        >
+          Volver al inventario por ubicación
+        </Button>
+      </div>
+
+      <InventoryScreen key={key} />
+    </div>
   );
 }
 
