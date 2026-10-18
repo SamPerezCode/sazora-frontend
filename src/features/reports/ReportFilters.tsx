@@ -1,5 +1,6 @@
 import { SelectField } from "../../components/forms/SelectField";
 import { Button } from "../../components/ui/Button";
+import { DateField } from "../../components/forms/DateField";
 
 import type {
   ReportFilters as Filters,
@@ -29,6 +30,7 @@ interface Props {
 
   employeesLoading: boolean;
   areasLoading: boolean;
+  timeZone: string;
 
   onChange: (key: keyof Filters, value: string) => void;
   onApply: () => void;
@@ -38,6 +40,7 @@ interface Props {
 
 export function ReportFilters({
   tab,
+  timeZone,
   draft,
   errors,
   employees,
@@ -83,27 +86,27 @@ export function ReportFilters({
       }}
     >
       <div className="rp-filter-grid">
-        {(["from", "to"] as const).map((key) => (
-          <label key={key} className="rp-field">
-            {key === "from" ? "Desde" : "Hasta"}
+        <DateField
+          className="rp-field"
+          label="Desde"
+          value={draft.from}
+          max={draft.to || undefined}
+          timeZone={timeZone}
+          error={errors.from}
+          clearable={false}
+          onValueChange={(value) => onChange("from", value)}
+        />
 
-            <input
-              type="date"
-              value={draft[key]}
-              aria-invalid={!!errors[key]}
-              aria-describedby={
-                errors[key] ? `rp-${key}-error` : undefined
-              }
-              onChange={(event) => onChange(key, event.target.value)}
-            />
-
-            {errors[key] && (
-              <small id={`rp-${key}-error`} role="alert">
-                {errors[key]}
-              </small>
-            )}
-          </label>
-        ))}
+        <DateField
+          className="rp-field"
+          label="Hasta"
+          value={draft.to}
+          min={draft.from || undefined}
+          timeZone={timeZone}
+          error={errors.to}
+          clearable={false}
+          onValueChange={(value) => onChange("to", value)}
+        />
 
         {tab === "kitchen" &&
           select(

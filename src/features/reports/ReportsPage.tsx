@@ -474,6 +474,7 @@ function ReportsContent({
         <>
           <ReportFilters
             tab={tab}
+            timeZone={timezone}
             draft={active.draft}
             errors={active.errors}
             employees={(employees.data ?? []).map((employee) => ({

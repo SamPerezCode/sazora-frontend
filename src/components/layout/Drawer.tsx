@@ -52,7 +52,7 @@ export function Drawer({
           onClose();
         }
       }}
-      className="fixed inset-y-0 left-0 m-0 h-dvh max-h-none w-64 max-w-[calc(100vw-2rem)] border-0 bg-transparent p-0 text-inherit backdrop:bg-black/50"
+      className="app-drawer fixed inset-y-0 left-0 m-0 h-dvh max-h-none w-64 max-w-[calc(100vw-2rem)] border-0 bg-transparent p-0 text-inherit backdrop:bg-black/50"
     >
       {children}
     </dialog>

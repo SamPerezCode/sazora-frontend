@@ -1635,3 +1635,60 @@ dialog.mp-workspace-summary {
     padding-inline: 0.7rem;
   }
 }
+
+/* Fechas del historial con el calendario compartido */
+
+.mp-history .mp-history-filter-grid > .date-field {
+  align-self: start;
+  gap: 0.5rem;
+}
+
+.mp-history .date-field > .date-field-label {
+  margin: 0;
+
+  color: var(--sazora-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.mp-history .date-field > .date-field-trigger {
+  box-sizing: border-box;
+
+  width: 100%;
+  min-width: 0;
+  min-height: var(--form-control-height, 2.75rem);
+
+  border: 1px solid var(--control-border, var(--sazora-outline));
+  border-radius: var(--control-radius, 0.75rem);
+
+  background: var(--sazora-background);
+  color: var(--sazora-heading);
+
+  box-shadow: var(--button-shadow, none);
+
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-history .date-field > .date-field-trigger > span {
+  white-space: nowrap;
+}
+
+.mp-history .date-field > .date-field-trigger > svg {
+  color: var(--sazora-heading);
+}
+
+.mp-history .date-field > .date-field-trigger[aria-expanded="true"] {
+  border-color: var(--sazora-accent);
+}
+
+.mp-history .date-field > .date-field-trigger[aria-invalid="true"] {
+  border-color: var(--sazora-action-danger);
+}
+
+.mp-history .date-field > .date-field-trigger:focus-visible {
+  outline: 2px solid var(--sazora-accent);
+  outline-offset: 2px;
+}

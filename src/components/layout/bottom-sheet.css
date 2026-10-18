@@ -290,3 +290,66 @@
     flex: 1 1 100%;
   }
 }
+
+/* Entrada compartida de modales, paneles inferiores y drawer. */
+
+@keyframes sazora-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(
+      var(--dialog-enter-x, 0),
+      var(--dialog-enter-y, 12px),
+      0
+    );
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sazora-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * Solo animamos cuando el usuario permite movimiento.
+ * El fondo conserva el color definido por cada módulo.
+ */
+@media screen and (prefers-reduced-motion: no-preference) {
+  dialog.bottom-sheet[open],
+  dialog.app-drawer[open] {
+    animation: sazora-dialog-enter 220ms
+      cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  dialog.bottom-sheet[open]::backdrop,
+  dialog.app-drawer[open]::backdrop {
+    animation: sazora-backdrop-enter 180ms ease-out backwards;
+  }
+
+  /* Panel inferior. */
+  dialog.bottom-sheet:not(.bottom-sheet-modal) {
+    --dialog-enter-x: 0px;
+    --dialog-enter-y: 24px;
+  }
+
+  /* Modal centrado. */
+  dialog.bottom-sheet.bottom-sheet-modal {
+    --dialog-enter-x: 0px;
+    --dialog-enter-y: 12px;
+  }
+
+  /* Navegación lateral. */
+  dialog.app-drawer {
+    --dialog-enter-x: -24px;
+    --dialog-enter-y: 0px;
+  }
+}

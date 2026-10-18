@@ -189,9 +189,22 @@
  * Al cerrar el último modal, el navegador retira
  * automáticamente esta regla.
  */
+/* Bloqueo del fondo al abrir cualquier modal. */
 @layer base {
-  html:has(dialog:modal),
-  html:has(dialog:modal) body {
+  html {
+    /*
+     * Conserva el espacio de la barra de desplazamiento.
+     * Evita cambios de ancho al abrir y cerrar modales.
+     */
+    scrollbar-gutter: stable;
+  }
+
+  html:has(dialog:modal) {
+    /*
+     * Bloqueamos únicamente el desplazamiento del documento.
+     * body conserva su comportamiento y los elementos sticky
+     * mantienen su referencia al viewport.
+     */
     overflow: hidden;
   }
 }

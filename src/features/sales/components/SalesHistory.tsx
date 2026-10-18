@@ -3,6 +3,7 @@ import { ArrowLeft, Eye, RefreshCw, Search } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { SelectField } from "../../../components/forms/SelectField";
 import { Alert } from "../../../components/feedback/Alert";
+import { DateField } from "../../../components/forms/DateField";
 
 import { ApiError } from "../../../lib/http/client";
 
@@ -289,31 +290,21 @@ export function SalesHistory({
             ]}
           />
 
-          <label className="sales-label" htmlFor={fromId}>
-            Desde
-            <input
-              id={fromId}
-              type="date"
-              value={from}
-              max={until || undefined}
-              onChange={(event) =>
-                change(setFrom, event.target.value)
-              }
-            />
-          </label>
+          <DateField
+            id={fromId}
+            label="Desde"
+            value={from}
+            max={until || undefined}
+            onValueChange={(value) => change(setFrom, value)}
+          />
 
-          <label className="sales-label" htmlFor={untilId}>
-            Hasta
-            <input
-              id={untilId}
-              type="date"
-              value={until}
-              min={from || undefined}
-              onChange={(event) =>
-                change(setUntil, event.target.value)
-              }
-            />
-          </label>
+          <DateField
+            id={untilId}
+            label="Hasta"
+            value={until}
+            min={from || undefined}
+            onValueChange={(value) => change(setUntil, value)}
+          />
 
           <SelectField
             label="Ordenar"
