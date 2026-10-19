@@ -40,7 +40,8 @@ export function OrderCancellationActions({
 
   const cancellable = !!orderId && (status === "OPEN" || confirmed);
 
-  const disabled = resource.busy || resource.uncertain;
+  const disabled =
+    resource.busy || resource.sending || resource.uncertain;
 
   const cancellationBlocked =
     disabled || verificationPending || (confirmed && delivered);
@@ -74,11 +75,11 @@ export function OrderCancellationActions({
   }
 
   return (
-    <div className="sales-cancellation-actions">
+    <div className="sales-cancellation-actions" data-draft={!orderId}>
       {!orderId && (
         <Button
           size="sm"
-          variant="danger"
+          variant="secondary"
           disabled={disabled}
           onClick={() => setMode("discard")}
         >
@@ -86,7 +87,6 @@ export function OrderCancellationActions({
           Descartar borrador
         </Button>
       )}
-
       {orderId && confirmed && pendingCount > 0 && (
         <Button
           size="sm"
@@ -97,7 +97,6 @@ export function OrderCancellationActions({
           Descartar adiciones
         </Button>
       )}
-
       {cancellable && (
         <Button
           size="sm"
@@ -117,7 +116,6 @@ export function OrderCancellationActions({
             : "Cancelar orden pendiente"}
         </Button>
       )}
-
       {confirmed && delivered && (
         <p className="sales-price-note">
           La orden tiene productos entregados y ya no puede cancelarse
@@ -125,7 +123,6 @@ export function OrderCancellationActions({
           que todavía no hayan sido entregados.
         </p>
       )}
-
       {modalVisible && (
         <dialog
           ref={dialogRef}

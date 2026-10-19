@@ -334,21 +334,6 @@ export function OrderWorkspace({
         </BottomSheet>
       )}
 
-      {data.ticketsError && (
-        <div className="mp-warning" role="alert">
-          {data.ticketsError}
-
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={resource.busy}
-            onClick={resource.retry}
-          >
-            Actualizar cuenta
-          </Button>
-        </div>
-      )}
-
       {partialItemId && order.id && (
         <CancelUnitsDialog
           key={partialItemId}
@@ -392,707 +377,754 @@ export function OrderWorkspace({
               : "Datos de la cuenta"}
           </button>
         )}
-
-        {order.notes && <p>{order.notes}</p>}
       </div>
 
-      {(resource.notice ||
-        resource.error ||
-        resource.uncertain ||
-        awaitingConfirmation ||
-        needsConfirmation ||
-        cancellationPending) && (
-        <div className="sales-order-notice" role="status">
-          <p>
-            {resource.notice ||
-              resource.error ||
-              "La orden está guardada y pendiente de confirmación."}
-          </p>
+      <div
+        className="sales-mobile-tabs"
+        role="group"
+        aria-label="Vista de la cuenta"
+      >
+        <button
+          type="button"
+          aria-pressed={!showAccount}
+          aria-controls={accountId + "-catalog"}
+          onClick={() => setShowAccount(false)}
+        >
+          Catálogo
+        </button>
 
-          {(awaitingConfirmation || needsConfirmation) &&
-            !cancellationPending && (
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={
-                  resource.busy ||
-                  resource.uncertain ||
-                  pendingCount > 0
-                }
-                onClick={() => void resource.retryConfirmation()}
-              >
-                Reintentar confirmación
-              </Button>
-            )}
+        <button
+          type="button"
+          aria-pressed={showAccount}
+          aria-controls={accountId}
+          onClick={() => setShowAccount(true)}
+        >
+          Cuenta
+          {pendingCount > 0
+            ? " · " + pendingCount + " por enviar"
+            : ""}
+        </button>
+      </div>
 
-          {cancellationPending && (
+      <div className="sales-workspace-content">
+        {order.notes && (
+          <p className="sales-account-notes">{order.notes}</p>
+        )}
+
+        {data.ticketsError && (
+          <div className="mp-warning" role="alert">
+            {data.ticketsError}
+
             <Button
               size="sm"
               variant="secondary"
               disabled={resource.busy}
-              onClick={() => void resource.verifyCancellation()}
+              onClick={resource.retry}
             >
-              Verificar cancelación
+              Actualizar cuenta
             </Button>
-          )}
+          </div>
+        )}
 
-          {resource.uncertain ? (
-            <>
-              {!order.id && (
-                <>
-                  <p>
-                    Revisa las cuentas activas antes de volver a
-                    enviar.
-                    {possibleCreatedOrder
-                      ? ` Hay una orden #${possibleCreatedOrder.id} en esta mesa; comprueba si corresponde a este pedido.`
-                      : ""}
-                  </p>
+        {(resource.notice ||
+          resource.error ||
+          resource.uncertain ||
+          awaitingConfirmation ||
+          needsConfirmation ||
+          cancellationPending) && (
+          <div className="sales-order-notice" role="status">
+            <p>
+              {resource.notice ||
+                resource.error ||
+                "La orden está guardada y pendiente de confirmación."}
+            </p>
 
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={resource.busy}
-                    onClick={() => resource.select(null)}
-                  >
-                    Ver cuentas activas sin reenviar
-                  </Button>
-                </>
-              )}
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={resource.busy}
-                onClick={resource.retry}
-              >
-                Actualizar cuentas para revisar
-              </Button>
-
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={resource.busy}
-                onClick={() => void resource.reconcile()}
-              >
-                {resource.needsWriteVerification
-                  ? "Verificar operación"
-                  : "Ya revisé las cuentas: habilitar acciones"}
-              </Button>
-
-              {resource.uncertainAdditions && (
-                <div className="sales-form-actions">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={resource.busy}
-                    onClick={() => void resource.reconcile("applied")}
-                  >
-                    Ya aparecen guardadas: descartar copia local
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={resource.busy}
-                    onClick={() =>
-                      void resource.reconcile("not-applied")
-                    }
-                  >
-                    Verifiqué que faltan: conservar para reintentar
-                  </Button>
-                </div>
-              )}
-            </>
-          ) : (
-            resource.error && (
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={resource.busy}
-                onClick={resource.retry}
-              >
-                Actualizar cuenta
-              </Button>
-            )
-          )}
-        </div>
-      )}
-
-      <div
-        className="sales-order-layout"
-        data-account={showAccount}
-        data-readonly={!canAdd}
-      >
-        <section className="sales-catalog" aria-label="Catálogo">
-          <div className="sales-catalog-tools">
-            <label className="sales-search" htmlFor={searchId}>
-              <Search size={17} aria-hidden="true" />
-
-              <span className="sr-only">Buscar plato o bebida</span>
-
-              <input
-                id={searchId}
-                type="search"
-                placeholder="Buscar plato o bebida"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </label>
-
-            <div
-              className="sales-chips"
-              aria-label="Filtrar por categoría"
-            >
-              <button
-                type="button"
-                aria-pressed={!category}
-                onClick={() => setCategory("")}
-              >
-                Todo
-              </button>
-
-              {categories.map(([id, name]) => (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={category === id}
-                  onClick={() => setCategory(id)}
+            {(awaitingConfirmation || needsConfirmation) &&
+              !cancellationPending && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={
+                    resource.busy ||
+                    resource.uncertain ||
+                    pendingCount > 0
+                  }
+                  onClick={() => void resource.retryConfirmation()}
                 >
-                  {name}
-                </button>
-              ))}
-            </div>
-          </div>
+                  Reintentar confirmación
+                </Button>
+              )}
 
-          <div className="sales-product-grid">
-            {!products.length && (
-              <p className="sales-muted">
-                No hay productos disponibles con ese filtro.
-              </p>
+            {cancellationPending && (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={resource.busy}
+                onClick={() => void resource.verifyCancellation()}
+              >
+                Verificar cancelación
+              </Button>
             )}
 
-            {products.map((product) => (
-              <article key={product.id} className="sales-product">
-                <Avatar
-                  name={product.name}
-                  src={resolveFileUrl(product.imageUrl)}
-                  size="md"
-                />
+            {resource.uncertain ? (
+              <>
+                {!order.id && (
+                  <>
+                    <p>
+                      Revisa las cuentas activas antes de volver a
+                      enviar.
+                      {possibleCreatedOrder
+                        ? ` Hay una orden #${possibleCreatedOrder.id} en esta mesa; comprueba si corresponde a este pedido.`
+                        : ""}
+                    </p>
 
-                <div className="sales-product-content">
-                  <h3>{product.name}</h3>
-                  <p>{product.description}</p>
-
-                  <div className="sales-product-bottom">
-                    <strong>
-                      {money(cents(product.currentPrice))}
-                    </strong>
-
-                    {canAdd && (
-                      <div className="sales-quantity">
-                        {!!draft[product.id] && (
-                          <>
-                            <button
-                              type="button"
-                              className="sales-icon"
-                              disabled={blocked}
-                              aria-label={`Quitar uno de ${product.name} del borrador`}
-                              onClick={() =>
-                                changeQuantity(product.id, -1)
-                              }
-                            >
-                              <Minus size={15} />
-                            </button>
-
-                            <span aria-label="Cantidad por enviar">
-                              {draft[product.id].quantity}
-                            </span>
-                          </>
-                        )}
-
-                        <button
-                          type="button"
-                          className="sales-icon sales-add"
-                          disabled={blocked}
-                          aria-label={`Agregar ${product.name}`}
-                          onClick={() =>
-                            changeQuantity(product.id, 1)
-                          }
-                        >
-                          <Plus size={17} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <aside
-          id={accountId}
-          className="sales-current"
-          aria-label="Cuenta actual"
-        >
-          <h3>
-            <ReceiptText size={18} />
-
-            {order.status === "DELIVERED"
-              ? "Resumen de la cuenta"
-              : "Cuenta actual"}
-
-            {order.status === "CONFIRMED" && (
-              <small className="kf-workflow-badge">
-                {screenWorkflow
-                  ? "Seguimiento en cocina"
-                  : workflowMode === "PRINT_ONLY"
-                    ? "Solo comandas impresas"
-                    : "Modo no disponible"}
-              </small>
-            )}
-
-            <span>
-              {items.reduce((sum, item) => sum + item.quantity, 0) +
-                pendingCount}{" "}
-              unidades
-            </span>
-          </h3>
-
-          <div className="sales-lines">
-            {unsentAdditions.length > 0 && (
-              <div className="sales-order-notice" role="status">
-                <p>
-                  Esta cuenta está por cerrar, pero conserva adiciones
-                  locales sin enviar. No están incluidas en el
-                  subtotal. Revísalas y descártalas antes de cerrar.
-                </p>
-
-                <ul>
-                  {unsentAdditions.map(([id, item]) => (
-                    <li key={id}>
-                      {item.quantity} × {item.name}
-                      {item.notes ? ` · ${item.notes}` : ""}
-                    </li>
-                  ))}
-                </ul>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={resource.busy}
+                      onClick={() => resource.select(null)}
+                    >
+                      Ver cuentas activas sin reenviar
+                    </Button>
+                  </>
+                )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={resource.busy}
+                  onClick={resource.retry}
+                >
+                  Actualizar cuentas para revisar
+                </Button>
 
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={blocked}
-                  onClick={() => {
-                    if (order.id) {
-                      resource.discardAdditions(order.id);
-                    }
-                  }}
+                  disabled={resource.busy}
+                  onClick={() => void resource.reconcile()}
                 >
-                  <Trash2
-                    size={15}
-                    aria-hidden="true"
-                    className="text-[#ae483c] dark:text-[#efa38f]"
-                  />
-                  Descartar adiciones sin enviar
+                  {resource.needsWriteVerification
+                    ? "Verificar operación"
+                    : "Ya revisé las cuentas: habilitar acciones"}
                 </Button>
+
+                {resource.uncertainAdditions && (
+                  <div className="sales-form-actions">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={resource.busy}
+                      onClick={() =>
+                        void resource.reconcile("applied")
+                      }
+                    >
+                      Ya aparecen guardadas: descartar copia local
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={resource.busy}
+                      onClick={() =>
+                        void resource.reconcile("not-applied")
+                      }
+                    >
+                      Verifiqué que faltan: conservar para reintentar
+                    </Button>
+                  </div>
+                )}
+              </>
+            ) : (
+              resource.error && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={resource.busy}
+                  onClick={resource.retry}
+                >
+                  Actualizar cuenta
+                </Button>
+              )
+            )}
+          </div>
+        )}
+
+        <div
+          className="sales-order-layout"
+          data-account={showAccount}
+          data-readonly={!canAdd}
+        >
+          <section
+            id={accountId + "-catalog"}
+            className="sales-catalog"
+            aria-label="Catálogo"
+          >
+            {" "}
+            <div className="sales-catalog-tools">
+              <label className="sales-search" htmlFor={searchId}>
+                <Search size={17} aria-hidden="true" />
+
+                <span className="sr-only">Buscar plato o bebida</span>
+
+                <input
+                  id={searchId}
+                  type="search"
+                  placeholder="Buscar plato o bebida"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </label>
+
+              <div
+                className="sales-chips"
+                aria-label="Filtrar por categoría"
+              >
+                <button
+                  type="button"
+                  aria-pressed={!category}
+                  onClick={() => setCategory("")}
+                >
+                  Todo
+                </button>
+
+                {categories.map(([id, name]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={category === id}
+                    onClick={() => setCategory(id)}
+                  >
+                    {name}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
+            <div className="sales-product-grid">
+              {!products.length && (
+                <p className="sales-muted">
+                  No hay productos disponibles con ese filtro.
+                </p>
+              )}
 
-            {!items.length && !pendingCount && (
-              <div className="mp-empty">
-                <ShoppingBag size={28} />
-                <strong>La cuenta está vacía</strong>
-                <p>Agrega productos para comenzar.</p>
-              </div>
-            )}
+              {products.map((product) => (
+                <article key={product.id} className="sales-product">
+                  <Avatar
+                    name={product.name}
+                    src={resolveFileUrl(product.imageUrl)}
+                    size="md"
+                  />
 
-            {order.status === "CONFIRMED" && items.length > 0 && (
-              <h4 className="sales-eyebrow">Productos confirmados</h4>
-            )}
+                  <div className="sales-product-content">
+                    <h3>{product.name}</h3>
+                    <p>{product.description}</p>
 
-            {items.map((item) => {
-              const ticket = ticketItems.get(item.id);
+                    <div className="sales-product-bottom">
+                      <strong>
+                        {money(cents(product.currentPrice))}
+                      </strong>
 
-              return (
-                <article key={item.id} className="sales-line">
-                  <strong>{item.productName}</strong>
+                      {canAdd && (
+                        <div className="sales-quantity">
+                          {!!draft[product.id] && (
+                            <>
+                              <button
+                                type="button"
+                                className="sales-icon"
+                                disabled={blocked}
+                                aria-label={`Quitar uno de ${product.name} del borrador`}
+                                onClick={() =>
+                                  changeQuantity(product.id, -1)
+                                }
+                              >
+                                <Minus size={15} />
+                              </button>
 
-                  <p>
-                    {item.quantity} × {money(cents(item.unitPrice))}
-                    {" · "}
-                    {money(cents(item.lineTotal))}
-                  </p>
-
-                  {item.notes && <p>{item.notes}</p>}
-
-                  {(order.status === "OPEN" || screenWorkflow) && (
-                    <span className="sales-line-status">
-                      {order.status === "OPEN"
-                        ? "Sin enviar"
-                        : ticket
-                          ? PREPARATION_LABELS[
-                              ticket.preparationStatus
-                            ]
-                          : "Preparación no disponible"}
-                    </span>
-                  )}
-
-                  <div className="sales-line-actions">
-                    {editable && (
-                      <>
-                        <button
-                          type="button"
-                          className="sales-icon"
-                          disabled={blocked}
-                          aria-label={`Editar ${item.productName}`}
-                          onClick={() =>
-                            setEditing(
-                              editing === item.id ? null : item.id
-                            )
-                          }
-                        >
-                          <Pencil size={15} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="sales-link sales-remove-product"
-                          disabled={blocked}
-                          aria-label={`Retirar ${item.productName}`}
-                          onClick={() =>
-                            void resource.action(
-                              `/orders/${order.id}/items/${item.id}`,
-                              "DELETE"
-                            )
-                          }
-                        >
-                          <Trash2 size={15} aria-hidden="true" />
-                          Quitar
-                        </button>
-                      </>
-                    )}
-
-                    {order.status === "CONFIRMED" &&
-                      item.status === "ACTIVE" &&
-                      ticket &&
-                      [
-                        "PENDING",
-                        "PREPARING",
-                        "IN_PREPARATION",
-                        "READY",
-                      ].includes(ticket.preparationStatus) && (
-                        <>
-                          {item.quantity > 1 && (
-                            <button
-                              type="button"
-                              className="sales-link sales-remove-product"
-                              disabled={blocked}
-                              onClick={() => {
-                                resource.clearNotice();
-                                setEditing(null);
-                                setPartialItemId(item.id);
-                              }}
-                            >
-                              <Minus size={15} aria-hidden="true" />
-                              Cancelar unidades
-                            </button>
+                              <span aria-label="Cantidad por enviar">
+                                {draft[product.id].quantity}
+                              </span>
+                            </>
                           )}
 
                           <button
                             type="button"
-                            className="sales-link"
+                            className="sales-icon sales-add"
                             disabled={blocked}
+                            aria-label={`Agregar ${product.name}`}
+                            onClick={() =>
+                              changeQuantity(product.id, 1)
+                            }
+                          >
+                            <Plus size={17} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <aside
+            id={accountId}
+            className="sales-current"
+            aria-label="Cuenta actual"
+          >
+            <h3>
+              <ReceiptText size={18} />
+
+              {order.status === "DELIVERED"
+                ? "Resumen de la cuenta"
+                : "Cuenta actual"}
+
+              {order.status === "CONFIRMED" && (
+                <small className="kf-workflow-badge">
+                  {screenWorkflow
+                    ? "Seguimiento en cocina"
+                    : workflowMode === "PRINT_ONLY"
+                      ? "Solo comandas impresas"
+                      : "Modo no disponible"}
+                </small>
+              )}
+
+              <span>
+                {items.reduce((sum, item) => sum + item.quantity, 0) +
+                  pendingCount}{" "}
+                unidades
+              </span>
+            </h3>
+
+            <div className="sales-lines">
+              {unsentAdditions.length > 0 && (
+                <div className="sales-order-notice" role="status">
+                  <p>
+                    Esta cuenta está por cerrar, pero conserva
+                    adiciones locales sin enviar. No están incluidas
+                    en el subtotal. Revísalas y descártalas antes de
+                    cerrar.
+                  </p>
+
+                  <ul>
+                    {unsentAdditions.map(([id, item]) => (
+                      <li key={id}>
+                        {item.quantity} × {item.name}
+                        {item.notes ? ` · ${item.notes}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={blocked}
+                    onClick={() => {
+                      if (order.id) {
+                        resource.discardAdditions(order.id);
+                      }
+                    }}
+                  >
+                    <Trash2
+                      size={15}
+                      aria-hidden="true"
+                      className="text-[#ae483c] dark:text-[#efa38f]"
+                    />
+                    Descartar adiciones sin enviar
+                  </Button>
+                </div>
+              )}
+
+              {!items.length && !pendingCount && (
+                <div className="mp-empty">
+                  <ShoppingBag size={28} />
+                  <strong>La cuenta está vacía</strong>
+                  <p>Agrega productos para comenzar.</p>
+                </div>
+              )}
+
+              {order.status === "CONFIRMED" && items.length > 0 && (
+                <h4 className="sales-eyebrow">
+                  Productos confirmados
+                </h4>
+              )}
+
+              {items.map((item) => {
+                const ticket = ticketItems.get(item.id);
+
+                return (
+                  <article key={item.id} className="sales-line">
+                    <strong>{item.productName}</strong>
+
+                    <p>
+                      {item.quantity} × {money(cents(item.unitPrice))}
+                      {" · "}
+                      {money(cents(item.lineTotal))}
+                    </p>
+
+                    {item.notes && <p>{item.notes}</p>}
+
+                    {(order.status === "OPEN" || screenWorkflow) && (
+                      <span className="sales-line-status">
+                        {order.status === "OPEN"
+                          ? "Sin enviar"
+                          : ticket
+                            ? PREPARATION_LABELS[
+                                ticket.preparationStatus
+                              ]
+                            : "Preparación no disponible"}
+                      </span>
+                    )}
+
+                    <div className="sales-line-actions">
+                      {editable && (
+                        <>
+                          <button
+                            type="button"
+                            className="sales-icon"
+                            disabled={blocked}
+                            aria-label={`Editar ${item.productName}`}
                             onClick={() =>
                               setEditing(
                                 editing === item.id ? null : item.id
                               )
                             }
                           >
-                            {item.quantity > 1
-                              ? "Cancelar producto completo"
-                              : "Cancelar producto"}
+                            <Pencil size={15} />
+                          </button>
+
+                          <button
+                            type="button"
+                            className="sales-link sales-remove-product"
+                            disabled={blocked}
+                            aria-label={`Retirar ${item.productName}`}
+                            onClick={() =>
+                              void resource.action(
+                                `/orders/${order.id}/items/${item.id}`,
+                                "DELETE"
+                              )
+                            }
+                          >
+                            <Trash2 size={15} aria-hidden="true" />
+                            Quitar
                           </button>
                         </>
                       )}
 
-                    {screenWorkflow &&
-                      ticket?.preparationStatus === "READY" && (
-                        <Button
-                          size="sm"
-                          disabled={blocked}
-                          onClick={() =>
-                            void resource.action(
-                              `/kitchen-tickets/${ticket.ticketId}/items/${ticket.id}/status`,
-                              "PATCH",
-                              { status: "DELIVERED" }
-                            )
-                          }
-                        >
-                          <Check size={15} />
-                          Entregar
-                        </Button>
-                      )}
+                      {order.status === "CONFIRMED" &&
+                        item.status === "ACTIVE" &&
+                        ticket &&
+                        [
+                          "PENDING",
+                          "PREPARING",
+                          "IN_PREPARATION",
+                          "READY",
+                        ].includes(ticket.preparationStatus) && (
+                          <>
+                            {item.quantity > 1 && (
+                              <button
+                                type="button"
+                                className="sales-link sales-remove-product"
+                                disabled={blocked}
+                                onClick={() => {
+                                  resource.clearNotice();
+                                  setEditing(null);
+                                  setPartialItemId(item.id);
+                                }}
+                              >
+                                <Minus size={15} aria-hidden="true" />
+                                Cancelar unidades
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              className="sales-link"
+                              disabled={blocked}
+                              onClick={() =>
+                                setEditing(
+                                  editing === item.id ? null : item.id
+                                )
+                              }
+                            >
+                              {item.quantity > 1
+                                ? "Cancelar producto completo"
+                                : "Cancelar producto"}
+                            </button>
+                          </>
+                        )}
+
+                      {screenWorkflow &&
+                        ticket?.preparationStatus === "READY" && (
+                          <Button
+                            size="sm"
+                            disabled={blocked}
+                            onClick={() =>
+                              void resource.action(
+                                `/kitchen-tickets/${ticket.ticketId}/items/${ticket.id}/status`,
+                                "PATCH",
+                                { status: "DELIVERED" }
+                              )
+                            }
+                          >
+                            <Check size={15} />
+                            Entregar
+                          </Button>
+                        )}
+                    </div>
+
+                    {editing === item.id && canAdd && (
+                      <BottomSheet
+                        id={accountId + "-deliver"}
+                        open
+                        variant="modal"
+                        title="¿Marcar esta orden como entregada?"
+                        className="app-confirm-dialog"
+                        busy={resource.busy}
+                        onClose={() => setConfirmDelivery(false)}
+                      >
+                        <div className="mp-dialog-content">
+                          <ItemEditor
+                            key={`${item.id}:${order.status}`}
+                            item={item}
+                            cancel={!editable}
+                            busy={blocked}
+                            onClose={() => setEditing(null)}
+                            onSave={async (body) => {
+                              const ok = await resource.action(
+                                `/orders/${order.id}/items/${item.id}${
+                                  editable ? "" : "/cancel"
+                                }`,
+                                editable ? "PATCH" : "POST",
+                                body
+                              );
+
+                              if (ok) {
+                                setEditing(null);
+                              }
+                            }}
+                          />
+                        </div>
+                      </BottomSheet>
+                    )}
+                  </article>
+                );
+              })}
+
+              {canAdd && pendingCount > 0 && (
+                <h4 className="sales-eyebrow">
+                  Productos por enviar
+                </h4>
+              )}
+
+              {draftEntries.map(([id, item]) => (
+                <article
+                  key={id}
+                  className="sales-line sales-draft-line"
+                >
+                  <div className="sales-line-heading">
+                    <strong>{item.name}</strong>
+
+                    <button
+                      type="button"
+                      className="sales-link sales-remove-product"
+                      disabled={blocked || !canAdd}
+                      aria-label={`Quitar ${item.name} del carrito`}
+                      onClick={() => removeDraftItem(id)}
+                    >
+                      <Trash2 size={15} aria-hidden="true" />
+                      Quitar
+                    </button>
                   </div>
 
-                  {editing === item.id && canAdd && (
-                    <BottomSheet
-                      id={accountId + "-deliver"}
-                      open
-                      variant="modal"
-                      title="¿Marcar esta orden como entregada?"
-                      className="app-confirm-dialog"
-                      busy={resource.busy}
-                      onClose={() => setConfirmDelivery(false)}
+                  <p>
+                    {item.quantity} × {money(cents(item.price))}
+                  </p>
+
+                  <label className="sales-label">
+                    Nota del producto
+                    <input
+                      value={item.notes}
+                      placeholder="Ej. Sin cebolla"
+                      disabled={blocked}
+                      onChange={(event) =>
+                        resource.setDraft(order.id, {
+                          ...draft,
+                          [id]: {
+                            ...item,
+                            notes: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+
+                  <div className="sales-quantity">
+                    <button
+                      type="button"
+                      className="sales-icon"
+                      disabled={blocked}
+                      aria-label={`Quitar uno de ${item.name}`}
+                      onClick={() => changeQuantity(id, -1)}
                     >
-                      <div className="mp-dialog-content">
-                        <ItemEditor
-                          key={`${item.id}:${order.status}`}
-                          item={item}
-                          cancel={!editable}
-                          busy={blocked}
-                          onClose={() => setEditing(null)}
-                          onSave={async (body) => {
-                            const ok = await resource.action(
-                              `/orders/${order.id}/items/${item.id}${
-                                editable ? "" : "/cancel"
-                              }`,
-                              editable ? "PATCH" : "POST",
-                              body
-                            );
+                      <Minus size={15} aria-hidden="true" />
+                    </button>
 
-                            if (ok) {
-                              setEditing(null);
-                            }
-                          }}
-                        />
-                      </div>
-                    </BottomSheet>
-                  )}
+                    <span>{item.quantity}</span>
+
+                    <button
+                      type="button"
+                      className="sales-icon"
+                      disabled={blocked || !canAdd}
+                      aria-label={`Agregar uno de ${item.name}`}
+                      onClick={() => changeQuantity(id, 1)}
+                    >
+                      <Plus size={15} aria-hidden="true" />
+                    </button>
+                  </div>
                 </article>
-              );
-            })}
+              ))}
 
-            {canAdd && pendingCount > 0 && (
-              <h4 className="sales-eyebrow">Productos por enviar</h4>
-            )}
+              {cancelledItems.length > 0 && (
+                <details className="sales-cancelled">
+                  <summary>
+                    Productos cancelados
+                    <span className="sales-cancelled-count">
+                      {cancelledItems.reduce(
+                        (sum, item) => sum + item.quantity,
+                        0
+                      )}
+                    </span>
+                  </summary>
 
-            {draftEntries.map(([id, item]) => (
-              <article
-                key={id}
-                className="sales-line sales-draft-line"
-              >
-                <div className="sales-line-heading">
-                  <strong>{item.name}</strong>
+                  <p className="sales-cancelled-help">
+                    Estos productos no se incluyen en el subtotal.
+                  </p>
 
-                  <button
-                    type="button"
-                    className="sales-link sales-remove-product"
-                    disabled={blocked || !canAdd}
-                    aria-label={`Quitar ${item.name} del carrito`}
-                    onClick={() => removeDraftItem(id)}
-                  >
-                    <Trash2 size={15} aria-hidden="true" />
-                    Quitar
-                  </button>
-                </div>
+                  {cancelledItems.map((item) => (
+                    <article
+                      key={item.id}
+                      className="sales-cancelled-item"
+                    >
+                      <strong>
+                        {item.quantity} × {item.productName}
+                      </strong>
 
-                <p>
-                  {item.quantity} × {money(cents(item.price))}
-                </p>
+                      <p>
+                        Motivo:{" "}
+                        {item.cancellationReason ||
+                          "Sin motivo registrado."}
+                      </p>
+                    </article>
+                  ))}
+                </details>
+              )}
 
-                <label className="sales-label">
-                  Nota del producto
-                  <input
-                    value={item.notes}
-                    placeholder="Ej. Sin cebolla"
-                    disabled={blocked}
-                    onChange={(event) =>
-                      resource.setDraft(order.id, {
-                        ...draft,
-                        [id]: {
-                          ...item,
-                          notes: event.target.value,
-                        },
-                      })
-                    }
-                  />
-                </label>
-
-                <div className="sales-quantity">
-                  <button
-                    type="button"
-                    className="sales-icon"
-                    disabled={blocked}
-                    aria-label={`Quitar uno de ${item.name}`}
-                    onClick={() => changeQuantity(id, -1)}
-                  >
-                    <Minus size={15} aria-hidden="true" />
-                  </button>
-
-                  <span>{item.quantity}</span>
-
-                  <button
-                    type="button"
-                    className="sales-icon"
-                    disabled={blocked || !canAdd}
-                    aria-label={`Agregar uno de ${item.name}`}
-                    onClick={() => changeQuantity(id, 1)}
-                  >
-                    <Plus size={15} aria-hidden="true" />
-                  </button>
-                </div>
-              </article>
-            ))}
-
-            {cancelledItems.length > 0 && (
-              <details className="sales-cancelled">
-                <summary>
-                  Productos cancelados
-                  <span className="sales-cancelled-count">
-                    {cancelledItems.reduce(
-                      (sum, item) => sum + item.quantity,
-                      0
-                    )}
-                  </span>
-                </summary>
-
-                <p className="sales-cancelled-help">
-                  Estos productos no se incluyen en el subtotal.
-                </p>
-
-                {cancelledItems.map((item) => (
-                  <article
-                    key={item.id}
-                    className="sales-cancelled-item"
-                  >
-                    <strong>
-                      {item.quantity} × {item.productName}
-                    </strong>
-
-                    <p>
-                      Motivo:{" "}
-                      {item.cancellationReason ||
-                        "Sin motivo registrado."}
-                    </p>
-                  </article>
-                ))}
-              </details>
-            )}
-
-            {order.id && order.status !== "OPEN" && (
-              <OrderPrintPanel
-                orderId={order.id}
-                printing={resource.printing}
-                disabled={blocked}
-              />
-            )}
-          </div>
-        </aside>
-
-        <footer className="sales-order-footer">
-          <div className="sales-total">
-            <div>
-              <span>
-                {pendingCount ? "Subtotal estimado" : "Subtotal"}
-              </span>
-
-              <strong>{money(total)}</strong>
+              {order.id && order.status !== "OPEN" && (
+                <OrderPrintPanel
+                  orderId={order.id}
+                  printing={resource.printing}
+                  disabled={blocked}
+                />
+              )}
             </div>
-
-            {canAdd && pendingCount > 0 && (
-              <small>{pendingCount} por enviar</small>
-            )}
-          </div>
-
-          {invalidDraft && (
-            <p role="alert">
-              Un producto del borrador ya no está disponible. Retíralo
-              antes de enviar.
-            </p>
-          )}
-
-          {pendingCount > 0 && (
-            <p className="sales-price-note">
-              El servidor confirma los precios al enviar.
-            </p>
-          )}
-
-          <div className="sales-footer-actions">
-            {directDelivery && (
-              <Button
-                size="sm"
-                variant="soft"
-                disabled={blocked || pendingCount > 0}
-                onClick={() => setConfirmDelivery(true)}
-              >
-                <Check size={16} aria-hidden="true" />
-                Marcar pedido como entregado
-              </Button>
-            )}
-
-            {canAdd ? (
-              (!order.id || pendingCount > 0) && (
-                <Button
-                  size="sm"
-                  className="sales-primary"
-                  loading={resource.sending}
-                  loadingText="Enviando pedido..."
-                  disabled={blocked || invalidDraft || !pendingCount}
-                  onClick={() => void resource.send()}
-                >
-                  <Send size={16} />
-
-                  {order.status === "CONFIRMED"
-                    ? "Enviar adiciones"
-                    : "Enviar pedido"}
-                </Button>
-              )
-            ) : order.status === "DELIVERED" ? (
-              <Button
-                size="sm"
-                disabled={blocked || unsentAdditions.length > 0}
-                onClick={() =>
-                  void resource.action(
-                    `/orders/${order.id}/close`,
-                    "POST"
-                  )
-                }
-              >
-                <Check size={16} />
-                Cerrar cuenta
-              </Button>
-            ) : null}
-
-            <button
-              type="button"
-              className="sales-icon sales-bag"
-              aria-label={
-                showAccount ? "Ver catálogo" : "Ver cuenta actual"
-              }
-              aria-controls={accountId}
-              aria-expanded={showAccount}
-              onClick={() => setShowAccount(!showAccount)}
-            >
-              <ShoppingBag size={19} />
-              <span>{showAccount ? "Productos" : "Cuenta"}</span>
-            </button>
-          </div>
-
-          <OrderCancellationActions
-            resource={resource}
-            orderId={order.id}
-            status={order.status}
-            pendingCount={pendingCount}
-            hasDelivered={hasDelivered}
-          />
-
-          {order.status === "DELIVERED" && (
-            <p className="sales-price-note">
-              {order.serviceType === "TABLE"
-                ? "El cierre libera la mesa. No registra un pago."
-                : "El cierre finaliza la cuenta. No registra un pago."}
-            </p>
-          )}
-        </footer>
+          </aside>
+        </div>
       </div>
+
+      <footer className="sales-order-footer">
+        <div className="sales-total">
+          <div>
+            <span>
+              {pendingCount ? "Subtotal estimado" : "Subtotal"}
+              {" · "}
+              {items.reduce((sum, item) => sum + item.quantity, 0) +
+                pendingCount}{" "}
+              unidades
+            </span>
+
+            <strong>{money(total)}</strong>
+          </div>
+
+          {canAdd && pendingCount > 0 && (
+            <small>{pendingCount} por enviar</small>
+          )}
+        </div>
+
+        {invalidDraft && (
+          <p role="alert">
+            Un producto del borrador ya no está disponible. Retíralo
+            antes de enviar.
+          </p>
+        )}
+
+        {pendingCount > 0 && (
+          <p className="sales-price-note">
+            El servidor confirma los precios al enviar.
+          </p>
+        )}
+
+        <div className="sales-footer-actions">
+          {directDelivery && (
+            <Button
+              size="sm"
+              variant="soft"
+              disabled={blocked || pendingCount > 0}
+              onClick={() => setConfirmDelivery(true)}
+            >
+              <Check size={16} aria-hidden="true" />
+              Marcar pedido como entregado
+            </Button>
+          )}
+
+          {canAdd ? (
+            (!order.id || pendingCount > 0) && (
+              <Button
+                size="sm"
+                className="sales-primary"
+                loading={resource.sending}
+                loadingText="Enviando…"
+                disabled={blocked || invalidDraft || !pendingCount}
+                onClick={() => void resource.send()}
+              >
+                <Send size={16} />
+
+                {order.status === "CONFIRMED"
+                  ? "Enviar adiciones"
+                  : "Enviar pedido"}
+              </Button>
+            )
+          ) : order.status === "DELIVERED" ? (
+            <Button
+              size="sm"
+              disabled={blocked || unsentAdditions.length > 0}
+              onClick={() =>
+                void resource.action(
+                  `/orders/${order.id}/close`,
+                  "POST"
+                )
+              }
+            >
+              <Check size={16} />
+              Cerrar cuenta
+            </Button>
+          ) : null}
+        </div>
+
+        <OrderCancellationActions
+          resource={resource}
+          orderId={order.id}
+          status={order.status}
+          pendingCount={pendingCount}
+          hasDelivered={hasDelivered}
+        />
+
+        {order.status === "DELIVERED" && (
+          <p className="sales-price-note">
+            {order.serviceType === "TABLE"
+              ? "El cierre libera la mesa. No registra un pago."
+              : "El cierre finaliza la cuenta. No registra un pago."}
+          </p>
+        )}
+      </footer>
     </div>
   );
 }

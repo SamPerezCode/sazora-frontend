@@ -14,8 +14,7 @@ import {
   UtensilsCrossed,
 } from "lucide-react";
 
-import { ResponsiveFilter } from "../../../components/ui/ResponsiveFilter";
-
+import { MesasGrid } from "../components/MesasGrid";
 import { useAppShell } from "../../../app/layout/shell-context";
 
 import { Alert } from "../../../components/feedback/Alert";
@@ -44,8 +43,7 @@ import {
 
 import type { SalesFilter } from "../utils/sales-board";
 
-import { cents, money, STATUS_LABELS } from "../schemas/sales.schema";
-
+import { cents, money } from "../schemas/sales.schema";
 import type { OrderSummary } from "../schemas/sales.schema";
 
 import type { SalesLocation } from "../services/sales.service";
@@ -434,13 +432,7 @@ function SalesContent({
               <Button
                 variant="soft"
                 size="compact"
-                disabled={
-                  blocked ||
-                  !board.some(
-                    ({ table: entry, order }) =>
-                      entry.isActive && !order
-                  )
-                }
+                disabled={blocked}
                 onClick={() => setChooseTable(true)}
               >
                 <UtensilsCrossed size={16} />
@@ -467,18 +459,6 @@ function SalesContent({
               Ver historial
             </Button>
           </div>
-
-          {resource.loading && (
-            <div
-              className="mp-skeletons"
-              role="status"
-              aria-label="Cargando tablero"
-            >
-              {[1, 2, 3].map((number) => (
-                <div key={number} />
-              ))}
-            </div>
-          )}
 
           {resource.error && (
             <Alert>
@@ -519,6 +499,15 @@ function SalesContent({
             </div>
           )}
 
+          {!data && resource.loading && (
+            <MesasGrid
+              entries={[]}
+              loading
+              disabled={() => true}
+              onOpen={openTable}
+            />
+          )}
+
           {data && (
             <>
               <SalesSummary
@@ -542,15 +531,25 @@ function SalesContent({
                 }
               />
 
-              <ResponsiveFilter
-                label="Estado de mesas y pedidos"
-                value={filter}
-                options={SALES_FILTERS.map((option) => ({
-                  value: option.id,
-                  label: option.label,
-                }))}
-                onChange={setFilter}
-              />
+              <div
+                className="mesa-filters flex gap-2 overflow-x-auto pb-1"
+                role="group"
+                aria-label="Estado de mesas y pedidos"
+              >
+                {SALES_FILTERS.map((option) => (
+                  <Button
+                    key={option.id}
+                    size="compact"
+                    variant={
+                      filter === option.id ? "primary" : "secondary"
+                    }
+                    aria-pressed={filter === option.id}
+                    onClick={() => setFilter(option.id)}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
 
               {filter !== "FREE" && (
                 <section className="mp-pickup">
@@ -630,97 +629,27 @@ function SalesContent({
               <section>
                 <div className="mp-section-heading">
                   <h3>Mesas del salón</h3>
+
                   <span>
                     {visible.length}{" "}
                     {visible.length === 1 ? "mesa" : "mesas"}
                   </span>
                 </div>
 
-                <div className="mp-mobile-table-picker">
-                  <SelectField
-                    label="Elegir mesa"
-                    value=""
-                    placeholder="Selecciona una mesa"
-                    disabled={resource.busy}
-                    onValueChange={openTable}
-                    options={visible.map(
-                      ({ table: entry, order }) => ({
-                        value: entry.id,
-                        label: `${entry.name} · ${
-                          order
-                            ? STATUS_LABELS[order.status]
-                            : "Libre"
-                        }`,
-                        disabled: !order && blocked,
-                      })
-                    )}
-                  />
-                </div>
-
-                <div className="mp-cards">
-                  {visible.map(({ table: entry, order }) => (
-                    <button
-                      type="button"
-                      className="mp-card"
-                      key={entry.id}
-                      disabled={resource.busy || (!order && blocked)}
-                      onClick={() => openTable(entry.id)}
-                    >
-                      <div className="mp-card-line">
-                        <strong>
-                          <UtensilsCrossed size={21} />
-                          {entry.name}
-                        </strong>
-
-                        <OrderStatusBadge
-                          status={order?.status ?? "FREE"}
-                        />
-                      </div>
-
-                      <p>
-                        {entry.code}
-                        {entry.capacity
-                          ? ` · Capacidad: ${entry.capacity}`
-                          : ""}
-                      </p>
-
-                      {entry.continuityOnly && (
-                        <p className="mp-warning">
-                          Mesa fuera del listado activo · continúa la
-                          cuenta existente
-                        </p>
-                      )}
-
-                      {order ? (
-                        orderInfo(order)
-                      ) : (
-                        <p className="mp-free-text">
-                          Disponible para una nueva cuenta
-                        </p>
-                      )}
-
-                      <span className="mp-card-action">
-                        {!order
-                          ? "Abrir mesa"
-                          : order.status === "DELIVERED"
-                            ? "Cerrar cuenta"
-                            : order.status === "OPEN"
-                              ? "Continuar cuenta"
-                              : "Ver cuenta"}
-
-                        <ArrowRight size={16} />
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
-                {!visible.length && (
-                  <p className="mp-empty">
-                    {board.length
-                      ? "No hay mesas en este estado."
-                      : "Este punto de venta no tiene mesas disponibles. Puedes crear un pedido para recoger."}
-                  </p>
-                )}
+                <MesasGrid
+                  entries={visible}
+                  loading={resource.loading}
+                  disabled={({ order }) =>
+                    resource.busy || (!order && blocked)
+                  }
+                  onOpen={openTable}
+                  pendingCount={pendingCount}
+                  emptyText={
+                    board.length
+                      ? "No hay mesas en este estado. Prueba otro filtro."
+                      : "Este punto de venta no tiene mesas disponibles. Puedes crear un pedido para recoger."
+                  }
+                />
               </section>
 
               <p className="mp-updated">
@@ -753,30 +682,15 @@ function SalesContent({
               {location.name} · {location.code}
             </p>
 
-            <div className="mp-table-choices">
-              {board
-                .filter(
-                  ({ table: entry, order }) =>
-                    entry.isActive && !order
-                )
-                .map(({ table: entry }) => (
-                  <Button
-                    variant="soft"
-                    className="mp-table-choice"
-                    key={entry.id}
-                    disabled={blocked}
-                    onClick={() => openTable(entry.id)}
-                  >
-                    <UtensilsCrossed
-                      size={20}
-                      strokeWidth={1.75}
-                      aria-hidden="true"
-                    />
-
-                    <span>{entry.name}</span>
-                  </Button>
-                ))}
-            </div>
+            <MesasGrid
+              compact
+              entries={board.filter(
+                ({ table, order }) => table.isActive && !order
+              )}
+              disabled={() => blocked}
+              onOpen={openTable}
+              emptyText="Todas las mesas están ocupadas o no hay mesas activas en este punto de venta."
+            />
           </div>
         </BottomSheet>
       )}

@@ -1692,3 +1692,410 @@ dialog.mp-workspace-summary {
   outline: 2px solid var(--sazora-accent);
   outline-offset: 2px;
 }
+
+/* Mesas: botones sin caja */
+.mesa-option {
+  width: 100%;
+  cursor: pointer;
+  color: var(--sazora-heading);
+  text-align: center;
+}
+
+.mesa-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.mesa-option:focus-visible {
+  outline: 2px solid var(--sazora-accent);
+  outline-offset: 2px;
+}
+
+.mesa-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.mesa-name,
+.mesa-caption,
+.mesa-amount,
+.mesa-people,
+.mesa-warning {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.mesa-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.mesa-caption,
+.mesa-people {
+  font-size: 0.75rem;
+  color: var(--sazora-muted);
+}
+
+.mesa-amount {
+  font-size: clamp(0.95rem, 3.6vw, 1.25rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.mesa-people {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.mesa-people svg {
+  flex-shrink: 0;
+}
+
+.mesa-free-caption {
+  color: var(--mp-success);
+}
+
+.mesa-content > .mesa-free-caption:not(strong) {
+  font-size: 0.7rem;
+}
+
+.mesa-warning {
+  color: var(--mp-warning);
+  font-size: 0.7rem;
+}
+
+.mesa-filters {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.mesa-filters > .ui-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: 44px;
+}
+
+/* Gráfico de la mesa */
+.mesa-graphic {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  width: min(100%, 7rem);
+  aspect-ratio: 1;
+}
+
+.mesa-graphic-occupied {
+  color: var(--sazora-accent);
+}
+
+.mesa-graphic-free {
+  color: var(--mp-success);
+}
+
+.mesa-graphic-compact {
+  width: min(100%, 5rem);
+}
+
+.mesa-top,
+.mesa-seat {
+  position: absolute;
+  border: 2px solid color-mix(in srgb, currentColor 65%, transparent);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.mesa-top {
+  inset: 15%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.6rem;
+  overflow: hidden;
+}
+
+.mesa-top small {
+  font-size: 0.6rem;
+  line-height: 1.2;
+}
+
+.mesa-top strong {
+  max-width: 100%;
+  font-size: 1.65rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.mesa-graphic-compact .mesa-top strong {
+  font-size: 1.25rem;
+}
+
+.mesa-seat {
+  border-radius: 0.25rem;
+}
+
+.mesa-seat-top,
+.mesa-seat-bottom {
+  width: 34%;
+  height: 8%;
+  left: 33%;
+}
+
+.mesa-seat-top {
+  top: 1%;
+}
+
+.mesa-seat-bottom {
+  bottom: 1%;
+}
+
+.mesa-seat-left,
+.mesa-seat-right {
+  width: 8%;
+  height: 34%;
+  top: 33%;
+}
+
+.mesa-seat-left {
+  left: 1%;
+}
+
+.mesa-seat-right {
+  right: 1%;
+}
+
+/* Distribución del modal */
+.mp-workspace .sales-mobile-tabs {
+  display: none;
+}
+
+.mp-workspace .sales-workspace-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mp-workspace .sales-order-layout {
+  min-width: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.mp-workspace .sales-order-body > .sales-order-footer {
+  flex: 0 0 auto;
+  position: static;
+  min-width: 0;
+}
+
+.mp-workspace .sales-account-notes {
+  padding: 0.5rem 1rem;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+}
+
+/* Modal móvil */
+@media (max-width: 47.999rem) {
+  dialog.bottom-sheet.mp-workspace:not(.mp-workspace-summary) {
+    box-sizing: border-box;
+    inset: 0;
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    border-radius: 0;
+  }
+
+  .mp-workspace > .bottom-sheet-heading {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+    padding-bottom: 0.75rem;
+  }
+
+  .mp-workspace > .bottom-sheet-heading h2 {
+    font-size: 1.1rem;
+  }
+
+  .mp-workspace-location {
+    padding: 0.45rem 0.75rem;
+    gap: 0.35rem;
+  }
+
+  .mp-workspace .sales-order-meta {
+    padding: 0.45rem 0.75rem;
+    gap: 0.4rem;
+  }
+
+  .mp-workspace .sales-order-meta > .sales-link {
+    flex-basis: 100%;
+    min-height: 44px;
+    text-align: left;
+  }
+
+  /* Dos opciones completas, sin carrusel */
+  .mp-workspace .sales-mobile-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex: 0 0 auto;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--sazora-outline);
+    background: var(--sazora-background);
+  }
+
+  .sales-mobile-tabs button {
+    min-width: 0;
+    min-height: 44px;
+    padding: 0.5rem;
+    border: 0;
+    border-radius: 0.75rem;
+    background: var(--sazora-secondary);
+    color: var(--sazora-heading);
+    font-size: 0.875rem;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .sales-mobile-tabs button[aria-pressed="true"] {
+    background: var(--sazora-accent);
+    color: var(--sazora-on-accent);
+  }
+
+  /* Única zona desplazable del modal de atención */
+  .mp-workspace .sales-workspace-content {
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .mp-workspace .sales-workspace-content .sales-order-notice {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .mp-workspace .sales-order-layout {
+    display: block;
+    min-height: 0;
+  }
+
+  .mp-workspace .sales-catalog,
+  .mp-workspace .sales-current,
+  .mp-workspace .sales-product-grid,
+  .mp-workspace .sales-lines {
+    overflow: visible;
+  }
+
+  .mp-workspace .sales-product-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mp-workspace .sales-catalog-tools {
+    position: static;
+  }
+
+  .mp-workspace .sales-search input {
+    min-width: 0;
+    font-size: 16px;
+  }
+
+  .mp-workspace .sales-product-bottom {
+    flex-wrap: wrap;
+  }
+
+  .mp-workspace .sales-product-content,
+  .mp-workspace .sales-line {
+    overflow-wrap: anywhere;
+  }
+
+  .mp-workspace .sales-quantity .sales-icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Pie dentro del modal, fuera del scroll */
+  .mp-workspace .sales-order-body > .sales-order-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem 0.65rem;
+    border-top: 1px solid var(--sazora-outline);
+    background: var(--sazora-secondary);
+    padding: 0.65rem 0.75rem
+      calc(0.65rem + env(safe-area-inset-bottom));
+  }
+
+  .mp-workspace .sales-total {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .mp-workspace .sales-total > div {
+    display: block;
+    min-width: 0;
+  }
+
+  .mp-workspace .sales-total strong {
+    font-size: 1.4rem;
+    overflow-wrap: anywhere;
+  }
+
+  .mp-workspace .sales-footer-actions {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    align-self: start;
+  }
+
+  .mp-workspace .sales-cancellation-actions {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    margin: 0;
+    align-self: start;
+  }
+
+  .mp-workspace .sales-footer-actions > .ui-button,
+  .mp-workspace .sales-cancellation-actions > .ui-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    height: auto;
+    padding: 0.65rem 0.5rem;
+    font-size: 0.8rem;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .mp-workspace
+    .sales-cancellation-actions[data-draft="true"]
+    > .ui-button {
+    border-color: transparent;
+    background: transparent;
+    color: var(--sazora-heading);
+    box-shadow: none;
+  }
+
+  .mp-workspace
+    .sales-cancellation-actions[data-draft="true"]
+    > .ui-button:enabled:hover {
+    background: var(--sazora-surface);
+  }
+
+  .mp-workspace .sales-order-footer > p {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: 0.7rem;
+  }
+}
