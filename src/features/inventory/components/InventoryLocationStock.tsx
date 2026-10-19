@@ -239,7 +239,7 @@ export function InventoryLocationStock({
   }
 
   return (
-    <div className="grid min-w-0 gap-5">
+    <div className="inventory-stock grid min-w-0 gap-5">
       {attention && (
         <Notice>
           Mostrando artículos con existencias sin costo o saldos
@@ -349,14 +349,13 @@ export function InventoryLocationStock({
           />
         </div>
       </div>
-
       {!locationId && (
         <Notice>
           Vista consolidada de consulta. Cada artículo conserva sus
           saldos y costos por ubicación.
         </Notice>
       )}
-      <div className="min-w-0 [&_table]:min-w-[1180px]">
+      <div className="hidden min-w-0 lg:block [&_table]:min-w-[1180px]">
         <DataTable
           headers={[
             "Artículo",
@@ -586,13 +585,213 @@ export function InventoryLocationStock({
             ))}
         </DataTable>
       </div>
+      <div className="grid min-w-0 gap-3 lg:hidden">
+        {groups
+          .slice((current - 1) * pageSize, current * pageSize)
+          .map(({ item, rows, total }, index) => {
+            const open = expanded.includes(item.id);
 
+            const local = data.locations.find(
+              (location) => location.id === locationId
+            );
+
+            const locationLabel = locationId
+              ? [local?.name, local?.code].filter(Boolean).join(" · ")
+              : "Consolidado";
+
+            const panelId = "stock-mobile-balances-" + item.id;
+
+            const valuationLabel = total.hasUnvalued
+              ? "Sin valorar"
+              : fixed(total.currentStock) === 0n
+                ? "Sin existencias"
+                : total.averageUnitCost === null
+                  ? "Sin costo vigente"
+                  : "Valorado";
+
+            return (
+              <article
+                key={item.id}
+                aria-label={item.name}
+                className={
+                  "min-w-0 rounded-2xl border border-outline p-4 text-heading " +
+                  (index % 2 === 0 ? "bg-surface" : "bg-secondary/40")
+                }
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="min-w-0 break-words pt-1 text-[18px] font-semibold leading-6">
+                    {item.name}
+                  </h3>
+
+                  <div className="shrink-0">
+                    {actions(
+                      item.id,
+                      item.isActive,
+                      rows,
+                      locationId
+                    )}
+                  </div>
+                </div>
+
+                <p className="mt-2 break-words text-[13px] leading-5 text-muted">
+                  {item.sku ?? "Sin SKU"} ·{" "}
+                  {itemTypeLabels[item.itemType]} · {locationLabel}
+                </p>
+
+                {!item.isActive && (
+                  <p className="mt-1 text-xs text-muted">
+                    Artículo inactivo
+                  </p>
+                )}
+
+                <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 [&_dt]:text-[13px] [&_dt]:leading-5 [&_dt]:text-muted [&_dd]:mt-1 [&_dd]:break-words [&_dd]:text-[16px] [&_dd]:leading-6">
+                  <div className="min-w-0">
+                    <dt>Existencia</dt>
+                    <dd>
+                      {quantity(total.currentStock, item.baseUnit)}
+                    </dd>
+                  </div>
+
+                  <div className="min-w-0">
+                    <dt>Stock mínimo local</dt>
+                    <dd>
+                      {quantity(total.minimumStock, item.baseUnit)}
+                    </dd>
+                  </div>
+
+                  <div className="min-w-0">
+                    <dt>Costo promedio</dt>
+                    <dd>
+                      {total.hasUnvalued
+                        ? "Sin valorar"
+                        : cost(
+                            locationId
+                              ? (rows[0]?.averageUnitCost ?? null)
+                              : total.averageUnitCost,
+                            item.baseUnit,
+                            currency
+                          )}
+                    </dd>
+                  </div>
+
+                  <div className="min-w-0">
+                    <dt>Valor de inventario</dt>
+                    <dd>
+                      {money(
+                        locationId &&
+                          rows[0] &&
+                          fixed(rows[0].currentStock) !== 0n
+                          ? rows[0].inventoryValue
+                          : total.inventoryValue,
+                        currency
+                      )}
+
+                      {(!total.complete || total.hasUnvalued) && (
+                        <span className="mt-1 block text-xs text-muted">
+                          Valor conocido parcial
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <StockBadge
+                    label={
+                      locationId && rows[0]
+                        ? physical(rows[0])
+                        : physical(total)
+                    }
+                  />
+
+                  <span className="text-[13px] text-muted">
+                    {valuationLabel}
+                  </span>
+                </div>
+
+                {!locationId && (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      aria-controls={panelId}
+                      className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg px-2 text-left text-[13px] text-heading transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      onClick={() =>
+                        setExpanded((previous) =>
+                          previous.includes(item.id)
+                            ? previous.filter((id) => id !== item.id)
+                            : [...previous, item.id]
+                        )
+                      }
+                    >
+                      <ChevronDown
+                        size={16}
+                        aria-hidden
+                        className={
+                          "shrink-0 transition-transform motion-reduce:transition-none " +
+                          (open ? "rotate-180" : "")
+                        }
+                      />
+                      Desglose por ubicación
+                    </button>
+
+                    <div id={panelId} hidden={!open}>
+                      <div className="mt-2 border-t border-outline pt-3">
+                        {rows.length === 0 ? (
+                          <p className="text-[13px] leading-5 text-muted">
+                            Este artículo todavía no tiene saldos por
+                            ubicación.
+                          </p>
+                        ) : (
+                          <ul className="grid gap-3">
+                            {rows.map((balance) => (
+                              <li
+                                key={balance.location.id}
+                                className="min-w-0"
+                              >
+                                <p className="break-words text-[13px] font-medium leading-5">
+                                  {balance.location.name} ·{" "}
+                                  {balance.location.code}
+                                </p>
+
+                                <p className="mt-1 break-words text-[13px] leading-5 text-muted">
+                                  {quantity(
+                                    balance.currentStock,
+                                    balance.baseUnit
+                                  )}
+                                  {" · "}
+                                  {unvalued(balance)
+                                    ? "Sin valorar"
+                                    : cost(
+                                        balance.averageUnitCost,
+                                        balance.baseUnit,
+                                        currency
+                                      )}
+                                  {" · "}
+                                  {money(
+                                    fixed(balance.currentStock) === 0n
+                                      ? "0"
+                                      : balance.inventoryValue,
+                                    currency
+                                  )}
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+      </div>
       {!groups.length && (
         <Notice>
           No hay artículos que coincidan con los filtros.
         </Notice>
       )}
-
       <Pagination
         page={current}
         pageSize={pageSize}

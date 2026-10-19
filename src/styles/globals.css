@@ -208,3 +208,29 @@
     overflow: hidden;
   }
 }
+
+/* Menú de acciones de Existencias */
+.inventory-stock [role="menu"][data-appearance="compact"] {
+  padding: 4px;
+}
+
+.inventory-stock
+  [role="menu"][data-appearance="compact"]
+  > [role="menuitem"] {
+  min-height: 36px;
+  padding: 6px 10px;
+  gap: 8px;
+  line-height: 20px;
+}
+
+.inventory-stock
+  [role="menu"][data-appearance="compact"]
+  > [role="menuitem"][data-separator="true"] {
+  margin-top: 4px;
+}
+
+.inventory-stock
+  [role="menu"][data-appearance="compact"]
+  > [role="menuitem"][data-separator="true"]::before {
+  top: -2px;
+}
