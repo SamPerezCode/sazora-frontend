@@ -1056,3 +1056,11 @@
     }
   }
 }
+
+@layer components {
+  @media (max-width: 47.999rem) {
+    .app-shell .shell-content {
+      padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+    }
+  }
+}

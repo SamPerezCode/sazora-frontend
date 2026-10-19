@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronRight, LogOut, Menu } from "lucide-react";
 import { NavLink, useLocation } from "react-router";
 import { BottomSheet } from "../../components/layout/BottomSheet";
@@ -223,7 +224,7 @@ function MobileNavigationContent({
   return (
     <>
       <nav
-        className="mobile-bottom-nav"
+        className="mobile-bottom-nav fixed! inset-x-0! top-auto! bottom-0! z-40"
         aria-label="Navegación principal móvil"
       >
         {primaryItems.map((item) => (
@@ -342,5 +343,12 @@ function MobileNavigationContent({
 export function MobileNavigation(props: MobileNavigationProps) {
   const usesSidebar = useMediaQuery("(min-width: 48rem)");
 
-  return usesSidebar ? null : <MobileNavigationContent {...props} />;
+  if (usesSidebar || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <MobileNavigationContent {...props} />,
+    document.body
+  );
 }

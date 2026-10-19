@@ -17,6 +17,9 @@ import { useInventoryRealtime } from "../../../hooks/useInventoryRealtime";
 import { Button } from "../components/InventoryButton";
 import { useInventoryQuery } from "../hooks/useInventoryQuery";
 
+import { InventoryConsumptionLocation } from "../components/InventoryConsumptionLocation";
+import { ProductInventorySetupDialog } from "../components/ProductInventorySetupDialog";
+
 import { InventoryLocationStock } from "../components/InventoryLocationStock";
 import { InventoryItemLocationDialog } from "../components/InventoryItemLocationDialog";
 import type { ItemAction } from "../components/InventoryItemLocationDialog";
@@ -39,19 +42,34 @@ export function InventoryLocationPage() {
   const { session, settings } = useAppShell();
   const [params, setParams] = useSearchParams();
 
-  const selectedTab = params.get("tab") ?? "stock";
+  const productId =
+    params.get("setupProductId") ?? params.get("productId") ?? "";
 
-  const tab = [
-    "summary",
-    "stock",
-    "purchases",
-    "movements",
-    "production",
-    "kardex",
-    "reconciliation",
-  ].includes(selectedTab)
-    ? selectedTab
-    : "stock";
+  const selectedTab =
+    params.get("tab") ?? (productId ? "consumption" : "stock");
+
+  const consumption = selectedTab === "consumption";
+
+  const configureProductId =
+    productId &&
+    (params.get("intent") === "configure" ||
+      params.has("setupProductId"))
+      ? productId
+      : "";
+
+  const tab = consumption
+    ? "stock"
+    : [
+          "summary",
+          "stock",
+          "purchases",
+          "movements",
+          "production",
+          "kardex",
+          "reconciliation",
+        ].includes(selectedTab)
+      ? selectedTab
+      : "stock";
 
   const locationId = params.get("locationId") ?? "";
 
@@ -95,6 +113,27 @@ export function InventoryLocationPage() {
       result.set("tab", next);
       return result;
     });
+  }
+
+  function finishConfiguration() {
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+
+        next.delete("intent");
+        next.delete("setupProductId");
+        next.set("tab", "consumption");
+
+        if (productId) {
+          next.set("productId", productId);
+        }
+
+        return next;
+      },
+      { replace: true }
+    );
+
+    refresh();
   }
 
   function saved() {
@@ -273,16 +312,18 @@ export function InventoryLocationPage() {
               <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="flex min-w-0 flex-wrap items-center gap-1">
                   <Button
-                    variant="soft"
+                    variant={consumption ? "ghost" : "soft"}
                     size="compact"
-                    aria-current="page"
+                    aria-current={!consumption ? "page" : undefined}
+                    onClick={() => openTab("stock")}
                   >
                     Existencias
                   </Button>
 
                   <Button
-                    variant="ghost"
+                    variant={consumption ? "soft" : "ghost"}
                     size="compact"
+                    aria-current={consumption ? "page" : undefined}
                     onClick={() => openTab("consumption")}
                   >
                     Consumo por producto
@@ -335,24 +376,41 @@ export function InventoryLocationPage() {
                 </div>
               </div>
 
-              <InventoryLocationStock
-                key={
-                  locationId + ":" + (params.get("stockReview") ?? "")
-                }
-                data={data}
-                locationId={locationId}
-                currency={currency}
-                onAction={(action) => {
-                  if (!query.pending && !query.error) {
-                    setAction(action);
+              {consumption ? (
+                <InventoryConsumptionLocation
+                  key={productId + ":" + (params.get("itemId") ?? "")}
+                  data={data}
+                  ready={!query.pending && !query.error}
+                  revision={revision}
+                  initialProductId={productId}
+                  initialItemId={params.get("itemId") ?? ""}
+                  onChanged={refresh}
+                />
+              ) : (
+                <InventoryLocationStock
+                  key={
+                    locationId +
+                    ":" +
+                    (params.get("stockReview") ?? "")
                   }
-                }}
-                onMovement={(itemId, locationId) => {
-                  if (!query.pending && !query.error) {
-                    setMovement({ itemId, locationId });
-                  }
-                }}
-              />
+                  data={data}
+                  locationId={locationId}
+                  currency={currency}
+                  onAction={(action) => {
+                    if (!query.pending && !query.error) {
+                      setAction(action);
+                    }
+                  }}
+                  onMovement={(itemId, locationId) => {
+                    if (!query.pending && !query.error) {
+                      setMovement({
+                        itemId,
+                        locationId,
+                      });
+                    }
+                  }}
+                />
+              )}
             </>
           )}
 
@@ -443,6 +501,15 @@ export function InventoryLocationPage() {
                 refresh();
               }}
               onSaved={saved}
+            />
+          )}
+
+          {configureProductId && (
+            <ProductInventorySetupDialog
+              key={configureProductId}
+              productId={configureProductId}
+              onClose={finishConfiguration}
+              onResolved={finishConfiguration}
             />
           )}
 

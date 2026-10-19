@@ -10,8 +10,8 @@ import {
   ArrowLeftRight,
   Power,
   FilterX,
-  ChevronRight,
 } from "lucide-react";
+
 import { ActionMenu } from "../../../components/ui/ActionMenu";
 import { Button } from "./InventoryButton";
 import { Pagination } from "../../../components/ui/Pagination";
@@ -378,34 +378,51 @@ export function InventoryLocationStock({
               <Fragment key={item.id}>
                 <tr>
                   <td>
-                    <button
-                      type="button"
-                      className="flex min-h-11 items-center gap-2 text-left font-semibold"
-                      disabled={!!locationId || !rows.length}
-                      aria-expanded={
-                        !locationId
-                          ? expanded.includes(item.id)
-                          : undefined
-                      }
-                      onClick={() =>
-                        setExpanded((previous) =>
-                          previous.includes(item.id)
-                            ? previous.filter((id) => id !== item.id)
-                            : [...previous, item.id]
-                        )
-                      }
-                    >
-                      {!locationId &&
-                        (expanded.includes(item.id) ? (
-                          <ChevronDown size={16} />
-                        ) : (
-                          <ChevronRight size={16} />
-                        ))}
-                      {item.name}
-                    </button>
+                    {locationId ? (
+                      <span className="font-semibold">
+                        {item.name}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="inline-flex min-h-10 items-center gap-2 rounded-lg text-left font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        aria-expanded={expanded.includes(item.id)}
+                        aria-label={
+                          (expanded.includes(item.id)
+                            ? "Ocultar"
+                            : "Mostrar") +
+                          " saldos por ubicación de " +
+                          item.name
+                        }
+                        onClick={() =>
+                          setExpanded((previous) =>
+                            previous.includes(item.id)
+                              ? previous.filter(
+                                  (id) => id !== item.id
+                                )
+                              : [...previous, item.id]
+                          )
+                        }
+                      >
+                        <ChevronDown
+                          size={16}
+                          aria-hidden
+                          className={
+                            "shrink-0 transition-transform motion-reduce:transition-none " +
+                            (expanded.includes(item.id)
+                              ? "rotate-180"
+                              : "")
+                          }
+                        />
+
+                        <span>{item.name}</span>
+                      </button>
+                    )}
 
                     {!item.isActive && (
-                      <small className="text-muted">Inactivo</small>
+                      <small className="block text-muted">
+                        Inactivo
+                      </small>
                     )}
                   </td>
 
