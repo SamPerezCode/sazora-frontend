@@ -279,9 +279,15 @@ export function InventoryLocationPage() {
         </Notice>
       )}
 
-      {query.pending && data && (
-        <Notice>Actualizando inventario…</Notice>
-      )}
+      {query.pending &&
+        data &&
+        (consumption ? (
+          <p role="status" className="sr-only">
+            Actualizando inventario…
+          </p>
+        ) : (
+          <Notice>Actualizando inventario…</Notice>
+        ))}
 
       {data && validLocation && (
         <>

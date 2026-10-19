@@ -151,7 +151,7 @@ export function InventoryConsumptionLocation({
       request.signal.throwIfAborted();
 
       setBlocked(resource.data);
-      reload();
+      resource.refresh();
     } catch (cause) {
       if (request.signal.aborted) return;
 

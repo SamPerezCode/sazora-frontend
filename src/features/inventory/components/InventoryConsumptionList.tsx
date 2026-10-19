@@ -1,4 +1,3 @@
-import { Power } from "lucide-react";
 import { Toggle } from "../../../components/forms/Toggle";
 import type { ConsumptionLink } from "../services/inventory-workspace";
 import { unitLabels } from "../utils/inventory-format";
@@ -16,7 +15,7 @@ const buttonClass =
   "inline-flex min-h-10 w-fit items-center justify-center gap-2 rounded-lg border px-3 " +
   "text-[13px] font-medium leading-5 transition-colors cursor-pointer " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent " +
-  "disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none";
+  "disabled:cursor-not-allowed motion-reduce:transition-none";
 
 function StatusButton({
   link,
@@ -42,11 +41,9 @@ function StatusButton({
       onClick={() => onStatus(link)}
       className={
         buttonClass +
-        " border-outline bg-background text-heading enabled:hover:border-accent enabled:hover:bg-accent/15 enabled:hover:text-accent"
+        " h-10 min-w-[104px] whitespace-nowrap border-none bg-background text-heading enabled:hover:border-accent enabled:hover:bg-accent/15 enabled:hover:text-accent"
       }
     >
-      <Power size={14} aria-hidden />
-
       {link.isActive ? "Activa" : "Inactiva"}
     </button>
   );
@@ -55,8 +52,9 @@ function StatusButton({
 function AutomaticSwitch({
   link,
   disabled,
+  busy,
   onAutomatic,
-}: Pick<Props, "disabled" | "onAutomatic"> & {
+}: Pick<Props, "disabled" | "busy" | "onAutomatic"> & {
   link: ConsumptionLink;
 }) {
   return (
@@ -75,7 +73,12 @@ function AutomaticSwitch({
       }
       checked={link.autoDeduct}
       disabled={disabled || !link.isActive}
-      className="max-w-11 gap-0 [&>span:first-child]:sr-only"
+      className={
+        "max-w-11 gap-0 [&>span:first-child]:sr-only" +
+        (busy && link.isActive
+          ? " [&_input:disabled~span]:opacity-100"
+          : "")
+      }
       onChange={(event) => onAutomatic(link, event.target.checked)}
     />
   );
@@ -96,7 +99,7 @@ export function InventoryConsumptionList({
       onClick={() => onEdit(link)}
       className={
         buttonClass +
-        " border-transparent bg-transparent text-heading enabled:hover:border-outline enabled:hover:bg-secondary"
+        " whitespace-nowrap border-transparent bg-transparent text-heading enabled:hover:border-outline enabled:hover:bg-secondary"
       }
     >
       Editar consumo
@@ -107,7 +110,16 @@ export function InventoryConsumptionList({
     <div className="min-w-0" aria-busy={busy}>
       {/* Tabla de escritorio */}
       <div className="hidden min-w-0 overflow-x-auto rounded-[14px] border border-outline bg-surface lg:block">
-        <table className="w-full min-w-[960px] border-collapse text-left text-[13px] leading-5">
+        <table className="w-full min-w-[1100px] table-fixed border-collapse text-left text-[13px] leading-5">
+          <colgroup>
+            <col style={{ width: "20%" }} />
+            <col style={{ width: "19%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "13%" }} />
+          </colgroup>{" "}
           <thead className="bg-secondary/50 text-muted">
             <tr>
               {[
@@ -129,8 +141,7 @@ export function InventoryConsumptionList({
               ))}
             </tr>
           </thead>
-
-          <tbody className="divide-y divide-outline">
+          <tbody className="divide-y divide-outline [&_td]:break-words">
             {rows.map((link, index) => (
               <tr
                 key={link.id}
@@ -156,6 +167,7 @@ export function InventoryConsumptionList({
                   <AutomaticSwitch
                     link={link}
                     disabled={disabled}
+                    busy={busy}
                     onAutomatic={onAutomatic}
                   />
                 </td>
@@ -217,11 +229,14 @@ export function InventoryConsumptionList({
               <div className="min-w-0">
                 <dt>Descuento automático</dt>
                 <dd>
-                  <AutomaticSwitch
-                    link={link}
-                    disabled={disabled}
-                    onAutomatic={onAutomatic}
-                  />
+                  <dd>
+                    <AutomaticSwitch
+                      link={link}
+                      disabled={disabled}
+                      busy={busy}
+                      onAutomatic={onAutomatic}
+                    />
+                  </dd>
                 </dd>
               </div>
 
