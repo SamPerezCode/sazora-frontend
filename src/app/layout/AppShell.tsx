@@ -103,7 +103,14 @@ export function AppShell() {
         />
       </div>
 
-      <div className="shell-workspace">
+      <div
+        className={
+          "shell-workspace " +
+          (isInventory
+            ? "[&_.shell-header-copy_h1]:text-[20px] [&_.shell-header-copy_h1]:leading-tight [&_.shell-header-copy_h1]:whitespace-normal md:[&_.shell-header-copy_h1]:text-[30px] [&_.shell-header-copy_p]:text-[13px] md:[&_.shell-header-copy_p]:text-[16px]"
+            : "")
+        }
+      >
         <AppHeader
           key={`${location.key}:${session.membership.id}`}
           title={
@@ -121,7 +128,7 @@ export function AppShell() {
               : isSettings
                 ? "Administra la identidad, información fiscal, sedes y operación general."
                 : isInventory
-                  ? "Controla existencias, movimientos, consumo por producto y producción."
+                  ? "Existencias y costos por ubicación"
                   : isPanel && dashboard.data
                     ? `${businessDate(dashboard.data.period.today)} · ${business.name}`
                     : business.name
@@ -132,7 +139,6 @@ export function AppShell() {
           showCashAction={isPanel}
           onLogout={logout}
         />
-
         <main
           id="app-content"
           tabIndex={-1}

@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "react-router";
+
 import {
   Boxes,
   ChartNoAxesCombined,
@@ -14,32 +15,25 @@ import {
 import { useAppShell } from "../../../app/layout/shell-context";
 import { useInventoryRealtime } from "../../../hooks/useInventoryRealtime";
 import { Button } from "../components/InventoryButton";
-import type { AuthSession } from "../../auth/types/auth.types";
 import { useInventoryQuery } from "../hooks/useInventoryQuery";
-import {
-  loadInventoryWorkspace,
-  loadSummary,
-  loadUnvalued,
-} from "../services/inventory-location.service";
-import type { InventoryWorkspace } from "../services/inventory-location.service";
+
 import { InventoryLocationStock } from "../components/InventoryLocationStock";
 import { InventoryItemLocationDialog } from "../components/InventoryItemLocationDialog";
 import type { ItemAction } from "../components/InventoryItemLocationDialog";
 import { InventoryLocationPurchases } from "../components/InventoryLocationPurchases";
 import { InventoryPurchaseForm } from "../components/InventoryPurchaseForm";
 import { InventoryLocalMovement } from "../components/InventoryLocalMovement";
-import {
-  Choice,
-  DataTable,
-  Notice,
-} from "../components/InventoryLocationUI";
+import { Choice, Notice } from "../components/InventoryLocationUI";
 import { InventorySkeleton } from "../components/InventoryStates";
-import { fixed, money } from "../utils/inventory-value";
 
 import { InventoryActivity } from "../components/InventoryActivity";
 import { InventoryProductionLocationForm } from "../components/InventoryProductionLocationForm";
 import { InventoryKardex } from "../components/InventoryKardex";
 import { InventoryReconciliation } from "../components/InventoryReconciliation";
+
+import { loadInventoryWorkspace } from "../services/inventory-location.service";
+
+import { InventorySummary } from "../components/InventorySummary";
 
 export function InventoryLocationPage() {
   const { session, settings } = useAppShell();
@@ -90,9 +84,13 @@ export function InventoryLocationPage() {
     setParams((previous) => {
       const result = new URLSearchParams(previous);
 
-      ["productId", "setupProductId", "intent", "itemId"].forEach(
-        (key) => result.delete(key)
-      );
+      [
+        "productId",
+        "setupProductId",
+        "intent",
+        "itemId",
+        "stockReview",
+      ].forEach((key) => result.delete(key));
 
       result.set("tab", next);
       return result;
@@ -166,12 +164,12 @@ export function InventoryLocationPage() {
       <div className="flex min-w-0 flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs text-muted">INVENTARIO</p>
-          <h2 className="text-2xl font-bold">
+          <h2 className="text-[20px] leading-7 font-bold sm:text-[24px]">
             {tabs.find((entry) => entry.id === tab)?.label}
           </h2>
         </div>
 
-        <div className="w-full min-w-0 sm:w-80">
+        <div className="w-full min-w-0 sm:w-[360px]">
           <Choice
             label="Ubicación"
             value={locationId}
@@ -211,14 +209,14 @@ export function InventoryLocationPage() {
             onClick={() => openTab(id)}
             aria-current={tab === id ? "page" : undefined}
             className={
-              "flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm max-sm:h-11 " +
+              "flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-[12px] sm:text-[14px] " +
               "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent " +
               (tab === id
                 ? "bg-accent/10 text-accent"
                 : "text-muted hover:bg-secondary")
             }
           >
-            <Icon size={18} aria-hidden />
+            <Icon size={16} aria-hidden />
             {label}
           </button>
         ))}
@@ -253,14 +251,27 @@ export function InventoryLocationPage() {
               data={data}
               locationId={locationId}
               currency={currency}
+              timezone={timezone}
               revision={revision}
+              workspaceReady={!query.pending && !query.error}
+              onMovements={() => openTab("movements")}
+              onReview={(filter) => {
+                setParams((previous) => {
+                  const next = new URLSearchParams(previous);
+
+                  next.set("tab", "stock");
+                  next.set("stockReview", filter);
+
+                  return next;
+                });
+              }}
             />
           )}
 
           {tab === "stock" && (
             <>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap gap-2">
+              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <div className="flex min-w-0 flex-wrap items-center gap-1">
                   <Button
                     variant="soft"
                     size="compact"
@@ -278,33 +289,56 @@ export function InventoryLocationPage() {
                   </Button>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
                   <Button
-                    variant="soft"
+                    variant="secondary"
+                    size="icon"
+                    className="order-2 sm:order-1"
                     disabled={query.pending}
                     onClick={refresh}
-                    aria-label="Actualizar inventario"
+                    title="Actualizar inventario"
+                    aria-label={
+                      query.pending
+                        ? "Actualizando inventario"
+                        : "Actualizar inventario"
+                    }
+                    aria-busy={query.pending}
                   >
-                    <RefreshCw size="icon" />
+                    <RefreshCw
+                      size={18}
+                      aria-hidden
+                      className={
+                        query.pending
+                          ? "motion-safe:animate-spin"
+                          : ""
+                      }
+                    />
                   </Button>
+
                   <Button
+                    className="order-1 sm:order-2"
                     disabled={
                       query.pending ||
                       !data.locations.length ||
                       !!query.error
                     }
                     onClick={() =>
-                      setAction({ kind: "create", locationId })
+                      setAction({
+                        kind: "create",
+                        locationId,
+                      })
                     }
                   >
-                    <PackagePlus size={16} />
+                    <PackagePlus size={16} aria-hidden />
                     Nuevo artículo
                   </Button>
                 </div>
               </div>
 
               <InventoryLocationStock
-                key={locationId}
+                key={
+                  locationId + ":" + (params.get("stockReview") ?? "")
+                }
                 data={data}
                 locationId={locationId}
                 currency={currency}
@@ -456,134 +490,5 @@ export function InventoryLocationPage() {
         </>
       )}
     </section>
-  );
-}
-
-function InventorySummary({
-  data,
-  locationId,
-  currency,
-  revision,
-}: {
-  data: InventoryWorkspace;
-  locationId: string;
-  currency: string;
-  revision: number;
-}) {
-  const loader = useCallback(
-    async (session: AuthSession, signal: AbortSignal) => {
-      const [summary, unvalued] = await Promise.all([
-        loadSummary(session, signal, locationId),
-        loadUnvalued(session, signal, locationId),
-      ]);
-
-      return { ...summary, unvalued };
-    },
-    [locationId]
-  );
-
-  const query = useInventoryQuery(
-    "inventory-summary:" + locationId,
-    loader,
-    revision
-  );
-
-  const balances = data.balances.filter(
-    (balance) => !locationId || balance.location.id === locationId
-  );
-
-  const report = query.data;
-
-  if (query.pending) return <InventorySkeleton />;
-
-  if (query.error || !report) {
-    return (
-      <Notice>
-        {query.error ?? "No pudimos consultar el resumen."}
-        <Button variant="soft" onClick={query.refresh}>
-          Reintentar
-        </Button>
-      </Notice>
-    );
-  }
-
-  return (
-    <div className="grid gap-5">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Object.entries({
-          "Valor del inventario": money(
-            report.summary.totalInventoryValue,
-            currency
-          ),
-          "Saldos disponibles": report.summary.inStockCount,
-          "Bajo mínimo": report.summary.lowStockCount,
-          Agotados: report.summary.outOfStockCount,
-          "Saldos sin valorar": report.summary.unvaluedStockCount,
-          "Saldos negativos": balances.filter(
-            (balance) => fixed(balance.currentStock) < 0n
-          ).length,
-          "Artículos activos": locationId
-            ? new Set(
-                balances
-                  .filter((balance) => balance.isItemActive)
-                  .map((balance) => balance.inventoryItemId)
-              ).size
-            : data.items.filter((item) => item.isActive).length,
-          "Artículos críticos": new Set(
-            balances
-              .filter(
-                (balance) =>
-                  balance.isItemActive &&
-                  balance.stockStatus !== "AVAILABLE"
-              )
-              .map((balance) => balance.inventoryItemId)
-          ).size,
-        }).map(([label, value]) => (
-          <div
-            key={label}
-            className="rounded-2xl border border-outline bg-surface p-5 shadow-sm"
-          >
-            <p className="text-sm text-muted">{label}</p>
-            <strong className="mt-2 block text-2xl">{value}</strong>
-          </div>
-        ))}
-      </div>
-
-      {report.unvalued.itemCount > 0 && (
-        <Notice>
-          Hay {report.unvalued.itemCount} saldos sin valorar. Revisa
-          sus acciones en Existencias.
-        </Notice>
-      )}
-
-      {report.summary.hasUnvaluedStock && (
-        <Notice>
-          El valor conocido del inventario no incluye los saldos
-          pendientes de valoración.
-        </Notice>
-      )}
-
-      {!locationId && (
-        <DataTable
-          headers={[
-            "Ubicación",
-            "Saldos",
-            "Sin valorar",
-            "Valor conocido",
-          ]}
-        >
-          {report.byLocation.map((row) => (
-            <tr key={row.location.id}>
-              <td>
-                {row.location.name} · {row.location.code}
-              </td>
-              <td>{row.balanceCount}</td>
-              <td>{row.unvaluedStockCount}</td>
-              <td>{money(row.totalInventoryValue, currency)}</td>
-            </tr>
-          ))}
-        </DataTable>
-      )}
-    </div>
   );
 }

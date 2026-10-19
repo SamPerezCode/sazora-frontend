@@ -46,15 +46,15 @@ export function Button({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={[
-        "inline-flex w-fit max-w-full shrink-0 items-center justify-center gap-2 self-start justify-self-start",
+        "inline-flex max-w-full shrink-0 items-center justify-center gap-2",
         "rounded-xl border font-medium leading-none whitespace-nowrap transition-colors",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
         "disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none [&>svg]:shrink-0",
         size === "icon"
-          ? "size-10 p-0 max-sm:size-11"
+          ? "h-10 w-10 min-w-10 flex-none p-0"
           : size === "compact"
-            ? "h-9 px-3 text-sm max-sm:h-11"
-            : "h-10 px-4 text-base max-sm:h-11",
+            ? "h-9 w-fit px-3 text-[14px]"
+            : "h-10 w-fit px-4 text-[16px]",
         tones[variant],
         className,
       ].join(" ")}
