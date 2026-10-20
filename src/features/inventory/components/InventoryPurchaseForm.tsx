@@ -337,6 +337,7 @@ export function InventoryPurchaseForm({
           <LocationChoice
             dirty={dirty}
             label="Ubicación"
+            placeholder="Selecciona dónde ingresa la compra"
             value={locationId}
             onValueChange={touch(setLocation)}
             options={data.locations.map((location) => ({
@@ -348,18 +349,21 @@ export function InventoryPurchaseForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
               label="Proveedor"
+              placeholder="Ej. Distribuidora de alimentos"
               value={supplier}
               onChange={touch(setSupplier)}
               maxLength={160}
             />
             <Field
               label="Documento del proveedor"
+              placeholder="NIT o número de identificación"
               value={document}
               onChange={touch(setDocument)}
               maxLength={80}
             />
             <Field
               label="Referencia o número de factura"
+              placeholder="Ej. FAC-2048"
               value={reference}
               onChange={touch(setReference)}
               maxLength={120}
@@ -374,6 +378,7 @@ export function InventoryPurchaseForm({
 
           <Field
             label="Notas"
+            placeholder="Escribe observaciones sobre la compra (opcional)"
             value={notes}
             multiline
             onChange={touch(setNotes)}
