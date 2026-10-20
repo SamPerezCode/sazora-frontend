@@ -709,19 +709,19 @@ function SalesContent({
           }`}
           onClose={closeWorkspace}
         >
-          <div className="mp-workspace-location">
-            <MapPin size={14} />
-            Punto de venta:
-            <strong>
-              {location.name} · {location.code}
-            </strong>
-            {workspaceOrder && (
+          {active?.status === "DELIVERED" && (
+            <div className="mp-workspace-location">
+              <MapPin size={14} />
+              Punto de venta:
+              <strong>
+                {location.name} · {location.code}
+              </strong>
               <span>
-                {active ? `Orden #${active.id}` : "Borrador"}
-                <OrderStatusBadge status={workspaceOrder.status} />
+                Orden #{active.id}
+                <OrderStatusBadge status={active.status} />
               </span>
-            )}
-          </div>
+            </div>
+          )}
 
           {active?.status === "DELIVERED" ? (
             <OrderSummaryView

@@ -956,6 +956,21 @@ export function useSales(
           ? (confirmationMessages[cause.code] ?? cause.message)
           : messageOf(cause);
 
+      if (
+        cause instanceof ApiError &&
+        cause.status === 409 &&
+        cause.code === "INSUFFICIENT_INVENTORY_STOCK"
+      ) {
+        // La consulta anterior ya verificó que la orden sigue OPEN.
+        clearConfirmation(id);
+
+        throw new RecoveryError(
+          "La orden está guardada y sigue sin enviar. " +
+            detail +
+            " Puedes quitar el producto o ajustar su cantidad y después reintentar la confirmación."
+        );
+      }
+
       throw new RecoveryError(
         "La orden fue guardada, pero no pudo confirmarse. Puedes intentar enviarla nuevamente o cancelar la orden pendiente. " +
           detail

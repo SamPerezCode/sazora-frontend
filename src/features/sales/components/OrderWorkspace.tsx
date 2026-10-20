@@ -10,7 +10,11 @@ import {
   Send,
   ShoppingBag,
   Trash2,
+  MapPin,
+  Monitor,
+  Printer,
 } from "lucide-react";
+import { OrderStatusBadge } from "./OrderStatusBadge";
 
 import { OrderPrintPanel } from "../../kitchen-flow/OrderPrintPanel";
 
@@ -28,7 +32,7 @@ import { resolveFileUrl } from "../../../lib/files";
 
 import { OrderDetailsForm } from "./OrderDetailsForm";
 
-import { cents, money, STATUS_LABELS } from "../schemas/sales.schema";
+import { cents, money } from "../schemas/sales.schema";
 import type { Order, OrderItem } from "../schemas/sales.schema";
 
 import type { SalesData } from "../services/sales.service";
@@ -346,22 +350,45 @@ export function OrderWorkspace({
           onClose={() => setPartialItemId(null)}
         />
       )}
-      <div className="sales-order-meta">
-        <span>
-          {order.id
-            ? `Orden #${order.id} · ${STATUS_LABELS[order.status]}`
-            : "Borrador · Sin enviar"}
+      <div className="sales-order-meta sales-account-context">
+        <div className="sales-account-context-location">
+          <MapPin size={16} aria-hidden="true" />
 
-          {order.customerCount
-            ? ` · ${order.customerCount} personas`
-            : ""}
-        </span>
-
-        {workflowMode && (
-          <span className="kf-workflow-badge">
-            {WORKFLOW_LABELS[workflowMode]}
+          <span>
+            Punto de venta:{" "}
+            <strong>
+              {data.location.name} · {data.location.code}
+            </strong>
           </span>
-        )}
+        </div>
+
+        <div className="sales-account-context-status">
+          <strong>
+            {order.id ? `Orden #${order.id}` : "Borrador"}
+          </strong>
+
+          <OrderStatusBadge status={order.status} />
+
+          {workflowMode && (
+            <span className="kf-workflow-badge">
+              {screenWorkflow ? (
+                <Monitor size={15} aria-hidden="true" />
+              ) : (
+                <Printer size={15} aria-hidden="true" />
+              )}
+
+              {screenWorkflow
+                ? "Seguimiento en cocina"
+                : WORKFLOW_LABELS[workflowMode]}
+
+              {editable && <span> · al enviar</span>}
+            </span>
+          )}
+
+          {!!order.customerCount && (
+            <span>{order.customerCount} personas</span>
+          )}
+        </div>
 
         {editable && (
           <button
@@ -370,7 +397,7 @@ export function OrderWorkspace({
             disabled={blocked}
             onClick={() => setShowDetails(!showDetails)}
           >
-            <Pencil size={14} />
+            <Pencil size={16} aria-hidden="true" />
 
             {showDetails
               ? "Volver al catálogo"

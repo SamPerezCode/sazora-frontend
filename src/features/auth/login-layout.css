@@ -326,3 +326,17 @@
     }
   }
 }
+
+@layer components {
+  /* Logo con nombre legible en tablet: 768–1023 px. */
+  @media (min-width: 48rem) and (max-width: 63.999rem) {
+    .login-header {
+      align-items: center;
+    }
+
+    .login-brand {
+      width: 5rem;
+      flex-shrink: 0;
+    }
+  }
+}

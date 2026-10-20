@@ -2099,3 +2099,83 @@ dialog.mp-workspace-summary {
     font-size: 0.7rem;
   }
 }
+
+.mp-workspace .sales-order-meta.sales-account-context {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem 1rem;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--sazora-outline);
+  background: var(--sazora-background);
+  color: var(--sazora-muted);
+  font-size: 0.8rem;
+}
+
+.sales-account-context-location {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.sales-account-context-location > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sales-account-context-location > svg,
+.sales-account-context-status svg {
+  flex-shrink: 0;
+}
+
+.sales-account-context-location strong,
+.sales-account-context-status > strong {
+  color: var(--sazora-heading);
+}
+
+.sales-account-context-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.sales-account-context-status .kf-workflow-badge {
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.mp-workspace .sales-account-context > .sales-link {
+  justify-self: start;
+  min-height: 44px;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.5rem;
+  color: var(--sazora-heading);
+}
+
+.mp-workspace .sales-account-context > .sales-link:enabled:hover {
+  background: var(--sazora-secondary);
+}
+
+@media (min-width: 1024px) {
+  .mp-workspace .sales-order-meta.sales-account-context {
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(0, 1.2fr)
+      auto;
+    padding-inline: 1.5rem;
+  }
+
+  .sales-account-context-status {
+    justify-content: center;
+  }
+
+  .mp-workspace .sales-account-context > .sales-link {
+    justify-self: end;
+  }
+}
