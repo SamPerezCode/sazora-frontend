@@ -234,3 +234,26 @@
   > [role="menuitem"][data-separator="true"]::before {
   top: -2px;
 }
+
+/*
+ * Evita que los selectores cambien el ancho de la página.
+ * html ya reserva el espacio del scrollbar.
+ */
+body[data-scroll-locked]:has(
+    .select-field-content[data-state="open"]
+  ) {
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+/*
+ * Conserva visible el scrollbar cuando se abre un selector
+ * en la página. Los diálogos mantienen su bloqueo del fondo.
+ */
+html:not(:has(dialog:modal))
+  body[data-scroll-locked]:has(
+    .select-field-content[data-state="open"]
+  ) {
+  overflow: visible !important;
+}

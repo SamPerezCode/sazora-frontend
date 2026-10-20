@@ -134,7 +134,15 @@ export function DateField({
     setToday(currentToday);
     move(validValue ? value : currentToday);
 
-    panel.current?.showPopover();
+    const popup = panel.current;
+    if (!popup) return;
+
+    // Permite medirlo sin mostrar una posición provisional.
+    popup.style.visibility = "hidden";
+    popup.showPopover();
+
+    // Calcula la posición desde useLayoutEffect antes del pintado.
+    setOpen(true);
   }
 
   function select(next: string) {
@@ -211,6 +219,12 @@ export function DateField({
     }
 
     position();
+
+    // Puede haberse cerrado si el campo quedó fuera de pantalla.
+    if (!popup.matches(":popover-open")) return;
+
+    // Ya tiene sus coordenadas definitivas.
+    popup.style.visibility = "visible";
 
     if (focusDay.current) {
       popup
