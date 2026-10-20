@@ -201,6 +201,7 @@ export function InventoryLocalMovement({
       <LocationChoice
         dirty={dirty}
         label="Ubicación"
+        placeholder="Selecciona una ubicación"
         value={locationId}
         onValueChange={touch(setLocation)}
         options={data.locations.map((location) => ({
@@ -225,6 +226,7 @@ export function InventoryLocalMovement({
 
         <Field
           label="Referencia (opcional)"
+          placeholder="Ej. AJU-001 o MER-017"
           value={reference}
           onChange={touch(setReference)}
           maxLength={120}
@@ -247,6 +249,13 @@ export function InventoryLocalMovement({
 
       <Field
         label="Motivo obligatorio"
+        placeholder={
+          type === "WASTE"
+            ? "Ej. Producto vencido o dañado."
+            : type === "RETURN"
+              ? "Explica el motivo de la devolución."
+              : "Ej. Diferencia encontrada durante el conteo físico."
+        }
         value={reason}
         multiline
         onChange={touch(setReason)}
@@ -272,6 +281,7 @@ export function InventoryLocalMovement({
             <div className="grid items-end gap-3 sm:grid-cols-[2fr_1fr_1fr_auto]">
               <Choice
                 label="Artículo"
+                placeholder="Selecciona un artículo"
                 value={line.inventoryItemId}
                 onValueChange={(value) =>
                   update(line.key, {
@@ -304,6 +314,7 @@ export function InventoryLocalMovement({
 
               <Field
                 label="Cantidad"
+                placeholder="Ej. 2.5"
                 value={line.quantity}
                 decimal
                 onChange={(value) =>
@@ -345,6 +356,7 @@ export function InventoryLocalMovement({
             {needsCost && (
               <Field
                 label="Costo unitario de entrada obligatorio"
+                placeholder="Ej. 4500.00"
                 value={line.unitCost}
                 decimal
                 onChange={(value) =>

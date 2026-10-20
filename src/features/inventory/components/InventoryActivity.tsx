@@ -15,8 +15,9 @@ import {
   Notice,
 } from "./InventoryLocationUI";
 import { InventoryMovementDetail } from "./InventoryMovementDetail";
+import { InventoryMovementList } from "./InventoryMovementList";
 
-export function InventoryActivity({
+function InventoryProductionActivity({
   production = false,
   locationId,
   currency,
@@ -231,5 +232,17 @@ export function InventoryActivity({
         />
       )}
     </div>
+  );
+}
+
+export function InventoryActivity(
+  props: Parameters<typeof InventoryProductionActivity>[0] & {
+    items: { id: string; name: string }[];
+  }
+) {
+  return props.production ? (
+    <InventoryProductionActivity {...props} />
+  ) : (
+    <InventoryMovementList {...props} />
   );
 }

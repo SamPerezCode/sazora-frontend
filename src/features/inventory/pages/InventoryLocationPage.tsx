@@ -444,6 +444,7 @@ export function InventoryLocationPage() {
             <InventoryActivity
               key={tab + ":" + locationId}
               production={tab === "production"}
+              items={data.items}
               locationId={locationId}
               currency={currency}
               timezone={timezone}

@@ -8,10 +8,12 @@ import {
   money,
   cost,
   quantity,
+  unit,
 } from "../utils/inventory-value";
 import { movementLabels } from "../utils/inventory-audit";
 import { Button } from "./InventoryButton";
 import { DataTable, Modal, Notice } from "./InventoryLocationUI";
+import { formatQuantity } from "../utils/inventory-format";
 
 export function InventoryMovementDetail({
   id,
@@ -79,23 +81,28 @@ export function InventoryMovementDetail({
 
       {movement && (
         <div className="grid gap-5">
+          <p className="text-sm text-muted">
+            M-{movement.id} · {movementLabels[movement.movementType]}
+          </p>
+
           <dl className="grid gap-4 sm:grid-cols-3">
             {Object.entries({
-              Registro: "M-" + movement.id,
-              Tipo: movementLabels[movement.movementType],
               Ubicación: movement.location
                 ? movement.location.name +
                   " · " +
                   movement.location.code
                 : "Sin ubicación histórica",
-              Fecha: new Intl.DateTimeFormat("es-CO", {
+
+              "Fecha y hora": new Intl.DateTimeFormat("es-CO", {
                 timeZone: timezone,
                 dateStyle: "medium",
                 timeStyle: "short",
               }).format(new Date(movement.createdAt)),
-              Responsable: movement.createdByName,
+
               Referencia: movement.externalReference ?? "—",
-              Notas: movement.notes ?? "—",
+              Responsable: movement.createdByName,
+              "Motivo / notas": movement.notes ?? "—",
+              Estado: "Registrado",
             }).map(([label, value]) => (
               <div key={label}>
                 <dt className="text-sm text-muted">{label}</dt>
@@ -116,17 +123,23 @@ export function InventoryMovementDetail({
               : "Este registro contiene líneas históricas sin valoración. No es posible calcular su impacto económico completo."}
           </Notice>
 
+          <h3 className="font-semibold">
+            Impacto físico y económico
+          </h3>
+
           <DataTable
             headers={[
               "Artículo",
-              "Operación",
+              "Dirección",
               "Cantidad",
+              "Unidad",
               "Saldo anterior",
               "Saldo resultante",
               "Costo unitario",
               "Costo total",
-              "Promedio anterior",
-              "Promedio nuevo",
+              ...(production
+                ? ["Promedio anterior", "Promedio nuevo"]
+                : []),
               "Valor anterior",
               "Valor resultante",
             ]}
@@ -134,6 +147,7 @@ export function InventoryMovementDetail({
             {movement.lines.map((line) => (
               <tr key={line.id}>
                 <td>{line.inventoryItemName}</td>
+
                 <td>
                   {line.direction === "IN"
                     ? production
@@ -143,28 +157,43 @@ export function InventoryMovementDetail({
                       ? "Consumido"
                       : "Salida"}
                 </td>
-                <td>{quantity(line.quantity, line.baseUnit)}</td>
+
+                <td>{formatQuantity(line.quantity)}</td>
+
+                <td>{unit(line.baseUnit, line.quantity)}</td>
+
                 <td>{quantity(line.balanceBefore, line.baseUnit)}</td>
+
                 <td>{quantity(line.balanceAfter, line.baseUnit)}</td>
+
                 <td>
                   {cost(line.unitCost, line.baseUnit, currency)}
                 </td>
+
                 <td>{money(line.totalCost, currency)}</td>
-                <td>
-                  {cost(
-                    line.averageUnitCostBefore,
-                    line.baseUnit,
-                    currency
-                  )}
-                </td>
-                <td>
-                  {cost(
-                    line.averageUnitCostAfter,
-                    line.baseUnit,
-                    currency
-                  )}
-                </td>
+
+                {production && (
+                  <>
+                    <td>
+                      {cost(
+                        line.averageUnitCostBefore,
+                        line.baseUnit,
+                        currency
+                      )}
+                    </td>
+
+                    <td>
+                      {cost(
+                        line.averageUnitCostAfter,
+                        line.baseUnit,
+                        currency
+                      )}
+                    </td>
+                  </>
+                )}
+
                 <td>{money(line.inventoryValueBefore, currency)}</td>
+
                 <td>{money(line.inventoryValueAfter, currency)}</td>
               </tr>
             ))}

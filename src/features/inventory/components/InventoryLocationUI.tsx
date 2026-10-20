@@ -49,6 +49,7 @@ export function Field({
   decimal = false,
   disabled = false,
   multiline = false,
+  placeholder,
   maxLength,
 }: {
   label: string;
@@ -57,10 +58,11 @@ export function Field({
   decimal?: boolean;
   disabled?: boolean;
   multiline?: boolean;
+  placeholder?: string;
   maxLength?: number;
 }) {
   const className =
-    "w-full min-w-0 rounded-xl border border-outline bg-surface px-3 py-2 text-sm text-heading shadow-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-50";
+    "w-full min-w-0 rounded-xl border border-outline bg-surface px-3 py-2 text-sm text-heading shadow-sm outline-none placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-50";
 
   return (
     <label className="grid min-w-0 content-start gap-2 text-sm text-heading">
@@ -71,6 +73,7 @@ export function Field({
           className={className}
           rows={3}
           value={value}
+          placeholder={placeholder}
           disabled={disabled}
           maxLength={maxLength}
           onChange={(event) => onChange(event.target.value)}
@@ -79,6 +82,7 @@ export function Field({
         <input
           className={className + " h-10"}
           value={value}
+          placeholder={placeholder}
           disabled={disabled}
           inputMode={decimal ? "decimal" : undefined}
           maxLength={maxLength}

@@ -41,7 +41,6 @@ export function InventoryLocationPurchases({
 
   const [from, setFrom] = useState(today.slice(0, 7) + "-01");
   const [to, setTo] = useState(today);
-  const [period, setPeriod] = useState({ from, to });
   const [search, setSearch] = useState("");
   const [itemId, setItem] = useState("");
   const [supplier, setSupplier] = useState("");
@@ -52,15 +51,16 @@ export function InventoryLocationPurchases({
   const loader = useCallback(
     (session: AuthSession, signal: AbortSignal) =>
       loadPurchaseRows(session, signal, {
-        ...period,
+        from,
+        to,
         locationId,
         inventoryItemId: "",
       }),
-    [period, locationId]
+    [from, to, locationId]
   );
 
   const query = useInventoryQuery(
-    JSON.stringify(["purchases", period, locationId]),
+    JSON.stringify(["purchases", from, to, locationId]),
     loader,
     revision
   );
@@ -122,16 +122,11 @@ export function InventoryLocationPurchases({
   function clear() {
     setFrom(today.slice(0, 7) + "-01");
     setTo(today);
-    setPeriod({
-      from: today.slice(0, 7) + "-01",
-      to: today,
-    });
     setSearch("");
     setItem("");
     setSupplier("");
     setPage(1);
   }
-
   return (
     <div className="grid min-w-0 gap-5">
       <div>
@@ -166,7 +161,10 @@ export function InventoryLocationPurchases({
           max={to || undefined}
           timeZone={timezone}
           clearable={false}
-          onValueChange={setFrom}
+          onValueChange={(value) => {
+            setFrom(value);
+            setPage(1);
+          }}
         />
 
         <DateField
@@ -175,7 +173,10 @@ export function InventoryLocationPurchases({
           min={from || undefined}
           timeZone={timezone}
           clearable={false}
-          onValueChange={setTo}
+          onValueChange={(value) => {
+            setTo(value);
+            setPage(1);
+          }}
         />
 
         <Choice
@@ -209,18 +210,6 @@ export function InventoryLocationPurchases({
             })),
           ]}
         />
-      </div>
-
-      <div className="flex justify-end">
-        <Button
-          disabled={!from || !to || from > to}
-          onClick={() => {
-            setPeriod({ from, to });
-            setPage(1);
-          }}
-        >
-          Aplicar fechas
-        </Button>
       </div>
 
       {query.pending && (
