@@ -14,7 +14,6 @@ import {
 import { getNavigation } from "../navigation";
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
-import { MobileNavigation } from "./MobileNavigation";
 import type { AppShellContext } from "./shell-context";
 
 export function AppShell() {
@@ -168,13 +167,6 @@ export function AppShell() {
           <Outlet context={context} />
         </main>
       </div>
-
-      <MobileNavigation
-        key={location.key}
-        authorization={session.authorization}
-        business={business}
-        onLogout={logout}
-      />
     </div>
   );
 }

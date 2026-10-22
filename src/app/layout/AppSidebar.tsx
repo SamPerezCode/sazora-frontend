@@ -1,5 +1,10 @@
 import { NavLink, useLocation } from "react-router";
-import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import {
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+  X,
+} from "lucide-react";
 import symbol from "../../assets/brand/sazora_icon_dark.png";
 import { Avatar } from "../../components/ui/Avatar";
 import { IconButton } from "../../components/ui/IconButton";
@@ -16,6 +21,7 @@ interface AppSidebarProps {
   mobile?: boolean;
   onToggle: () => void;
   onNavigate?: () => void;
+  onLogout?: () => void;
 }
 
 export function AppSidebar({
@@ -25,6 +31,7 @@ export function AppSidebar({
   mobile = false,
   onToggle,
   onNavigate,
+  onLogout,
 }: AppSidebarProps) {
   const { pathname } = useLocation();
   const items = getNavigation(session.authorization);
@@ -81,7 +88,7 @@ export function AppSidebar({
         className="shell-navigation"
       >
         {items
-          .filter((item) => item.group === "main")
+          .filter((item) => mobile || item.group === "main")
           .map((item) => {
             if (collapsed && !mobile) {
               return (
@@ -183,7 +190,7 @@ export function AppSidebar({
           </div>
         )}
 
-        {settings?.status === "ready" && (
+        {!mobile && settings?.status === "ready" && (
           <NavLink
             to={settings.to}
             onClick={onNavigate}
@@ -198,20 +205,33 @@ export function AppSidebar({
           </NavLink>
         )}
 
-        <div className="shell-label mt-3 border-t border-white/15 pt-3">
-          <p
-            className="truncate text-xs"
-            title={session.user.fullName}
-          >
-            {session.user.fullName}
-          </p>
+        {!mobile && (
+          <div className="shell-label mt-3 border-t border-white/15 pt-3">
+            <p
+              className="truncate text-xs"
+              title={session.user.fullName}
+            >
+              {session.user.fullName}
+            </p>
 
-          <p className="mt-1 text-[0.625rem] text-slate-300">
-            {session.authorization.roles
-              .map((role) => ROLE_LABELS[role])
-              .join(" · ")}
-          </p>
-        </div>
+            <p className="mt-1 text-[0.625rem] text-slate-300">
+              {session.authorization.roles
+                .map((role) => ROLE_LABELS[role])
+                .join(" · ")}
+            </p>
+          </div>
+        )}
+
+        {mobile && onLogout && (
+          <button
+            type="button"
+            className="shell-drawer-logout"
+            onClick={onLogout}
+          >
+            <LogOut size={18} aria-hidden="true" />
+            Cerrar sesión
+          </button>
+        )}
       </div>
     </aside>
   );

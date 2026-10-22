@@ -1,354 +1,195 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { ChevronRight, LogOut, Menu } from "lucide-react";
-import { NavLink, useLocation } from "react-router";
-import { BottomSheet } from "../../components/layout/BottomSheet";
-import { Avatar } from "../../components/ui/Avatar";
-import type { CurrentSession } from "../../features/auth/types/auth.types";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
+
+import type { AuthSession } from "../../features/auth/types/auth.types";
 import type { BusinessIdentity } from "../../features/business/schemas/business-profile.schema";
-import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { getNavigation } from "../navigation";
-import type { NavigationItem } from "../navigation";
+import { AppSidebar } from "./AppSidebar";
 
 interface MobileNavigationProps {
-  authorization: CurrentSession;
+  session: AuthSession;
   business: BusinessIdentity;
   onLogout: () => void;
 }
 
-const shortcuts = [
-  "panel",
-  "sales",
-  "kitchen",
-  "production",
-  "public-orders",
-  "deliveries",
-  "inventory",
-  "products",
-  "settings",
-  "workspaces",
-];
-
-const shortLabels: Record<string, string> = {
-  panel: "Panel",
-  sales: "Mesas",
-  deliveries: "Domicilios",
-  "public-orders": "Pedidos",
-  settings: "Ajustes",
-  workspaces: "Espacios",
-};
-
-function NavigationEntry({
-  item,
-  compact = false,
-  detail = false,
-  onNavigate,
-  onGroup,
-}: {
-  item: NavigationItem;
-  compact?: boolean;
-  detail?: boolean;
-  onNavigate: () => void;
-  onGroup: (id: string) => void;
-}) {
-  const { pathname } = useLocation();
-  const Icon = item.icon;
-
-  const label = compact
-    ? (shortLabels[item.id] ?? item.label)
-    : item.label;
-
-  const className = detail
-    ? "mobile-submenu-item"
-    : compact
-      ? "mobile-nav-item"
-      : "mobile-menu-item";
-
-  const content = detail ? (
-    <>
-      <span className="mobile-submenu-icon">
-        <Icon aria-hidden="true" size={22} strokeWidth={1.75} />
-      </span>
-
-      <span className="min-w-0 flex-1">
-        <span className="mobile-submenu-title">{label}</span>
-
-        <span className="mobile-submenu-description">
-          {item.description}
-        </span>
-      </span>
-
-      <ChevronRight
-        aria-hidden="true"
-        size={16}
-        className="mobile-submenu-chevron"
-      />
-    </>
-  ) : (
-    <>
-      <Icon aria-hidden="true" size={18} strokeWidth={1.75} />
-      <span>{label}</span>
-
-      {item.status === "group" && (
-        <ChevronRight
-          aria-hidden="true"
-          size={12}
-          className="absolute right-2 top-2"
-        />
-      )}
-    </>
-  );
-
-  if (item.status === "group") {
-    const active = item.children.some(
-      (child) => child.status === "ready" && child.to === pathname
-    );
-
-    return (
-      <button
-        type="button"
-        data-navigation-group={item.id}
-        className={`${className} relative ${active ? "is-active" : ""}`}
-        onClick={() => onGroup(item.id)}
-        aria-label={`${label}, abrir opciones`}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  return item.status === "ready" ? (
-    <NavLink
-      to={item.to}
-      end
-      onClick={onNavigate}
-      className={({ isActive }) =>
-        `${className}${isActive ? " is-active" : ""}`
-      }
-    >
-      {content}
-    </NavLink>
-  ) : (
-    <button
-      type="button"
-      disabled
-      className={className}
-      title={`${item.label} · Próximamente`}
-      aria-label={`${label}, próximamente`}
-    >
-      {content}
-    </button>
-  );
-}
-
-function MobileNavigationContent({
-  authorization,
+export function MobileNavigation({
+  session,
   business,
   onLogout,
 }: MobileNavigationProps) {
-  const { pathname } = useLocation();
+  const id = useId();
+
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const timerRef = useRef<number | null>(null);
+  const startedOutside = useRef(false);
 
   const [open, setOpen] = useState(false);
-  const [groupId, setGroupId] = useState<string | null>(null);
 
-  const sheetId = useId();
-  const submenuRef = useRef<HTMLElement>(null);
+  const close = useCallback(() => {
+    const dialog = dialogRef.current;
 
-  const items = getNavigation(authorization);
-  const group = items.find(
-    (item) => item.id === groupId && item.status === "group"
-  );
-  const priority = new Map(shortcuts.map((id, index) => [id, index]));
+    if (!dialog?.open || timerRef.current !== null) return;
 
-  const primaryItems = items
-    .filter(
-      (item) => item.status === "ready" || item.status === "group"
-    )
-    .sort(
-      (a, b) =>
-        (priority.get(a.id) ?? shortcuts.length) -
-        (priority.get(b.id) ?? shortcuts.length)
-    )
-    .slice(0, 4);
-
-  useEffect(() => {
-    if (groupId) {
-      submenuRef.current?.focus({ preventScroll: true });
-    }
-  }, [groupId]);
-
-  function close() {
-    setOpen(false);
-    setGroupId(null);
-  }
-
-  function back() {
-    const previous = groupId;
-    setGroupId(null);
-
-    requestAnimationFrame(() => {
-      const dialog = document.getElementById(sheetId);
-      const buttons = dialog?.querySelectorAll<HTMLButtonElement>(
-        "[data-navigation-group]"
-      );
-
-      Array.from(buttons ?? [])
-        .find((button) => button.dataset.navigationGroup === previous)
-        ?.focus({ preventScroll: true });
-    });
-  }
-
-  function openMenu() {
-    const currentPath = pathname.replace(/\/+$/, "") || "/";
-
-    const currentGroup = items.find(
-      (item) =>
-        item.status === "group" &&
-        item.children.some(
-          (child) =>
-            child.status === "ready" &&
-            (currentPath === child.to ||
-              currentPath.startsWith(`${child.to}/`))
-        )
+    // Si se cierra durante la apertura, continúa desde
+    // su posición actual para evitar un salto.
+    const panel = dialog.querySelector<HTMLElement>(
+      ".shell-drawer-panel"
     );
 
-    setGroupId(currentGroup?.id ?? null);
-    setOpen(true);
-  }
+    if (panel) {
+      panel.style.setProperty(
+        "--drawer-close-from",
+        getComputedStyle(panel).transform
+      );
+    }
 
-  function openGroup(id: string) {
-    setGroupId(id);
+    dialog.style.setProperty(
+      "--drawer-fade-from",
+      getComputedStyle(dialog, "::backdrop").opacity
+    );
+
+    dialog.dataset.closing = "true";
+
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    timerRef.current = window.setTimeout(
+      () => {
+        timerRef.current = null;
+        dialog.close();
+        delete dialog.dataset.closing;
+      },
+      reduced ? 0 : 220
+    );
+  }, []);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const desktop = window.matchMedia("(min-width: 80rem)");
+
+    function closeOnDesktop() {
+      if (!desktop.matches) return;
+
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+
+      dialog?.close();
+
+      if (dialog) {
+        delete dialog.dataset.closing;
+      }
+    }
+
+    desktop.addEventListener("change", closeOnDesktop);
+
+    return () => {
+      desktop.removeEventListener("change", closeOnDesktop);
+
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+
+      dialog?.close();
+    };
+  }, []);
+
+  function show() {
+    const dialog = dialogRef.current;
+
+    if (
+      !dialog ||
+      dialog.open ||
+      window.matchMedia("(min-width: 80rem)").matches
+    ) {
+      return;
+    }
+
+    delete dialog.dataset.closing;
+
+    dialog.showModal();
     setOpen(true);
+
+    dialog
+      .querySelector<HTMLButtonElement>('[aria-label="Cerrar menú"]')
+      ?.focus({ preventScroll: true });
   }
 
   return (
     <>
-      <nav
-        className="mobile-bottom-nav fixed! inset-x-0! top-auto! bottom-0! z-40"
-        aria-label="Navegación principal móvil"
+      <button
+        ref={triggerRef}
+        type="button"
+        className="shell-menu-trigger"
+        aria-label="Abrir menú de navegación"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={show}
       >
-        {primaryItems.map((item) => (
-          <NavigationEntry
-            key={item.id}
-            item={item}
-            compact
+        <span className="shell-menu-lines" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+      </button>
+
+      <dialog
+        ref={dialogRef}
+        id={id}
+        className="shell-drawer"
+        aria-label="Menú de navegación"
+        onCancel={(event) => {
+          event.preventDefault();
+          close();
+        }}
+        onPointerDown={(event) => {
+          startedOutside.current =
+            event.target === event.currentTarget;
+        }}
+        onClick={(event) => {
+          if (
+            startedOutside.current &&
+            event.target === event.currentTarget
+          ) {
+            close();
+          }
+
+          startedOutside.current = false;
+        }}
+        onClose={() => {
+          setOpen(false);
+
+          if (!window.matchMedia("(min-width: 80rem)").matches) {
+            triggerRef.current?.focus({
+              preventScroll: true,
+            });
+          }
+        }}
+      >
+        <div className="shell-drawer-panel">
+          <AppSidebar
+            session={session}
+            business={business}
+            collapsed={false}
+            mobile
+            onToggle={close}
             onNavigate={close}
-            onGroup={openGroup}
+            onLogout={() => {
+              close();
+              onLogout();
+            }}
           />
-        ))}
-
-        <button
-          type="button"
-          className="mobile-nav-item"
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          aria-controls={sheetId}
-          onClick={openMenu}
-        >
-          <Menu aria-hidden="true" size={18} strokeWidth={1.75} />
-          <span>Más</span>
-        </button>
-      </nav>
-
-      <BottomSheet
-        id={sheetId}
-        open={open}
-        title={group?.label ?? "Navegación"}
-        className="mobile-navigation-sheet"
-        onClose={close}
-        onBack={group ? back : undefined}
-      >
-        {group?.status === "group" ? (
-          <nav
-            ref={submenuRef}
-            tabIndex={-1}
-            aria-label={`Opciones de ${group.label}`}
-            className="mobile-submenu focus:outline-none"
-          >
-            {group.children.map((item) => (
-              <NavigationEntry
-                key={item.id}
-                item={item}
-                detail
-                onNavigate={close}
-                onGroup={openGroup}
-              />
-            ))}
-          </nav>
-        ) : (
-          <>
-            <nav
-              aria-label="Todas las secciones"
-              className="mobile-menu-grid"
-            >
-              {items.map((item) => (
-                <NavigationEntry
-                  key={item.id}
-                  item={item}
-                  onNavigate={close}
-                  onGroup={openGroup}
-                />
-              ))}
-            </nav>
-
-            {items.some((item) => item.status === "planned") && (
-              <p className="mobile-menu-hint">
-                Las opciones atenuadas estarán disponibles
-                próximamente.
-              </p>
-            )}
-
-            <div className="mt-3.5 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-3">
-              <div className="mobile-menu-business mt-0 min-w-0">
-                <Avatar
-                  name={business.name}
-                  src={business.logoUrl}
-                  size="sm"
-                />
-
-                <div className="min-w-0">
-                  <p className="mobile-menu-caption">Organización</p>
-                  <p
-                    className="mobile-menu-name"
-                    title={business.name}
-                  >
-                    {business.name}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="profile-logout sm:w-auto sm:whitespace-nowrap sm:rounded-r-xl sm:border-t-0 sm:border-l sm:border-outline"
-                onClick={() => {
-                  close();
-                  onLogout();
-                }}
-              >
-                <LogOut
-                  aria-hidden="true"
-                  size={16}
-                  strokeWidth={1.75}
-                />
-                Cerrar sesión
-              </button>
-            </div>
-          </>
-        )}
-      </BottomSheet>
+        </div>
+      </dialog>
     </>
-  );
-}
-
-export function MobileNavigation(props: MobileNavigationProps) {
-  const usesSidebar = useMediaQuery("(min-width: 48rem)");
-
-  if (usesSidebar || typeof document === "undefined") {
-    return null;
-  }
-
-  return createPortal(
-    <MobileNavigationContent {...props} />,
-    document.body
   );
 }

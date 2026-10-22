@@ -3,6 +3,7 @@ import { ThemeToggleButton } from "../../components/ui/ThemeToggleButton";
 import type { AuthSession } from "../../features/auth/types/auth.types";
 import type { BusinessIdentity } from "../../features/business/schemas/business-profile.schema";
 import { UserMenu } from "./UserMenu";
+import { MobileNavigation } from "./MobileNavigation";
 
 interface AppHeaderProps {
   title: string;
@@ -31,6 +32,12 @@ export function AppHeader({
 
   return (
     <header className="shell-header">
+      <MobileNavigation
+        session={session}
+        business={business}
+        onLogout={onLogout}
+      />
+
       <div className="shell-header-copy">
         <h1 title={title}>{title}</h1>
 
