@@ -6,6 +6,8 @@ import { Button } from "./InventoryButton";
 import { Pagination } from "../../../components/ui/Pagination";
 import type { AuthSession } from "../../auth/types/auth.types";
 import { useInventoryQuery } from "../hooks/useInventoryQuery";
+import { InventoryMobileCards } from "./InventoryMobileCards";
+
 import {
   loadPurchase,
   loadPurchaseRows,
@@ -136,10 +138,11 @@ export function InventoryLocationPurchases({
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-0 flex-1">
+      <div className="grid min-w-0 grid-cols-1 items-end gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:gap-3">
+        <div className="min-w-0">
           <Field
-            label="Buscar referencia, proveedor o responsable"
+            label="Buscar"
+            placeholder="Buscar referencia, proveedor o responsable"
             value={search}
             onChange={(value) => {
               setSearch(value);
@@ -148,8 +151,12 @@ export function InventoryLocationPurchases({
           />
         </div>
 
-        <Button variant="soft" onClick={clear}>
-          <FilterX size={16} />
+        <Button
+          variant="ghost"
+          onClick={clear}
+          className="min-h-11 justify-self-end"
+        >
+          <FilterX size={16} aria-hidden="true" />
           Limpiar filtros
         </Button>
       </div>
@@ -227,75 +234,178 @@ export function InventoryLocationPurchases({
 
       {!query.pending && !query.error && (
         <>
-          <DataTable
-            headers={[
-              "Fecha",
-              "Documento",
-              "Proveedor",
-              "Ubicación",
-              "Líneas",
-              "Costo bruto",
-              "Descuentos",
-              "Adicionales",
-              "Costo neto",
-              "Responsable",
-              "Acción",
-            ]}
-          >
-            {filtered
+          <InventoryMobileCards
+            label="Compras de inventario"
+            rows={filtered
               .slice((current - 1) * size, current * size)
               .map((rows) => {
                 const row = rows[0];
 
-                return (
-                  <tr key={row.movementId}>
-                    <td>
-                      {row.documentDate ??
+                return {
+                  id: row.movementId,
+                  fields: [
+                    {
+                      label: "Fecha",
+                      value:
+                        row.documentDate ??
                         new Intl.DateTimeFormat("es-CO", {
                           timeZone: timezone,
                           dateStyle: "short",
-                        }).format(new Date(row.createdAt))}
-                    </td>
-                    <td>
-                      {row.externalReference ?? "M-" + row.movementId}
-                    </td>
-                    <td>{row.supplierName ?? "—"}</td>
-                    <td>
-                      {row.location
+                        }).format(new Date(row.createdAt)),
+                    },
+                    {
+                      label: "Documento",
+                      value:
+                        row.externalReference ??
+                        "M-" + row.movementId,
+                    },
+                    {
+                      label: "Proveedor",
+                      value: row.supplierName ?? "—",
+                    },
+                    {
+                      label: "Ubicación",
+                      value: row.location
                         ? row.location.name +
                           " · " +
                           row.location.code
-                        : "Sin ubicación histórica"}
-                    </td>
-                    <td>{rows.length}</td>
-                    <td>
-                      {money(total(rows, "grossCost"), currency)}
-                    </td>
-                    <td>
-                      {money(total(rows, "discountAmount"), currency)}
-                    </td>
-                    <td>
-                      {money(
+                        : "Sin ubicación histórica",
+                    },
+                    {
+                      label: "Líneas",
+                      value: rows.length,
+                    },
+                    {
+                      label: "Costo bruto",
+                      value: money(
+                        total(rows, "grossCost"),
+                        currency
+                      ),
+                    },
+                    {
+                      label: "Descuentos",
+                      value: money(
+                        total(rows, "discountAmount"),
+                        currency
+                      ),
+                    },
+                    {
+                      label: "Adicionales",
+                      value: money(
                         total(rows, "additionalCostAmount"),
                         currency
-                      )}
-                    </td>
-                    <td>{money(total(rows, "netCost"), currency)}</td>
-                    <td>{row.createdByName}</td>
-                    <td>
-                      <Button
-                        variant="soft"
-                        size="compact"
-                        onClick={() => setOpened(row.movementId)}
-                      >
-                        <Eye size={16} />
-                        Ver detalle
-                      </Button>
-                    </td>
-                  </tr>
-                );
+                      ),
+                    },
+                    {
+                      label: "Costo neto",
+                      value: (
+                        <strong>
+                          {money(total(rows, "netCost"), currency)}
+                        </strong>
+                      ),
+                    },
+                    {
+                      label: "Responsable",
+                      value: row.createdByName,
+                    },
+                    {
+                      label: "Acción",
+                      value: (
+                        <Button
+                          variant="ghost"
+                          size="compact"
+                          className="min-h-11 hover:bg-accent! hover:text-on-accent!"
+                          onClick={() => setOpened(row.movementId)}
+                          aria-label={
+                            "Ver detalle de la compra M-" +
+                            row.movementId
+                          }
+                        >
+                          Ver detalle
+                        </Button>
+                      ),
+                    },
+                  ],
+                };
               })}
-          </DataTable>
+          />
+          <div className="hidden min-w-0 md:block">
+            <DataTable
+              headers={[
+                "Fecha",
+                "Documento",
+                "Proveedor",
+                "Ubicación",
+                "Líneas",
+                "Costo bruto",
+                "Descuentos",
+                "Adicionales",
+                "Costo neto",
+                "Responsable",
+                "Acción",
+              ]}
+            >
+              {filtered
+                .slice((current - 1) * size, current * size)
+                .map((rows) => {
+                  const row = rows[0];
+
+                  return (
+                    <tr key={row.movementId}>
+                      <td>
+                        {row.documentDate ??
+                          new Intl.DateTimeFormat("es-CO", {
+                            timeZone: timezone,
+                            dateStyle: "short",
+                          }).format(new Date(row.createdAt))}
+                      </td>
+                      <td>
+                        {row.externalReference ??
+                          "M-" + row.movementId}
+                      </td>
+                      <td>{row.supplierName ?? "—"}</td>
+                      <td>
+                        {row.location
+                          ? row.location.name +
+                            " · " +
+                            row.location.code
+                          : "Sin ubicación histórica"}
+                      </td>
+                      <td>{rows.length}</td>
+                      <td>
+                        {money(total(rows, "grossCost"), currency)}
+                      </td>
+                      <td>
+                        {money(
+                          total(rows, "discountAmount"),
+                          currency
+                        )}
+                      </td>
+                      <td>
+                        {money(
+                          total(rows, "additionalCostAmount"),
+                          currency
+                        )}
+                      </td>
+                      <td>
+                        {money(total(rows, "netCost"), currency)}
+                      </td>
+                      <td>{row.createdByName}</td>
+                      <td>
+                        <Button
+                          variant="soft"
+                          size="compact"
+                          onClick={() => setOpened(row.movementId)}
+                        >
+                          <Eye size={16} />
+                          Ver detalle
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+            </DataTable>
+          </div>
 
           {!filtered.length && (
             <Notice>

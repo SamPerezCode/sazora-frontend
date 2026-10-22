@@ -4,6 +4,7 @@ import { FilterX, Plus, Search } from "lucide-react";
 import type { AuthSession } from "../../auth/types/auth.types";
 import { DateField } from "../../../components/forms/DateField";
 import { Pagination } from "../../../components/ui/Pagination";
+import { InventoryMobileCards } from "./InventoryMobileCards";
 
 import { useInventoryQuery } from "../hooks/useInventoryQuery";
 import {
@@ -213,10 +214,9 @@ export function InventoryMovementList({
       </div>
 
       <div className="grid gap-4 border-b border-outline pb-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="grid min-w-0 flex-1 basis-64 gap-2 text-sm text-heading">
+        <div className="grid min-w-0 grid-cols-1 items-end gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:gap-3">
+          <label className="grid min-w-0 gap-2 text-sm text-heading">
             <span>Buscar</span>
-
             <div className="relative">
               <Search
                 size={17}
@@ -235,8 +235,11 @@ export function InventoryMovementList({
               />
             </div>
           </label>
-
-          <Button variant="ghost" onClick={clear}>
+          <Button
+            variant="ghost"
+            onClick={clear}
+            className="min-h-11 justify-self-end"
+          >
             <FilterX size={16} aria-hidden="true" />
             Limpiar filtros
           </Button>
@@ -308,7 +311,98 @@ export function InventoryMovementList({
 
       {!pending && !error && !invalidDates && (
         <>
-          <div className="min-w-0 [&_table]:bg-surface">
+          <InventoryMobileCards
+            label="Movimientos de inventario"
+            rows={rows
+              .slice((current - 1) * size, current * size)
+              .map((row) => {
+                const movement = byId.get(row.id);
+                const impact = movement
+                  ? economicImpact(movement)
+                  : null;
+
+                return {
+                  id: row.id,
+                  fields: [
+                    {
+                      label: "Fecha y hora",
+                      value: new Intl.DateTimeFormat("es-CO", {
+                        timeZone: timezone,
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }).format(new Date(row.createdAt)),
+                    },
+                    {
+                      label: "Tipo",
+                      value: movementLabels[row.movementType],
+                    },
+                    {
+                      label: "Ubicación",
+                      value: row.location
+                        ? row.location.name +
+                          " · " +
+                          row.location.code
+                        : "Sin ubicación histórica",
+                    },
+                    {
+                      label: "Referencia",
+                      value: row.externalReference ?? "M-" + row.id,
+                    },
+                    {
+                      label: "Responsable",
+                      value: row.createdByName,
+                    },
+                    {
+                      label: "Entradas / salidas",
+                      value:
+                        movement?.lines
+                          .map(
+                            (line) =>
+                              (line.direction === "IN" ? "+" : "−") +
+                              quantity(line.quantity, line.baseUnit) +
+                              " " +
+                              line.inventoryItemName
+                          )
+                          .join(" · ") || "Sin líneas",
+                    },
+                    {
+                      label: "Impacto económico",
+                      value:
+                        impact === null
+                          ? "Sin valoración completa"
+                          : money(impact, currency),
+                    },
+                    {
+                      label: "Estado",
+                      value: (
+                        <span className="text-emerald-700 dark:text-emerald-400">
+                          Registrado
+                        </span>
+                      ),
+                    },
+                    {
+                      label: "Acción",
+                      value: (
+                        <Button
+                          variant="ghost"
+                          size="compact"
+                          className="min-h-11 hover:bg-accent! hover:text-on-accent!"
+                          onClick={() => setOpened(row.id)}
+                          aria-label={
+                            "Ver detalle del movimiento M-" + row.id
+                          }
+                        >
+                          Ver detalle
+                        </Button>
+                      ),
+                    },
+                  ],
+                };
+              })}
+          />
+          <div className="hidden min-w-0 md:block [&_table]:bg-surface">
             <DataTable
               headers={[
                 "Fecha y hora",
