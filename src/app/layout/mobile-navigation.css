@@ -350,3 +350,16 @@
     animation: none !important;
   }
 }
+
+/* Centra el texto dentro de las opciones del menú lateral. */
+.shell-drawer .shell-nav-item,
+.shell-drawer .shell-subnav-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+
+  min-height: 2.75rem;
+  padding-block: 0.625rem;
+  line-height: 1.25rem;
+  text-align: left;
+}

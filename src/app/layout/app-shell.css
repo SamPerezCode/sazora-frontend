@@ -1064,3 +1064,80 @@
     }
   }
 }
+
+/* Submenús del sidebar abierto: desktop, tablet y móvil. */
+
+.shell-submenu-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+
+  opacity: 0;
+  visibility: hidden;
+
+  transition:
+    grid-template-rows 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease,
+    visibility 0s linear 280ms;
+}
+
+.shell-submenu-collapse[data-expanded="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+/*
+ * Permite contraer completamente el contenido,
+ * independientemente del número de opciones.
+ */
+.shell-submenu-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* La flecha acompaña la apertura y el cierre. */
+
+.shell-submenu-chevron {
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.shell-submenu-chevron[data-expanded="true"] {
+  transform: rotate(180deg);
+}
+
+/* Submenú flotante del sidebar de escritorio plegado. */
+
+.shell-flyout {
+  opacity: 0;
+  transform: translateX(-6px) scale(0.98);
+  transform-origin: left top;
+
+  transition:
+    opacity 200ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    display 260ms allow-discrete,
+    overlay 260ms allow-discrete;
+}
+
+.shell-flyout:popover-open {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+@starting-style {
+  .shell-flyout:popover-open {
+    opacity: 0;
+    transform: translateX(-6px) scale(0.98);
+  }
+}
+
+/* Accesibilidad: respeta la preferencia de movimiento reducido. */
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-submenu-collapse,
+  .shell-submenu-chevron,
+  .shell-flyout {
+    transition: none;
+  }
+}

@@ -29,6 +29,7 @@ export function MobileNavigation({
   const startedOutside = useRef(false);
 
   const [open, setOpen] = useState(false);
+  const [menuVersion, setMenuVersion] = useState(0);
 
   const close = useCallback(() => {
     const dialog = dialogRef.current;
@@ -168,6 +169,9 @@ export function MobileNavigation({
         onClose={() => {
           setOpen(false);
 
+          // Reinicia los submenús cuando el panel ya terminó de cerrarse.
+          setMenuVersion((previous) => previous + 1);
+
           if (!window.matchMedia("(min-width: 80rem)").matches) {
             triggerRef.current?.focus({
               preventScroll: true,
@@ -177,6 +181,7 @@ export function MobileNavigation({
       >
         <div className="shell-drawer-panel">
           <AppSidebar
+            key={menuVersion}
             session={session}
             business={business}
             collapsed={false}
