@@ -29,6 +29,7 @@ export function Pagination({
   onPageSizeChange,
 }: PaginationProps) {
   const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
+  if (totalItems <= 10) return null;
 
   const current = Math.max(1, Math.min(page, pageCount));
 
@@ -86,16 +87,10 @@ export function Pagination({
 
             <span
               className="pagination-compact"
+              aria-current="page"
               aria-label={`Página ${current} de ${pageCount}`}
             >
               <strong>{current}</strong>
-
-              <span
-                aria-hidden="true"
-                className="pagination-divider"
-              />
-
-              <span>{pageCount}</span>
             </span>
 
             <div className="pagination-pages">

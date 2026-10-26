@@ -98,11 +98,21 @@
 
   .pagination-compact {
     display: flex;
-    gap: 0.5rem;
-    min-width: 3.5rem;
-    padding-inline: 0.625rem;
-    font-size: 0.75rem;
-    color: var(--sazora-muted);
+    align-items: center;
+    justify-content: center;
+
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0.25rem 0.625rem;
+
+    border: 1px solid var(--pagination-active-border);
+    border-radius: 999px;
+
+    background: var(--sazora-surface);
+    color: var(--sazora-heading);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
   }
 
   .pagination-compact strong {
