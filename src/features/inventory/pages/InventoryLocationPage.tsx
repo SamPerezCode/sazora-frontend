@@ -168,6 +168,7 @@ export function InventoryLocationPage() {
   const data = query.data;
 
   const validLocation =
+    tab === "reconciliation" ||
     !locationId ||
     !!data?.locations.some((location) => location.id === locationId);
 
@@ -211,8 +212,8 @@ export function InventoryLocationPage() {
         <div className="w-full min-w-0 sm:w-[360px]">
           <Choice
             label="Ubicación"
-            value={locationId}
-            disabled={query.pending}
+            value={tab === "reconciliation" ? "" : locationId}
+            disabled={query.pending || tab === "reconciliation"}
             onValueChange={(value) =>
               setParams((previous) => {
                 const result = new URLSearchParams(previous);
@@ -493,7 +494,7 @@ export function InventoryLocationPage() {
 
           {tab === "reconciliation" && (
             <InventoryReconciliation
-              data={data}
+              currency={currency}
               revision={revision}
             />
           )}

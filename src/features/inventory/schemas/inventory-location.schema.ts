@@ -164,17 +164,27 @@ export const purchaseRowSchema = z.object({
   movementId: id,
   movementLineId: id,
   location: locationSchema.nullable(),
+
   supplierName: z.string().nullable(),
   supplierDocument: z.string().nullable(),
   externalReference: z.string().nullable(),
   documentDate: z.string().nullable(),
+
   inventoryItemId: id,
   inventoryItemName: z.string(),
   baseUnit: baseUnitSchema,
+  baseQuantity: numeric,
+
   grossCost: numeric.nullable(),
   discountAmount: numeric.nullable(),
   additionalCostAmount: numeric.nullable(),
   netCost: numeric.nullable(),
+
+  purchaseUnitCost: numeric.nullable(),
+  previousAverageUnitCost: numeric.nullable(),
+  averageCostVariationPercentage: numeric.nullable(),
+  costStatus: z.enum(["VALUED", "UNVALUED_LEGACY"]),
+
   createdByName: z.string(),
   createdAt: z.string(),
 });
