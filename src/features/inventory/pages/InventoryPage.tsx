@@ -1,18 +1,26 @@
+import { useSearchParams } from "react-router";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { InventoryLocationPage } from "./InventoryLocationPage";
+import { InventoryProduction } from "../components/InventoryProduction";
 
 export function InventoryPage() {
   const { session } = useAppShell();
+  const [params] = useSearchParams();
 
-  return (
-    <InventoryLocationPage
-      key={
-        session.business.id +
-        ":" +
-        session.membership.id +
-        ":" +
-        session.accessToken
-      }
-    />
+  const productionOnly =
+    !session.authorization.roles.includes("ADMIN") &&
+    session.authorization.roles.includes("PRODUCTION");
+
+  const key =
+    session.business.id +
+    ":" +
+    session.membership.id +
+    ":" +
+    session.accessToken;
+
+  return productionOnly || params.get("tab") === "production" ? (
+    <InventoryProduction key={key} />
+  ) : (
+    <InventoryLocationPage key={key} />
   );
 }

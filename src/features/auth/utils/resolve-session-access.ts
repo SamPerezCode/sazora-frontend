@@ -33,9 +33,9 @@ const WORKSPACES: readonly Workspace[] = [
     id: "production",
     role: "PRODUCTION",
     label: "Producción",
-    path: "/produccion",
+    path: "/inventario",
     locationType: "PRODUCTION_WAREHOUSE",
-    pending: true,
+    pending: false,
   },
   {
     id: "public-orders",

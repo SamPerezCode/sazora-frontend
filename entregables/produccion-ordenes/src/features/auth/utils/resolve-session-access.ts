@@ -1,0 +1,193 @@
+import type { CurrentSession, RoleCode } from "../types/auth.types";
+
+type SessionLocation =
+  CurrentSession["locationAccess"]["locations"][number];
+
+export interface Workspace {
+  id: string;
+  role: Exclude<RoleCode, "ADMIN">;
+  label: string;
+  path: string;
+  locationType: SessionLocation["locationType"];
+  pending: boolean;
+}
+
+const WORKSPACES: readonly Workspace[] = [
+  {
+    id: "sales",
+    role: "WAITER",
+    label: "Mesas y pedidos",
+    path: "/ventas",
+    locationType: "POINT_OF_SALE",
+    pending: false,
+  },
+  {
+    id: "kitchen",
+    role: "KITCHEN",
+    label: "Cocina",
+    path: "/cocina",
+    locationType: "POINT_OF_SALE",
+    pending: false,
+  },
+  {
+    id: "production",
+    role: "PRODUCTION",
+    label: "Producción",
+    path: "/inventario",
+    locationType: "PRODUCTION_WAREHOUSE",
+    pending: false,
+  },
+  {
+    id: "public-orders",
+    role: "PUBLIC_ORDER_MANAGER",
+    label: "Pedidos públicos",
+    path: "/pedidos-publicos",
+    locationType: "POINT_OF_SALE",
+    pending: true,
+  },
+  {
+    id: "deliveries",
+    role: "DELIVERY_DRIVER",
+    label: "Domicilios",
+    path: "/domicilios",
+    locationType: "POINT_OF_SALE",
+    pending: true,
+  },
+];
+
+type AccessIssue = "no-locations" | "no-default" | "incompatible";
+
+export interface AccessResolution {
+  kind: "global" | "blocked" | "single" | "choose";
+  home: string;
+  allowedPaths: readonly string[];
+
+  // Todos los módulos compatibles con el rol y la ubicación.
+  workspaces: readonly Workspace[];
+
+  // Opciones utilizadas para decidir el ingreso inicial.
+  entryWorkspaces: readonly Workspace[];
+
+  defaultLocation: SessionLocation | null;
+  issue: AccessIssue | null;
+}
+
+export function resolveSessionAccess(
+  session: CurrentSession
+): AccessResolution {
+  const { roles, locationAccess } = session;
+
+  const { locations, defaultLocationId, hasGlobalAccess } =
+    locationAccess;
+
+  const isAdmin = roles.includes("ADMIN");
+
+  const kitchenPaths = roles.some(
+    (role) =>
+      role === "ADMIN" || role === "KITCHEN" || role === "WAITER"
+  )
+    ? ["/cocina"]
+    : [];
+
+  const defaultLocation =
+    locations.find((location) => location.id === defaultLocationId) ??
+    null;
+
+  const defaultWorkspaces =
+    defaultLocation && defaultLocation.isActive !== false
+      ? WORKSPACES.filter(
+          (workspace) =>
+            roles.includes(workspace.role) &&
+            workspace.locationType === defaultLocation.locationType
+        )
+      : [];
+
+  const workspaces = roles.includes("WAITER")
+    ? [
+        WORKSPACES[0],
+        ...defaultWorkspaces.filter(
+          (workspace) => workspace.id !== "sales"
+        ),
+      ]
+    : defaultWorkspaces;
+
+  if (isAdmin || hasGlobalAccess) {
+    return {
+      kind: "global",
+      home: "/panel",
+      allowedPaths: [
+        "/panel",
+        ...kitchenPaths,
+        ...(isAdmin
+          ? [
+              "/configuracion",
+              "/mi-negocio",
+              "/ventas",
+              "/productos",
+              "/productos/categorias",
+              "/inventario",
+              "/estadisticas",
+            ]
+          : []),
+        ...workspaces.map((workspace) => workspace.path),
+      ],
+      workspaces,
+      entryWorkspaces: [],
+      defaultLocation,
+      issue: null,
+    };
+  }
+
+  let issue: AccessIssue | null = null;
+
+  if (roles.includes("WAITER")) {
+    issue = null;
+  } else if (locations.length === 0) {
+    issue = "no-locations";
+  } else if (defaultLocationId === null) {
+    issue = "no-default";
+  } else if (
+    !defaultLocation ||
+    defaultLocation.isActive === false ||
+    workspaces.length === 0
+  ) {
+    issue = "incompatible";
+  }
+
+  if (issue) {
+    return {
+      kind: "blocked",
+      home: "/acceso",
+      allowedPaths: ["/acceso", ...kitchenPaths],
+      workspaces: [],
+      entryWorkspaces: [],
+      defaultLocation,
+      issue,
+    };
+  }
+
+  // Si hay módulos disponibles, tienen prioridad al ingresar.
+  const readyWorkspaces = workspaces.filter(
+    (workspace) => !workspace.pending
+  );
+
+  // Si todos están pendientes, se ofrecen sus pantallas informativas.
+  const entryWorkspaces =
+    readyWorkspaces.length > 0 ? readyWorkspaces : workspaces;
+
+  const choose = entryWorkspaces.length > 1;
+
+  return {
+    kind: choose ? "choose" : "single",
+    home: choose ? "/espacios" : entryWorkspaces[0].path,
+    allowedPaths: [
+      ...kitchenPaths,
+      ...workspaces.map((workspace) => workspace.path),
+      ...(choose ? ["/espacios"] : []),
+    ],
+    workspaces,
+    entryWorkspaces,
+    defaultLocation,
+    issue: null,
+  };
+}

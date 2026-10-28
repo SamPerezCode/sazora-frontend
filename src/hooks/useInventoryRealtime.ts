@@ -13,7 +13,9 @@ export function useInventoryRealtime(
   const businessId = session.business.id;
   const membershipId = session.membership.id;
   const userId = session.user.id;
-  const allowed = session.authorization.roles.includes("ADMIN");
+  const allowed =
+    session.authorization.roles.includes("ADMIN") ||
+    session.authorization.roles.includes("PRODUCTION");
 
   useEffect(() => {
     if (!allowed) return;

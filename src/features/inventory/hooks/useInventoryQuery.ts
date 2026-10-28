@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { ApiError } from "../../../lib/http/client";
-import type { AuthSession } from "../../auth/types/auth.types";
+import type {
+  AuthSession,
+  RoleCode,
+} from "../../auth/types/auth.types";
 
 export function useInventoryQuery<T>(
   key: string,
   load: (session: AuthSession, signal: AbortSignal) => Promise<T>,
-  revision = 0
+  revision = 0,
+  allowedRoles: readonly RoleCode[] = ["ADMIN"]
 ) {
   const { session } = useAppShell();
 
@@ -29,7 +33,9 @@ export function useInventoryQuery<T>(
 
   const requestKey = JSON.stringify([scope, revision, attempt]);
 
-  const allowed = session.authorization.roles.includes("ADMIN");
+  const allowed = allowedRoles.some((role) =>
+    session.authorization.roles.includes(role)
+  );
 
   useEffect(() => {
     if (!allowed) return;

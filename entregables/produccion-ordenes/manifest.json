@@ -1,0 +1,58 @@
+[
+  {
+    "file": "src/features/auth/utils/resolve-session-access.ts",
+    "before": "7c7064e02ba68294c042b81f334157408ae9259d0d7e8a482fea3be0f4bb30fb"
+  },
+  {
+    "file": "src/features/inventory/hooks/useInventoryQuery.ts",
+    "before": "fe4eb411a4bd65170b529fec1f4a9e08f4e1f87b383df9c4c5ace0546e03f980"
+  },
+  {
+    "file": "src/features/inventory/pages/InventoryPage.tsx",
+    "before": "4b944c0131b7c7ae33e3f5745426a82b74b64c1e57026c4c9299341b4333c96d"
+  },
+  {
+    "file": "src/features/inventory/production/production.access.ts",
+    "before": null
+  },
+  {
+    "file": "src/features/inventory/production/production.api.ts",
+    "before": null
+  },
+  {
+    "file": "src/features/inventory/production/production.contracts.ts",
+    "before": null
+  },
+  {
+    "file": "src/features/inventory/production/production.view.tsx",
+    "before": null
+  },
+  {
+    "file": "src/features/inventory/production/ProductionOrderDetail.tsx",
+    "before": null
+  },
+  {
+    "file": "src/features/inventory/production/ProductionOrderDialog.tsx",
+    "before": null
+  },
+  {
+    "file": "src/features/inventory/production/ProductionOrderForms.tsx",
+    "before": null
+  },
+  {
+    "file": "src/features/inventory/production/ProductionOrders.tsx",
+    "before": null
+  },
+  {
+    "file": "src/features/inventory/production/ProductionPage.tsx",
+    "before": null
+  },
+  {
+    "file": "src/hooks/useInventoryRealtime.ts",
+    "before": "86ab22534b4ec4ba725ae9504aba891790a44d07c8019b5bd5e24d6adb664a39"
+  },
+  {
+    "file": "src/features/inventory/production/production.format.ts",
+    "before": null
+  }
+]
