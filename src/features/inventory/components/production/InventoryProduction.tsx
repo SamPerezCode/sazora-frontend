@@ -30,36 +30,12 @@ import { QuickProductions } from "./components/quick/QuickProductions";
 import { ProductionListState } from "./components/shared/ProductionListState";
 
 const inventoryTabs = [
-  {
-    id: "summary",
-    label: "Resumen",
-    Icon: ChartNoAxesCombined,
-  },
-  {
-    id: "stock",
-    label: "Existencias",
-    Icon: Boxes,
-  },
-  {
-    id: "purchases",
-    label: "Compras",
-    Icon: ReceiptText,
-  },
-  {
-    id: "movements",
-    label: "Movimientos",
-    Icon: History,
-  },
-  {
-    id: "production",
-    label: "Producción",
-    Icon: Factory,
-  },
-  {
-    id: "kardex",
-    label: "Kardex y costos",
-    Icon: SlidersHorizontal,
-  },
+  { id: "summary", label: "Resumen", Icon: ChartNoAxesCombined },
+  { id: "stock", label: "Existencias", Icon: Boxes },
+  { id: "purchases", label: "Compras", Icon: ReceiptText },
+  { id: "movements", label: "Movimientos", Icon: History },
+  { id: "production", label: "Producción", Icon: Factory },
+  { id: "kardex", label: "Kardex y costos", Icon: SlidersHorizontal },
   {
     id: "reconciliation",
     label: "Conciliación",
@@ -97,8 +73,15 @@ const productionTabs = [
 const navClass =
   "flex min-w-0 max-w-full gap-1 overflow-x-auto border-b border-outline pb-2";
 
-const tabClass =
-  "flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50 ";
+// Mismas medidas que la navegación de Compras y Movimientos.
+const inventoryTabClass =
+  "flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-[12px] sm:text-[14px] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ";
+
+// Navegación secundaria del módulo.
+const productionTabClass =
+  "flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-xs " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50 ";
 
 export function InventoryProduction() {
   const { session, settings } = useAppShell();
@@ -170,13 +153,13 @@ export function InventoryProduction() {
 
   return (
     <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 text-heading">
-      <header className="grid min-w-0 items-end gap-4 md:grid-cols-[minmax(0,1fr)_20rem]">
+      <header className="flex min-w-0 flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <p className="mb-1 hidden text-xs text-muted md:block">
-            INVENTARIO
-          </p>
+          <p className="text-xs text-muted">INVENTARIO</p>
 
-          <h2 className="text-xl font-bold leading-7">Producción</h2>
+          <h2 className="text-[20px] leading-7 font-bold sm:text-[24px]">
+            Producción
+          </h2>
 
           <p className="mt-1 text-xs leading-5 text-muted">
             Planifica, ejecuta y analiza la transformación de
@@ -184,36 +167,37 @@ export function InventoryProduction() {
           </p>
         </div>
 
-        <Choice
-          label="Planta"
-          value={locationId}
-          disabled={!admin || context.pending || !!context.error}
-          className="min-w-0 [&_.select-field-label]:text-xs! [&_.select-field-trigger]:h-9! [&_.select-field-trigger]:min-h-9!"
-          onValueChange={(value) =>
-            setParams((previous) => {
-              const next = new URLSearchParams(previous);
+        <div className="w-full min-w-0 sm:w-[360px]">
+          <Choice
+            label="Planta"
+            value={locationId}
+            disabled={!admin || context.pending || !!context.error}
+            onValueChange={(value) =>
+              setParams((previous) => {
+                const next = new URLSearchParams(previous);
 
-              next.set("tab", "production");
+                next.set("tab", "production");
 
-              if (value) {
-                next.set("locationId", value);
-              } else {
-                next.delete("locationId");
-              }
+                if (value) {
+                  next.set("locationId", value);
+                } else {
+                  next.delete("locationId");
+                }
 
-              return next;
-            })
-          }
-          options={[
-            ...(admin
-              ? [{ value: "", label: "Todas las plantas" }]
-              : []),
-            ...(plants ?? (plant ? [plant] : [])).map((item) => ({
-              value: item.id,
-              label: item.name,
-            })),
-          ]}
-        />
+                return next;
+              })
+            }
+            options={[
+              ...(admin
+                ? [{ value: "", label: "Todas las plantas" }]
+                : []),
+              ...(plants ?? (plant ? [plant] : [])).map((item) => ({
+                value: item.id,
+                label: item.name,
+              })),
+            ]}
+          />
+        </div>
       </header>
 
       <nav aria-label="Secciones de inventario" className={navClass}>
@@ -225,7 +209,7 @@ export function InventoryProduction() {
               type="button"
               aria-current={id === "production" ? "page" : undefined}
               className={
-                tabClass +
+                inventoryTabClass +
                 (id === "production"
                   ? "bg-accent/10 text-accent"
                   : "text-muted hover:bg-secondary")
@@ -259,7 +243,7 @@ export function InventoryProduction() {
             title={enabled ? undefined : "Próximamente"}
             aria-current={section === id ? "page" : undefined}
             className={
-              tabClass +
+              productionTabClass +
               (section === id
                 ? "bg-accent/10 text-accent"
                 : "text-muted hover:bg-secondary")
