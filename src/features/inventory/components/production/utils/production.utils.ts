@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ApiError } from "../../../../lib/http/client";
+import { ApiError } from "../../../../../lib/http/client";
 import {
   money,
   cost as formatCost,
@@ -8,15 +8,15 @@ import {
   add,
   subtract,
   divide,
-} from "../../utils/inventory-value";
-import { formatQuantity, dayKey } from "../../utils/inventory-format";
+} from "../../../utils/inventory-value";
+import { formatQuantity, dayKey } from "../../../utils/inventory-format";
 import type {
   Status,
   Action,
   Order,
   OrderResources,
   QuickLine,
-} from "./production.types";
+} from "../types/production.types";
 
 export const statusLabels: Record<Status, string> = {
   DRAFT: "Borrador",

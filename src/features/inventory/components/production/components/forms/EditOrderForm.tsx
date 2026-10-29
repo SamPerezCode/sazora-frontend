@@ -1,35 +1,35 @@
 import { useState, useCallback } from "react";
-import { DateField } from "../../../../components/forms/DateField";
-import type { AuthSession } from "../../../auth/types/auth.types";
-import { useInventoryQuery } from "../../hooks/useInventoryQuery";
-import { loadBalances } from "../../services/inventory-location.service";
-import { dayKey } from "../../utils/inventory-format";
+import { DateField } from "../../../../../../components/forms/DateField";
+import type { AuthSession } from "../../../../../auth/types/auth.types";
+import { useInventoryQuery } from "../../../../hooks/useInventoryQuery";
+import { loadBalances } from "../../../../services/inventory-location.service";
+import { dayKey } from "../../../../utils/inventory-format";
 import {
   quantity3,
   multiply,
   fixed,
   quantity,
-} from "../../utils/inventory-value";
-import { Button } from "../InventoryButton";
-import { Notice, Choice, Field } from "../InventoryLocationUI";
-import { InventoryResponsiveRecords as Records } from "../InventoryResponsiveRecords";
+} from "../../../../utils/inventory-value";
+import { Button } from "../../../InventoryButton";
+import { Notice, Choice, Field } from "../../../InventoryLocationUI";
+import { InventoryResponsiveRecords as Records } from "../../../InventoryResponsiveRecords";
 import {
   listRecipes,
   loadPlants,
   getRecipe,
-} from "./production.catalog";
-import { productionRoles } from "./production.access";
+} from "../../services/production.catalog";
+import { productionRoles } from "../../utils/production.access";
 import {
   positiveQuantity,
   editOrderSchema,
-} from "./production.schemas";
+} from "../../schemas/production.schemas";
 import {
   plannedISO,
   errorText,
   percentage,
-} from "./production.utils";
-import { Frame } from "./ProductionUI";
-import type { FormContext } from "./production.types";
+} from "../../utils/production.utils";
+import { Frame } from "../shared/ProductionUI";
+import type { FormContext } from "../../types/production.types";
 
 export function EditOrderForm({
   context: c,

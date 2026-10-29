@@ -1,13 +1,13 @@
 import { z } from "zod";
-import type { AuthSession } from "../../../auth/types/auth.types";
-import { ApiError } from "../../../../lib/http/client";
-import { id } from "../../schemas/inventory-location.schema";
-import { movementDetail } from "../../schemas/inventory-audit.schema";
+import type { AuthSession } from "../../../../auth/types/auth.types";
+import { ApiError } from "../../../../../lib/http/client";
+import { id } from "../../../schemas/inventory-location.schema";
+import { movementDetail } from "../../../schemas/inventory-audit.schema";
 import {
   allowedActions,
   isAdmin,
   plantScope,
-} from "./production.access";
+} from "../utils/production.access";
 import { api, checkOrder } from "./production.api";
 import {
   orderSchema,
@@ -17,8 +17,8 @@ import {
   wasteSchema,
   createOrderSchema,
   quickCreateSchema,
-} from "./production.schemas";
-import type { Order, Mutation } from "./production.types";
+} from "../schemas/production.schemas";
+import type { Order, Mutation } from "../types/production.types";
 
 export async function saveOrder(
   session: AuthSession,

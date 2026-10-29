@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { useAppShell } from "../../../../app/layout/shell-context";
+import { useAppShell } from "../../../../../../app/layout/shell-context";
 import {
   multiply,
   add,
@@ -8,24 +8,24 @@ import {
   unit,
   subtract,
   divide,
-} from "../../utils/inventory-value";
-import { Button } from "../InventoryButton";
-import { Choice, Field, Notice } from "../InventoryLocationUI";
-import { InventoryResponsiveRecords as Records } from "../InventoryResponsiveRecords";
+} from "../../../../utils/inventory-value";
+import { Button } from "../../../InventoryButton";
+import { Choice, Field, Notice } from "../../../InventoryLocationUI";
+import { InventoryResponsiveRecords as Records } from "../../../InventoryResponsiveRecords";
 import {
   positiveQuantity,
   wasteInputSchema,
   completeOrderSchema,
-} from "./production.schemas";
+} from "../../schemas/production.schemas";
 import {
   estimate,
   errorText,
   percentage,
   cash,
   cost,
-} from "./production.utils";
-import { Frame, Warning, Metrics } from "./ProductionUI";
-import type { FormContext, Mutation } from "./production.types";
+} from "../../utils/production.utils";
+import { Frame, Warning, Metrics } from "../shared/ProductionUI";
+import type { FormContext, Mutation } from "../../types/production.types";
 
 export function ExecutionForm({
   context: c,

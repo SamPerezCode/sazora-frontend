@@ -1,21 +1,21 @@
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
-import { BottomSheet } from "../../../../components/layout/BottomSheet";
-import { DateField } from "../../../../components/forms/DateField";
+import { BottomSheet } from "../../../../../../components/layout/BottomSheet";
+import { DateField } from "../../../../../../components/forms/DateField";
 
-import { Button } from "../InventoryButton";
-import { Choice, Notice } from "../InventoryLocationUI";
-import { InventoryResponsiveRecords as Records } from "../InventoryResponsiveRecords";
+import { Button } from "../../../InventoryButton";
+import { Choice, Notice } from "../../../InventoryLocationUI";
+import { InventoryResponsiveRecords as Records } from "../../../InventoryResponsiveRecords";
 
-import { isAdmin } from "./production.access";
-import { cash } from "./production.utils";
+import { isAdmin } from "../../utils/production.access";
+import { cash } from "../../utils/production.utils";
 
-import { Metrics, Warning } from "./ProductionUI";
+import { Metrics, Warning } from "../shared/ProductionUI";
 import { ProductionQuickLines } from "./ProductionQuickLines";
 import { ProductionRecipeProjection } from "./ProductionRecipeProjection";
-import { useProductionCreateForm } from "./useProductionCreateForm";
+import { useProductionCreateForm } from "../../hooks/useProductionCreateForm";
 
-import type { ProductionCreateProps } from "./production.types";
+import type { ProductionCreateProps } from "../../types/production.types";
 
 export function ProductionCreateDialog(props: ProductionCreateProps) {
   const model = useProductionCreateForm(props);

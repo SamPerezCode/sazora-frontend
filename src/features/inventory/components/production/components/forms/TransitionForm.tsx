@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Button } from "../InventoryButton";
-import { Field, Notice } from "../InventoryLocationUI";
-import { Frame, Warning } from "./ProductionUI";
-import type { FormContext } from "./production.types";
+import { Button } from "../../../InventoryButton";
+import { Field, Notice } from "../../../InventoryLocationUI";
+import { Frame, Warning } from "../shared/ProductionUI";
+import type { FormContext } from "../../types/production.types";
 
 export function TransitionForm({
   context: c,

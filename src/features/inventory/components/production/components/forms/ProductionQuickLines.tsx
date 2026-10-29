@@ -1,15 +1,15 @@
 import { Plus, Trash2 } from "lucide-react";
 
-import { Button } from "../InventoryButton";
-import { Choice } from "../InventoryLocationUI";
+import { Button } from "../../../InventoryButton";
+import { Choice } from "../../../InventoryLocationUI";
 
-import { fixed, quantity, unit } from "../../utils/inventory-value";
+import { fixed, quantity, unit } from "../../../../utils/inventory-value";
 
-import { positiveQuantity } from "./production.schemas";
+import { positiveQuantity } from "../../schemas/production.schemas";
 
-import { cash, cost, percentage } from "./production.utils";
+import { cash, cost, percentage } from "../../utils/production.utils";
 
-import type { ProductionCreateModel } from "./useProductionCreateForm";
+import type { ProductionCreateModel } from "../../hooks/useProductionCreateForm";
 
 export function ProductionQuickLines({
   model,

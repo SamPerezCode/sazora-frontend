@@ -1,25 +1,25 @@
 import { z } from "zod";
-import type { AuthSession } from "../../../auth/types/auth.types";
-import { getLocations } from "../../../business/services/organization.service";
-import { ApiError } from "../../../../lib/http/client";
+import type { AuthSession } from "../../../../auth/types/auth.types";
+import { getLocations } from "../../../../business/services/organization.service";
+import { ApiError } from "../../../../../lib/http/client";
 import {
   id,
   balancesSchema,
-} from "../../schemas/inventory-location.schema";
+} from "../../../schemas/inventory-location.schema";
 import {
   assertProduction,
   isAdmin,
   assignedPlant,
   usablePlant,
   plantScope,
-} from "./production.access";
+} from "../utils/production.access";
 import {
   recipeSummarySchema,
   recipeSchema,
   productionItemSchema,
-} from "./production.schemas";
+} from "../schemas/production.schemas";
 import { api } from "./production.api";
-import type { CreationKind } from "./production.types";
+import type { CreationKind } from "../types/production.types";
 
 export async function loadPlants(
   session: AuthSession,

@@ -1,18 +1,18 @@
 import { z } from "zod";
-import type { AuthSession } from "../../../auth/types/auth.types";
-import { ApiError } from "../../../../lib/http/client";
-import { id } from "../../schemas/inventory-location.schema";
-import { movementDetail } from "../../schemas/inventory-audit.schema";
+import type { AuthSession } from "../../../../auth/types/auth.types";
+import { ApiError } from "../../../../../lib/http/client";
+import { id } from "../../../schemas/inventory-location.schema";
+import { movementDetail } from "../../../schemas/inventory-audit.schema";
 import { loadPlants, productionBalances } from "./production.catalog";
-import { isAdmin, plantScope } from "./production.access";
+import { isAdmin, plantScope } from "../utils/production.access";
 import { api, checkOrder } from "./production.api";
 import {
   orderSummarySchema,
   orderSchema,
   performanceSchema,
   wasteSchema,
-} from "./production.schemas";
-import type { Order } from "./production.types";
+} from "../schemas/production.schemas";
+import type { Order } from "../types/production.types";
 
 export async function loadContext(
   session: AuthSession,

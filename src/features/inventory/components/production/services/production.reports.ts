@@ -1,12 +1,12 @@
 import { z } from "zod";
-import type { AuthSession } from "../../../auth/types/auth.types";
-import { fixed } from "../../utils/inventory-value";
-import { plantScope } from "./production.access";
+import type { AuthSession } from "../../../../auth/types/auth.types";
+import { fixed } from "../../../utils/inventory-value";
+import { plantScope } from "../utils/production.access";
 import { api } from "./production.api";
 import {
   reportSummarySchema,
   historySchema,
-} from "./production.schemas";
+} from "../schemas/production.schemas";
 
 export async function loadPeriod(
   session: AuthSession,

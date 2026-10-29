@@ -1,24 +1,24 @@
 import { useCallback, useState, useRef, useEffect } from "react";
-import { useAppShell } from "../../../../app/layout/shell-context";
-import { ApiError } from "../../../../lib/http/client";
-import type { AuthSession } from "../../../auth/types/auth.types";
-import { useInventoryQuery } from "../../hooks/useInventoryQuery";
-import { Modal, Notice } from "../InventoryLocationUI";
-import { Button } from "../InventoryButton";
-import { orderResources } from "./production.queries";
-import { saveOrder } from "./production.mutations";
-import { errorText } from "./production.utils";
-import { productionRoles, allowedActions } from "./production.access";
-import { EditOrderForm } from "./EditOrderForm";
-import { ExecutionForm } from "./ExecutionForm";
-import { TransitionForm } from "./TransitionForm";
+import { useAppShell } from "../../../../../../app/layout/shell-context";
+import { ApiError } from "../../../../../../lib/http/client";
+import type { AuthSession } from "../../../../../auth/types/auth.types";
+import { useInventoryQuery } from "../../../../hooks/useInventoryQuery";
+import { Modal, Notice } from "../../../InventoryLocationUI";
+import { Button } from "../../../InventoryButton";
+import { orderResources } from "../../services/production.queries";
+import { saveOrder } from "../../services/production.mutations";
+import { errorText } from "../../utils/production.utils";
+import { productionRoles, allowedActions } from "../../utils/production.access";
+import { EditOrderForm } from "../forms/EditOrderForm";
+import { ExecutionForm } from "../forms/ExecutionForm";
+import { TransitionForm } from "../forms/TransitionForm";
 import { ProductionOrderDetail } from "./ProductionOrderDetail";
 import type {
   Action,
   Order,
   Mutation,
   FormContext,
-} from "./production.types";
+} from "../../types/production.types";
 
 export function ProductionOrderDialog({
   id,

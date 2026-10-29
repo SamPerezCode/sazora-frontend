@@ -1,8 +1,8 @@
 import { useCallback } from "react";
-import type { AuthSession } from "../../../auth/types/auth.types";
-import { useInventoryQuery } from "../../hooks/useInventoryQuery";
-import { orderPage } from "./production.queries";
-import { productionRoles } from "./production.access";
+import type { AuthSession } from "../../../../auth/types/auth.types";
+import { useInventoryQuery } from "../../../hooks/useInventoryQuery";
+import { orderPage } from "../services/production.queries";
+import { productionRoles } from "../utils/production.access";
 
 export function useOrderPage(idsKey: string, revision: number) {
   const loader = useCallback(

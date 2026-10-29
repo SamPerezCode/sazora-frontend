@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { CircleAlert } from "lucide-react";
-import { Modal } from "../InventoryLocationUI";
-import { statusLabels } from "./production.utils";
-import type { Status, FormContext } from "./production.types";
+import { Modal } from "../../../InventoryLocationUI";
+import { statusLabels } from "../../utils/production.utils";
+import type { Status, FormContext } from "../../types/production.types";
 
 export function StatusBadge({ status }: { status: Status }) {
   const tones: Record<Status, string> = {

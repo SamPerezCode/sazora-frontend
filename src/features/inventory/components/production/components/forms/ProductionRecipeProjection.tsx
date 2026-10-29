@@ -1,12 +1,12 @@
-import { InventoryResponsiveRecords as Records } from "../InventoryResponsiveRecords";
+import { InventoryResponsiveRecords as Records } from "../../../InventoryResponsiveRecords";
 
-import { formatQuantity } from "../../utils/inventory-format";
+import { formatQuantity } from "../../../../utils/inventory-format";
 
-import { fixed, quantity } from "../../utils/inventory-value";
+import { fixed, quantity } from "../../../../utils/inventory-value";
 
-import { percentage } from "./production.utils";
+import { percentage } from "../../utils/production.utils";
 
-import type { ProductionCreateModel } from "./useProductionCreateForm";
+import type { ProductionCreateModel } from "../../hooks/useProductionCreateForm";
 
 export function ProductionRecipeProjection({
   model,

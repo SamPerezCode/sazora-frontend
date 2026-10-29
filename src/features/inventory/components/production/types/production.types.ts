@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { movementDetail } from "../../schemas/inventory-audit.schema";
+import type { movementDetail } from "../../../schemas/inventory-audit.schema";
 
 import type {
   orderSchema,
@@ -7,9 +7,9 @@ import type {
   editOrderSchema,
   completeOrderSchema,
   wasteInputSchema,
-} from "./production.schemas";
+} from "../schemas/production.schemas";
 
-import type { orderResources } from "./production.queries";
+import type { orderResources } from "../services/production.queries";
 
 export type Order = z.infer<typeof orderSchema>;
 

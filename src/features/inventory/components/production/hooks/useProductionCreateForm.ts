@@ -5,11 +5,11 @@ import {
   useEffect,
   useCallback,
 } from "react";
-import { useAppShell } from "../../../../app/layout/shell-context";
-import { calendarToday } from "../../../../components/forms/calendar-date";
-import { ApiError } from "../../../../lib/http/client";
-import type { AuthSession } from "../../../auth/types/auth.types";
-import { useInventoryQuery } from "../../hooks/useInventoryQuery";
+import { useAppShell } from "../../../../../app/layout/shell-context";
+import { calendarToday } from "../../../../../components/forms/calendar-date";
+import { ApiError } from "../../../../../lib/http/client";
+import type { AuthSession } from "../../../../auth/types/auth.types";
+import { useInventoryQuery } from "../../../hooks/useInventoryQuery";
 import {
   add,
   multiply,
@@ -18,37 +18,37 @@ import {
   divide,
   quantity3,
   quantity,
-} from "../../utils/inventory-value";
+} from "../../../utils/inventory-value";
 import {
   isAdmin,
   assignedPlant,
   productionRoles,
-} from "./production.access";
+} from "../utils/production.access";
 import {
   emptyQuickLine,
   plannedISO,
   errorText,
   percentage,
-} from "./production.utils";
+} from "../utils/production.utils";
 import {
   loadCreationCatalog,
   productionBalances,
   getRecipe,
-} from "./production.catalog";
+} from "../services/production.catalog";
 import {
   positiveQuantity,
   allocationSchema,
   quickCreateSchema,
   createOrderSchema,
-} from "./production.schemas";
+} from "../schemas/production.schemas";
 import {
   registerQuickProduction,
   createDraftOrder,
-} from "./production.mutations";
+} from "../services/production.mutations";
 import type {
   QuickLine,
   ProductionCreateProps,
-} from "./production.types";
+} from "../types/production.types";
 
 export function useProductionCreateForm({
   kind,

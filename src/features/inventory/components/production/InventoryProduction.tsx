@@ -18,13 +18,13 @@ import { useInventoryRealtime } from "../../../../hooks/useInventoryRealtime";
 import { useInventoryQuery } from "../../hooks/useInventoryQuery";
 import { Notice, Choice } from "../InventoryLocationUI";
 import { Button } from "../InventoryButton";
-import { loadContext } from "./production.queries";
+import { loadContext } from "./services/production.queries";
 import {
   productionRoles,
   isAdmin,
   assignedPlant,
-} from "./production.access";
-import { ProductionOrders } from "./ProductionOrders";
+} from "./utils/production.access";
+import { ProductionOrders } from "./components/orders/ProductionOrders";
 
 export function InventoryProduction() {
   const { session, settings } = useAppShell();

@@ -25,6 +25,10 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
+  --font-sans: var(--sazora-font-body);
+  --font-body: var(--sazora-font-body);
+  --font-heading: var(--sazora-font-heading);
+
   --color-danger: var(--sazora-danger, #c9302d);
   --color-background: var(--sazora-background);
   --color-heading: var(--sazora-heading);
@@ -46,6 +50,14 @@
 @layer base {
   :root {
     color-scheme: light;
+
+    --sazora-font-body:
+      "Manrope", ui-sans-serif, system-ui, -apple-system,
+      BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+    --sazora-font-heading:
+      "Sora", ui-sans-serif, system-ui, -apple-system,
+      BlinkMacSystemFont, "Segoe UI", sans-serif;
 
     --sazora-background: #f4f7fb;
     --sazora-heading: #1c2a4d;
@@ -85,7 +97,7 @@
   }
 
   html {
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: var(--sazora-font-body);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -94,12 +106,43 @@
     margin: 0;
     min-width: 320px;
     min-height: 100svh;
+    font-family: var(--sazora-font-body);
     background-color: var(--sazora-background);
     color: var(--sazora-heading);
   }
 
   #root {
     min-height: 100svh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  [role="heading"] {
+    font-family: var(--sazora-font-heading);
+  }
+
+  button,
+  input,
+  select,
+  textarea,
+  optgroup {
+    font-family: inherit;
+  }
+
+  .login-page {
+    --sazora-font-body:
+      "Figtree", ui-sans-serif, system-ui, -apple-system,
+      BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+    --sazora-font-heading:
+      "Outfit", ui-sans-serif, system-ui, -apple-system,
+      BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+    font-family: var(--sazora-font-body);
   }
 }
 
@@ -118,6 +161,7 @@
     transparent
   );
 }
+
 /* Cierre de modales y avisos. */
 
 :root button:is(.bottom-sheet-close, .app-close-button) {
@@ -168,8 +212,10 @@
   cursor: not-allowed;
 }
 
-/* En los encabezados naranjas, una base neutra permite
-   distinguir la X sin cambiar su color corporativo. */
+/*
+ * En los encabezados naranjas, una base neutra permite
+ * distinguir la X sin cambiar su color corporativo.
+ */
 
 :root .sales-workspace .bottom-sheet-close,
 :root .sales-quantity-dialog .bottom-sheet-close {
@@ -182,14 +228,8 @@
   }
 }
 
-/*
- * Bloquea el desplazamiento de la página únicamente
- * mientras exista un diálogo modal abierto.
- *
- * Al cerrar el último modal, el navegador retira
- * automáticamente esta regla.
- */
 /* Bloqueo del fondo al abrir cualquier modal. */
+
 @layer base {
   html {
     /*
@@ -209,7 +249,8 @@
   }
 }
 
-/* Menú de acciones de Existencias */
+/* Menú de acciones de Existencias. */
+
 .inventory-stock [role="menu"][data-appearance="compact"] {
   padding: 4px;
 }
@@ -239,6 +280,7 @@
  * Evita que los selectores cambien el ancho de la página.
  * html ya reserva el espacio del scrollbar.
  */
+
 body[data-scroll-locked]:has(
     .select-field-content[data-state="open"]
   ) {
@@ -251,6 +293,7 @@ body[data-scroll-locked]:has(
  * Conserva visible el scrollbar cuando se abre un selector
  * en la página. Los diálogos mantienen su bloqueo del fondo.
  */
+
 html:not(:has(dialog:modal))
   body[data-scroll-locked]:has(
     .select-field-content[data-state="open"]

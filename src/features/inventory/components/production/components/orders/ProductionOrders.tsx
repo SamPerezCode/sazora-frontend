@@ -12,35 +12,45 @@ import {
   Plus,
   FilterX,
 } from "lucide-react";
-import { useAppShell } from "../../../../app/layout/shell-context";
-import { calendarToday } from "../../../../components/forms/calendar-date";
-import { ActionMenu } from "../../../../components/ui/ActionMenu";
-import { Pagination } from "../../../../components/ui/Pagination";
-import type { AuthSession } from "../../../auth/types/auth.types";
-import { useInventoryQuery } from "../../hooks/useInventoryQuery";
-import { searchKey, dayKey } from "../../utils/inventory-format";
-import { quantity } from "../../utils/inventory-value";
-import { Button } from "../InventoryButton";
-import { Notice, Choice } from "../InventoryLocationUI";
-import { InventoryResponsiveRecords as Records } from "../InventoryResponsiveRecords";
-import { listOrders } from "./production.queries";
-import { loadPeriod } from "./production.reports";
+
+import { useAppShell } from "../../../../../../app/layout/shell-context";
+import { calendarToday } from "../../../../../../components/forms/calendar-date";
+import { ActionMenu } from "../../../../../../components/ui/ActionMenu";
+import { Pagination } from "../../../../../../components/ui/Pagination";
+import type { AuthSession } from "../../../../../auth/types/auth.types";
+
+import { useInventoryQuery } from "../../../../hooks/useInventoryQuery";
+import { searchKey, dayKey } from "../../../../utils/inventory-format";
+import { quantity } from "../../../../utils/inventory-value";
+
+import { Button } from "../../../InventoryButton";
+import { Notice, Choice } from "../../../InventoryLocationUI";
+
+import {
+  ProductionOrderRecords,
+  type ProductionOrderRecord,
+} from "./ProductionOrderRecords";
+
+import { listOrders } from "../../services/production.queries";
+import { loadPeriod } from "../../services/production.reports";
 import {
   productionRoles,
   allowedActions,
   isAdmin,
-} from "./production.access";
-import { cash, actionLabels, statusLabels } from "./production.utils";
-import { useOrderPage } from "./useOrderPage";
-import { StatusBadge, Metrics } from "./ProductionUI";
-import { ProductionCreateDialog } from "./ProductionCreateDialog";
+} from "../../utils/production.access";
+import { cash, actionLabels, statusLabels } from "../../utils/production.utils";
+
+import { useOrderPage } from "../../hooks/useOrderPage";
+import { Metrics } from "../shared/ProductionUI";
+import { ProductionCreateDialog } from "../forms/ProductionCreateDialog";
 import { ProductionOrderDialog } from "./ProductionOrderDialog";
+
 import type {
   CreationKind,
   Action,
   Order,
   OrderSummary,
-} from "./production.types";
+} from "../../types/production.types";
 
 export function ProductionOrders({
   locationId,
@@ -56,16 +66,20 @@ export function ProductionOrders({
   onChanged: () => void;
 }) {
   const { session } = useAppShell();
+
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
   const [notice, setNotice] = useState("");
+
   const [creation, setCreation] = useState<CreationKind | null>(null);
+
   const [selection, setSelection] = useState<{
     id: string;
     action: Action;
   } | null>(null);
+
   const [returned, setReturned] = useState<Order | null>(null);
 
   const today = calendarToday(zone);
@@ -131,10 +145,12 @@ export function ProductionOrders({
     page,
     Math.max(1, Math.ceil(filtered.length / size))
   );
+
   const visible = filtered.slice(
     (current - 1) * size,
     current * size
   );
+
   const idsKey = JSON.stringify(visible.map((row) => row.id));
   const details = useOrderPage(idsKey, revision);
 
@@ -150,114 +166,77 @@ export function ProductionOrders({
     movement: History,
   };
 
-  const rows = visible.map((summary) => {
+  const rows: ProductionOrderRecord[] = visible.map((summary) => {
     const detail = details.data?.find(
       (item) =>
         item.order.id === summary.id &&
         item.order.version >= summary.version
     );
+
     const row = detail?.order ?? summary;
 
     return {
       id: row.id,
-      fields: [
-        {
-          label: "Orden",
-          value: (
-            <button
-              type="button"
-              className="min-h-11 font-medium text-accent underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-accent"
-              onClick={() =>
-                setSelection({ id: row.id, action: "detail" })
-              }
-            >
-              OP-{row.id}
-            </button>
-          ),
-        },
-        {
-          label: "Receta",
-          value: (
-            <div>
-              {row.recipe.name}
-              <p className="text-xs text-muted">{row.recipe.code}</p>
-            </div>
-          ),
-        },
-        {
-          label: "Planta",
-          value: row.location.name + " · " + row.location.code,
-        },
-        {
-          label: "Estado",
-          value: <StatusBadge status={row.status} />,
-        },
-        {
-          label: "Fecha prevista",
-          value: row.plannedFor
-            ? dayKey(row.plannedFor, zone)
-            : "Sin fecha",
-        },
-        {
-          label: "Responsable",
-          value:
-            row.completedByName ??
-            row.startedByName ??
-            row.createdByName,
-        },
-        {
-          label: "Productos esperados",
-          value: detail
-            ? detail.order.outputs
-                .map(
-                  (line) =>
-                    line.inventoryItemName +
-                    " · " +
-                    quantity(line.plannedQuantity, line.baseUnit)
-                )
-                .join("; ")
+      number: "OP-" + row.id,
+      recipeName: row.recipe.name,
+      recipeCode: row.recipe.code,
+      plantName: row.location.name,
+      plantCode: row.location.code,
+      status: row.status,
+
+      plannedDate: row.plannedFor
+        ? dayKey(row.plannedFor, zone)
+        : "Sin fecha",
+
+      responsible:
+        row.completedByName ?? row.startedByName ?? row.createdByName,
+
+      products: detail
+        ? detail.order.outputs
+            .map(
+              (line) =>
+                line.inventoryItemName +
+                " · " +
+                quantity(line.plannedQuantity, line.baseUnit)
+            )
+            .join("; ")
+        : details.pending
+          ? "Cargando…"
+          : summary.outputCount + " resultados · consulta el detalle",
+
+      producedValue:
+        row.status !== "COMPLETED"
+          ? "No aplicado"
+          : detail
+            ? cash(detail.value, currency)
             : details.pending
               ? "Cargando…"
-              : summary.outputCount +
-                " resultados · consulta el detalle",
-        },
-        {
-          label: "Valor producido",
-          value:
-            row.status !== "COMPLETED"
-              ? "No aplicado"
-              : details.pending
-                ? "Cargando…"
-                : cash(detail?.value ?? null, currency),
-        },
-        {
-          label: "Acciones",
-          value: (
-            <ActionMenu
-              label={"Acciones de OP-" + row.id}
-              actions={allowedActions(session, row).map((action) => {
-                const Icon = icons[action];
+              : "Sin valoración",
 
-                return {
-                  id: action,
-                  label: actionLabels[action],
-                  icon: <Icon size={16} />,
-                  danger: action === "cancel",
-                  separatorBefore: action === "cancel",
-                  onSelect: () =>
-                    setSelection({ id: row.id, action }),
-                };
-              })}
-            />
-          ),
-        },
-      ],
+      actions: (
+        <ActionMenu
+          label={"Acciones de OP-" + row.id}
+          actions={allowedActions(session, row).map((action) => {
+            const Icon = icons[action];
+
+            return {
+              id: action,
+              label: actionLabels[action],
+              icon: <Icon size={16} aria-hidden />,
+              danger: action === "cancel",
+              separatorBefore: action === "cancel",
+              onSelect: () => setSelection({ id: row.id, action }),
+            };
+          })}
+        />
+      ),
     };
   });
 
   function saved(order: Order) {
     setReturned(order);
     setSelection(null);
+
     setNotice(
       "Orden OP-" +
         order.id +
@@ -265,6 +244,7 @@ export function ProductionOrders({
         statusLabels[order.status] +
         "."
     );
+
     onChanged();
   }
 
@@ -284,6 +264,7 @@ export function ProductionOrders({
         <h3 className="text-base font-semibold">
           Órdenes de producción
         </h3>
+
         <div className="flex flex-wrap items-center gap-2">
           <Button
             size="compact"
@@ -431,7 +412,10 @@ export function ProductionOrders({
                   setPage(1);
                 }}
                 options={[
-                  { value: "", label: "Todos los estados" },
+                  {
+                    value: "",
+                    label: "Todos los estados",
+                  },
                   ...Object.entries(statusLabels).map(
                     ([value, label]) => ({
                       value,
@@ -452,7 +436,10 @@ export function ProductionOrders({
             </Notice>
           )}
 
-          <Records label="Órdenes de producción" rows={rows} wide />
+          <ProductionOrderRecords
+            rows={rows}
+            onOpen={(id) => setSelection({ id, action: "detail" })}
+          />
 
           {!filtered.length && (
             <Notice>No hay órdenes para estos filtros.</Notice>
@@ -487,6 +474,7 @@ export function ProductionOrders({
             setPage(1);
             setSearch("");
             setStatus("");
+
             setNotice(
               "Orden OP-" +
                 order.id +
@@ -494,15 +482,18 @@ export function ProductionOrders({
                 order.location.name +
                 "."
             );
+
             onChanged();
           }}
           onQuickSaved={(movement) => {
             setCreation(null);
+
             setNotice(
               "Producción rápida registrada correctamente. Movimiento M-" +
                 movement.id +
                 "."
             );
+
             onChanged();
           }}
         />

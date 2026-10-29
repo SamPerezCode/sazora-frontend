@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { id, numeric } from "../../schemas/inventory-location.schema";
+import { id, numeric } from "../../../schemas/inventory-location.schema";
 import {
   baseUnitSchema,
   inventoryItemSchema,
-} from "../../schemas/inventory.schema";
-import { fixed } from "../../utils/inventory-value";
+} from "../../../schemas/inventory.schema";
+import { fixed } from "../../../utils/inventory-value";
 
 export const statusSchema = z.enum([
   "DRAFT",

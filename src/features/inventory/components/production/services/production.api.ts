@@ -1,7 +1,7 @@
 import { z } from "zod";
-import type { AuthSession } from "../../../auth/types/auth.types";
-import { request, ApiError } from "../../../../lib/http/client";
-import { assertProduction, plantScope } from "./production.access";
+import type { AuthSession } from "../../../../auth/types/auth.types";
+import { request, ApiError } from "../../../../../lib/http/client";
+import { assertProduction, plantScope } from "../utils/production.access";
 
 export async function api<T>(
   session: AuthSession,

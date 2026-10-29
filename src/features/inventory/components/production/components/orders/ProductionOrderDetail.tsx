@@ -1,20 +1,20 @@
 import { useCallback } from "react";
-import type { AuthSession } from "../../../auth/types/auth.types";
-import { useInventoryQuery } from "../../hooks/useInventoryQuery";
-import { quantity } from "../../utils/inventory-value";
-import { Notice } from "../InventoryLocationUI";
-import { Button } from "../InventoryButton";
-import { InventoryResponsiveRecords as Records } from "../InventoryResponsiveRecords";
-import { getOrderMovement } from "./production.queries";
-import { productionRoles } from "./production.access";
+import type { AuthSession } from "../../../../../auth/types/auth.types";
+import { useInventoryQuery } from "../../../../hooks/useInventoryQuery";
+import { quantity } from "../../../../utils/inventory-value";
+import { Notice } from "../../../InventoryLocationUI";
+import { Button } from "../../../InventoryButton";
+import { InventoryResponsiveRecords as Records } from "../../../InventoryResponsiveRecords";
+import { getOrderMovement } from "../../services/production.queries";
+import { productionRoles } from "../../utils/production.access";
 import {
   timestamp,
   percentage,
   cost,
   cash,
-} from "./production.utils";
-import { StatusBadge, Metrics } from "./ProductionUI";
-import type { OrderResources } from "./production.types";
+} from "../../utils/production.utils";
+import { StatusBadge, Metrics } from "../shared/ProductionUI";
+import type { OrderResources } from "../../types/production.types";
 
 export function ProductionOrderDetail({
   data,
