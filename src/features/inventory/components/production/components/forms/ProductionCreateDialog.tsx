@@ -5,7 +5,8 @@ import { DateField } from "../../../../../../components/forms/DateField";
 
 import { Button } from "../../../InventoryButton";
 import { Choice, Notice } from "../../../InventoryLocationUI";
-import { InventoryResponsiveRecords as Records } from "../../../InventoryResponsiveRecords";
+
+import { ProductionReviewRecords as Records } from "../shared/ProductionReviewRecords";
 
 import { isAdmin } from "../../utils/production.access";
 import { cash } from "../../utils/production.utils";
@@ -13,8 +14,8 @@ import { cash } from "../../utils/production.utils";
 import { Metrics, Warning } from "../shared/ProductionUI";
 import { ProductionQuickLines } from "./ProductionQuickLines";
 import { ProductionRecipeProjection } from "./ProductionRecipeProjection";
-import { useProductionCreateForm } from "../../hooks/useProductionCreateForm";
 
+import { useProductionCreateForm } from "../../hooks/useProductionCreateForm";
 import type { ProductionCreateProps } from "../../types/production.types";
 
 export function ProductionCreateDialog(props: ProductionCreateProps) {
@@ -261,7 +262,9 @@ export function ProductionCreateDialog(props: ProductionCreateProps) {
                   maxLength={500}
                   value={form.notes}
                   onChange={(event) =>
-                    update({ notes: event.target.value })
+                    update({
+                      notes: event.target.value,
+                    })
                   }
                 />
               </label>

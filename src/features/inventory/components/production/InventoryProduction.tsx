@@ -11,25 +11,104 @@ import {
   ClipboardList,
   FlaskConical,
   BookOpen,
-  RefreshCw,
 } from "lucide-react";
+
 import { useAppShell } from "../../../../app/layout/shell-context";
 import { useInventoryRealtime } from "../../../../hooks/useInventoryRealtime";
 import { useInventoryQuery } from "../../hooks/useInventoryQuery";
-import { Notice, Choice } from "../InventoryLocationUI";
-import { Button } from "../InventoryButton";
+import { Choice, Notice } from "../InventoryLocationUI";
+
 import { loadContext } from "./services/production.queries";
 import {
   productionRoles,
   isAdmin,
   assignedPlant,
 } from "./utils/production.access";
+
 import { ProductionOrders } from "./components/orders/ProductionOrders";
+import { QuickProductions } from "./components/quick/QuickProductions";
+import { ProductionListState } from "./components/shared/ProductionListState";
+
+const inventoryTabs = [
+  {
+    id: "summary",
+    label: "Resumen",
+    Icon: ChartNoAxesCombined,
+  },
+  {
+    id: "stock",
+    label: "Existencias",
+    Icon: Boxes,
+  },
+  {
+    id: "purchases",
+    label: "Compras",
+    Icon: ReceiptText,
+  },
+  {
+    id: "movements",
+    label: "Movimientos",
+    Icon: History,
+  },
+  {
+    id: "production",
+    label: "Producción",
+    Icon: Factory,
+  },
+  {
+    id: "kardex",
+    label: "Kardex y costos",
+    Icon: SlidersHorizontal,
+  },
+  {
+    id: "reconciliation",
+    label: "Conciliación",
+    Icon: ClipboardCheck,
+  },
+];
+
+const productionTabs = [
+  {
+    id: "orders",
+    label: "Órdenes",
+    Icon: ClipboardList,
+    ready: true,
+  },
+  {
+    id: "quick",
+    label: "Producción rápida",
+    Icon: FlaskConical,
+    ready: true,
+  },
+  {
+    id: "recipes",
+    label: "Recetas",
+    Icon: BookOpen,
+    ready: false,
+  },
+  {
+    id: "reports",
+    label: "Informes",
+    Icon: ChartNoAxesCombined,
+    ready: false,
+  },
+];
+
+const navClass =
+  "flex min-w-0 max-w-full gap-1 overflow-x-auto border-b border-outline pb-2";
+
+const tabClass =
+  "flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50 ";
 
 export function InventoryProduction() {
   const { session, settings } = useAppShell();
   const [params, setParams] = useSearchParams();
   const [revision, setRevision] = useState(0);
+
+  const admin = isAdmin(session);
+  const plant = assignedPlant(session);
+  const allowed =
+    admin || session.authorization.roles.includes("PRODUCTION");
 
   const context = useInventoryQuery(
     "production-context",
@@ -38,99 +117,68 @@ export function InventoryProduction() {
     productionRoles
   );
 
-  const plants = {
-    ...context,
-    data: context.data?.plants ?? null,
-  };
-
   const refresh = () => setRevision((value) => value + 1);
 
   useInventoryRealtime(session, () => {
-    if (plants.pending) return false;
+    if (context.pending) return false;
+
     refresh();
     return true;
   });
 
-  const admin = isAdmin(session);
-  const allowed =
-    admin || session.authorization.roles.includes("PRODUCTION");
-  const currency = admin ? (settings.data?.currencyCode ?? "") : "";
-  const zone = admin ? settings.data?.timezone : context.data?.zone;
+  const section =
+    params.get("productionTab") === "quick" ? "quick" : "orders";
+
+  const ActivePanel =
+    section === "quick" ? QuickProductions : ProductionOrders;
+
+  const plants = context.data?.plants;
   const requested = params.get("locationId") ?? "";
 
   const locationId = admin
-    ? plants.data?.some((plant) => plant.id === requested)
+    ? plants?.some((item) => item.id === requested)
       ? requested
       : ""
-    : (assignedPlant(session)?.id ?? "");
+    : (plant?.id ?? "");
 
-  const inventoryTabs = [
-    { id: "summary", label: "Resumen", Icon: ChartNoAxesCombined },
-    { id: "stock", label: "Existencias", Icon: Boxes },
-    { id: "purchases", label: "Compras", Icon: ReceiptText },
-    { id: "movements", label: "Movimientos", Icon: History },
-    { id: "production", label: "Producción", Icon: Factory },
-    {
-      id: "kardex",
-      label: "Kardex y costos",
-      Icon: SlidersHorizontal,
-    },
-    {
-      id: "reconciliation",
-      label: "Conciliación",
-      Icon: ClipboardCheck,
-    },
-  ];
+  const currency = admin ? (settings.data?.currencyCode ?? "") : "";
 
-  if (!allowed)
-    return <Notice>No tienes acceso a Producción.</Notice>;
+  const zone = admin ? settings.data?.timezone : context.data?.zone;
 
-  if (!admin && !assignedPlant(session)) {
+  const setupError = context.error || (admin ? settings.error : null);
+
+  const ready =
+    !!context.data && !!zone && (!admin || !!settings.data);
+
+  if (!allowed) {
     return (
-      <Notice>
-        No tienes una planta de producción asignada. Solicita la
-        asignación a un administrador.
-      </Notice>
+      <ProductionListState
+        state="error"
+        message="No tienes acceso a Producción."
+      />
+    );
+  }
+
+  if (!admin && !plant) {
+    return (
+      <ProductionListState
+        state="error"
+        message="No tienes una planta de producción asignada. Solicita la asignación a un administrador."
+      />
     );
   }
 
   return (
-    <div className="grid min-w-0 gap-5 text-heading">
-      <nav
-        aria-label="Secciones de inventario"
-        className="flex min-w-0 gap-1 overflow-x-auto border-b border-outline pb-2"
-      >
-        {inventoryTabs
-          .filter((tab) => admin || tab.id === "production")
-          .map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              type="button"
-              aria-current={id === "production" ? "page" : undefined}
-              className={
-                "flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-sm focus-visible:outline-2 focus-visible:outline-accent " +
-                (id === "production"
-                  ? "bg-accent/10 text-accent"
-                  : "text-muted hover:bg-secondary")
-              }
-              onClick={() =>
-                setParams((previous) => {
-                  const next = new URLSearchParams(previous);
-                  next.set("tab", id);
-                  return next;
-                })
-              }
-            >
-              <Icon size={17} aria-hidden />
-              {label}
-            </button>
-          ))}
-      </nav>
+    <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 text-heading">
+      <header className="grid min-w-0 items-end gap-4 md:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0">
+          <p className="mb-1 hidden text-xs text-muted md:block">
+            INVENTARIO
+          </p>
 
-      <div className="grid items-end gap-4 md:grid-cols-[minmax(0,1fr)_20rem]">
-        <div>
-          <h2 className="text-xl font-bold">Producción</h2>
-          <p className="mt-1 text-sm text-muted">
+          <h2 className="text-xl font-bold leading-7">Producción</h2>
+
+          <p className="mt-1 text-xs leading-5 text-muted">
             Planifica, ejecuta y analiza la transformación de
             inventario.
           </p>
@@ -139,13 +187,20 @@ export function InventoryProduction() {
         <Choice
           label="Planta"
           value={locationId}
-          disabled={!admin || plants.pending}
+          disabled={!admin || context.pending || !!context.error}
+          className="min-w-0 [&_.select-field-label]:text-xs! [&_.select-field-trigger]:h-9! [&_.select-field-trigger]:min-h-9!"
           onValueChange={(value) =>
             setParams((previous) => {
               const next = new URLSearchParams(previous);
+
               next.set("tab", "production");
-              if (value) next.set("locationId", value);
-              else next.delete("locationId");
+
+              if (value) {
+                next.set("locationId", value);
+              } else {
+                next.delete("locationId");
+              }
+
               return next;
             })
           }
@@ -153,104 +208,112 @@ export function InventoryProduction() {
             ...(admin
               ? [{ value: "", label: "Todas las plantas" }]
               : []),
-            ...(plants.data ?? []).map((plant) => ({
-              value: plant.id,
-              label: plant.name + " · " + plant.code,
+            ...(plants ?? (plant ? [plant] : [])).map((item) => ({
+              value: item.id,
+              label: item.name,
             })),
           ]}
         />
-      </div>
+      </header>
 
-      <nav
-        aria-label="Secciones de producción"
-        className="flex gap-1 overflow-x-auto border-b border-outline pb-2"
-      >
-        {[
-          { label: "Órdenes", Icon: ClipboardList, ready: true },
-          {
-            label: "Producción rápida",
-            Icon: FlaskConical,
-            ready: false,
-          },
-          { label: "Recetas", Icon: BookOpen, ready: false },
-          {
-            label: "Informes",
-            Icon: ChartNoAxesCombined,
-            ready: false,
-          },
-        ].map(({ label, Icon, ready }) => (
+      <nav aria-label="Secciones de inventario" className={navClass}>
+        {inventoryTabs
+          .filter((tab) => admin || tab.id === "production")
+          .map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              aria-current={id === "production" ? "page" : undefined}
+              className={
+                tabClass +
+                (id === "production"
+                  ? "bg-accent/10 text-accent"
+                  : "text-muted hover:bg-secondary")
+              }
+              onClick={() =>
+                setParams((previous) => {
+                  const next = new URLSearchParams(previous);
+
+                  next.set("tab", id);
+                  return next;
+                })
+              }
+            >
+              <Icon size={16} aria-hidden />
+              {label}
+            </button>
+          ))}
+      </nav>
+
+      <p className="text-sm leading-5 text-muted">
+        Órdenes y producción rápida, recetas estándar y seguimiento de
+        costos y rendimientos por planta.
+      </p>
+
+      <nav aria-label="Secciones de producción" className={navClass}>
+        {productionTabs.map(({ id, label, Icon, ready: enabled }) => (
           <button
+            key={id}
             type="button"
-            key={label}
-            disabled={!ready}
-            aria-current={ready ? "page" : undefined}
-            title={ready ? undefined : "Próximamente"}
+            disabled={!enabled}
+            title={enabled ? undefined : "Próximamente"}
+            aria-current={section === id ? "page" : undefined}
             className={
-              "flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-sm disabled:opacity-50 " +
-              (ready ? "bg-accent/10 text-accent" : "text-muted")
+              tabClass +
+              (section === id
+                ? "bg-accent/10 text-accent"
+                : "text-muted hover:bg-secondary")
+            }
+            onClick={() =>
+              setParams((previous) => {
+                const next = new URLSearchParams(previous);
+
+                next.set("tab", "production");
+                next.set("productionTab", id);
+
+                return next;
+              })
             }
           >
-            <Icon size={17} aria-hidden />
+            <Icon size={16} aria-hidden />
             {label}
           </button>
         ))}
-
-        <Button
-          variant="ghost"
-          size="icon"
-          className="ml-auto"
-          disabled={plants.pending}
-          aria-label="Actualizar producción"
-          onClick={refresh}
-        >
-          <RefreshCw size={17} />
-        </Button>
       </nav>
 
-      {plants.pending && <Notice>Actualizando plantas…</Notice>}
+      {setupError ? (
+        <ProductionListState
+          state="error"
+          message={setupError}
+          onRetry={() => {
+            context.refresh();
 
-      {plants.error && (
-        <Notice>
-          {plants.error}{" "}
-          <Button variant="secondary" onClick={plants.refresh}>
-            Reintentar
-          </Button>
-        </Notice>
-      )}
+            if (admin && settings.error) {
+              settings.retry();
+            }
+          }}
+        />
+      ) : !ready ? (
+        <ProductionListState state="loading" />
+      ) : (
+        <>
+          {!admin && (
+            <Notice>
+              Los importes se muestran en la moneda del negocio, sin
+              símbolo.
+            </Notice>
+          )}
 
-      {admin && settings.error && (
-        <Notice>
-          {settings.error}{" "}
-          <Button variant="secondary" onClick={settings.retry}>
-            Reintentar configuración
-          </Button>
-        </Notice>
-      )}
-
-      {admin && !settings.data && !settings.error && (
-        <Notice>Cargando configuración del negocio…</Notice>
-      )}
-
-      {!admin && (
-        <Notice>
-          Los importes se muestran en la moneda del negocio, sin
-          símbolo.
-        </Notice>
-      )}
-
-      {plants.data &&
-        !plants.error &&
-        zone &&
-        (!admin || !settings.error) && (
-          <ProductionOrders
-            key={locationId}
+          <ActivePanel
+            key={section + ":" + locationId}
             locationId={locationId}
             currency={currency}
-            zone={zone}
+            zone={zone!}
             revision={revision}
             onChanged={refresh}
           />
-        )}
-    </div>
+        </>
+      )}
+    </section>
   );
 }

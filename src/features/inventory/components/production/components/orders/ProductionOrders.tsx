@@ -20,11 +20,14 @@ import { Pagination } from "../../../../../../components/ui/Pagination";
 import type { AuthSession } from "../../../../../auth/types/auth.types";
 
 import { useInventoryQuery } from "../../../../hooks/useInventoryQuery";
-import { searchKey, dayKey } from "../../../../utils/inventory-format";
+import {
+  searchKey,
+  dayKey,
+} from "../../../../utils/inventory-format";
 import { quantity } from "../../../../utils/inventory-value";
 
 import { Button } from "../../../InventoryButton";
-import { Notice, Choice } from "../../../InventoryLocationUI";
+import { Choice } from "../../../InventoryLocationUI";
 
 import {
   ProductionOrderRecords,
@@ -38,10 +41,14 @@ import {
   allowedActions,
   isAdmin,
 } from "../../utils/production.access";
-import { cash, actionLabels, statusLabels } from "../../utils/production.utils";
+import {
+  cash,
+  actionLabels,
+  statusLabels,
+} from "../../utils/production.utils";
 
 import { useOrderPage } from "../../hooks/useOrderPage";
-import { Metrics } from "../shared/ProductionUI";
+import { ProductionListState } from "../shared/ProductionListState";
 import { ProductionCreateDialog } from "../forms/ProductionCreateDialog";
 import { ProductionOrderDialog } from "./ProductionOrderDialog";
 
@@ -233,6 +240,21 @@ export function ProductionOrders({
     };
   });
 
+  const listLoading =
+    query.pending ||
+    (!query.error && visible.length > 0 && details.pending);
+
+  const listError =
+    query.error || (visible.length > 0 ? details.error : null);
+
+  function count(value: Order["status"]) {
+    if (!query.data) {
+      return query.pending ? "…" : "—";
+    }
+
+    return items.filter((row) => row.status === value).length;
+  }
+
   function saved(order: Order) {
     setReturned(order);
     setSelection(null);
@@ -261,7 +283,7 @@ export function ProductionOrders({
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-base font-semibold">
+        <h3 className="text-sm font-semibold">
           Órdenes de producción
         </h3>
 
@@ -295,155 +317,155 @@ export function ProductionOrders({
         </div>
       </div>
 
-      {query.pending && <Notice>Consultando órdenes…</Notice>}
+      <dl className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-3">
+        {[
+          {
+            label: "Borradores",
+            value: count("DRAFT"),
+          },
+          {
+            label: "Planificadas",
+            value: count("PLANNED"),
+          },
+          {
+            label: "En proceso",
+            value: count("IN_PROGRESS"),
+          },
+          {
+            label: "Completadas durante el período",
+            value: period.pending
+              ? "…"
+              : period.error
+                ? "—"
+                : (period.data?.summary.completedCount ?? "—"),
+          },
+          {
+            label: "Órdenes con variación de costo",
+            value: period.pending
+              ? "…"
+              : period.error
+                ? "—"
+                : (period.data?.variations ?? "—"),
+          },
+          {
+            label: "Costo producido durante el período",
+            value: period.pending
+              ? "…"
+              : period.error
+                ? "—"
+                : cash(
+                    period.data?.summary.producedInventoryValue ??
+                      null,
+                    currency
+                  ),
+          },
+        ].map((metric) => (
+          <div
+            key={metric.label}
+            className="min-w-0 rounded-xl border border-outline bg-surface p-4"
+          >
+            <dt className="text-xs leading-4 text-muted">
+              {metric.label}
+            </dt>
 
-      {query.error && (
-        <Notice>
-          {query.error}{" "}
-          <Button variant="secondary" onClick={query.refresh}>
-            Reintentar
-          </Button>
-        </Notice>
+            <dd className="m-0 mt-3 text-xl font-semibold leading-6 [overflow-wrap:anywhere]">
+              {metric.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      <p className="text-xs leading-5 text-muted">
+        Período: {from} a {today} · Fecha de finalización · {zone}.
+        Los estados pendientes abarcan todas las fechas de la planta
+        seleccionada.
+      </p>
+
+      {period.error && (
+        <ProductionListState
+          state="error"
+          message={
+            "No fue posible cargar el resumen.\n" + period.error
+          }
+          onRetry={period.refresh}
+        />
       )}
 
-      {!query.pending && !query.error && query.data && (
-        <>
-          <Metrics
-            rows={[
+      <div className="grid min-w-0 gap-3 border-b border-outline pb-4">
+        <div className="grid min-w-0 items-end gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+          <label className="grid min-w-0 gap-2 text-xs">
+            Buscar
+            <input
+              type="search"
+              value={search}
+              placeholder="Número, código o nombre de receta"
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              className="h-9 min-w-0 rounded-xl border border-outline bg-surface px-3 text-sm text-heading shadow-sm outline-none placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20"
+            />
+          </label>
+
+          <Button
+            size="compact"
+            variant="ghost"
+            className="justify-self-end"
+            onClick={() => {
+              setSearch("");
+              setStatus("");
+              setPage(1);
+            }}
+          >
+            <FilterX size={16} aria-hidden />
+            Limpiar filtros
+          </Button>
+        </div>
+
+        <div className="min-w-0 md:max-w-[340px]">
+          <Choice
+            label="Estado"
+            value={status}
+            className="[&_.select-field-label]:text-xs! [&_.select-field-trigger]:h-9! [&_.select-field-trigger]:min-h-9!"
+            onValueChange={(value) => {
+              setStatus(value);
+              setPage(1);
+            }}
+            options={[
               {
-                label: "Borradores",
-                value: items.filter((row) => row.status === "DRAFT")
-                  .length,
+                value: "",
+                label: "Todos los estados",
               },
-              {
-                label: "Planificadas",
-                value: items.filter((row) => row.status === "PLANNED")
-                  .length,
-              },
-              {
-                label: "En proceso",
-                value: items.filter(
-                  (row) => row.status === "IN_PROGRESS"
-                ).length,
-              },
-              {
-                label: "Completadas durante el período",
-                value: period.pending
-                  ? "…"
-                  : period.error
-                    ? "Sin datos"
-                    : (period.data?.summary.completedCount ??
-                      "Sin datos"),
-              },
-              {
-                label: "Órdenes con variación de costo en el período",
-                value: period.pending
-                  ? "…"
-                  : period.error
-                    ? "Sin datos"
-                    : (period.data?.variations ?? "Sin datos"),
-              },
-              {
-                label: "Costo producido durante el período",
-                value: period.pending
-                  ? "…"
-                  : period.error
-                    ? "Sin datos"
-                    : cash(
-                        period.data?.summary.producedInventoryValue ??
-                          null,
-                        currency
-                      ),
-              },
+              ...Object.entries(statusLabels).map(
+                ([value, label]) => ({
+                  value,
+                  label,
+                })
+              ),
             ]}
           />
+        </div>
+      </div>
 
-          <p className="text-xs text-muted">
-            Período: {from} a {today} · Fecha de finalización · {zone}
-            . Los estados pendientes abarcan todas las fechas de la
-            planta seleccionada.
-          </p>
-
-          {period.error && (
-            <Notice>
-              {period.error}{" "}
-              <Button variant="secondary" onClick={period.refresh}>
-                Reintentar resumen
-              </Button>
-            </Notice>
-          )}
-
-          <div className="grid gap-3 border-b border-outline pb-4">
-            <div className="grid items-end gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-              <label className="grid gap-2 text-sm">
-                Buscar
-                <input
-                  type="search"
-                  value={search}
-                  placeholder="Número, código o nombre de receta"
-                  onChange={(event) => {
-                    setSearch(event.target.value);
-                    setPage(1);
-                  }}
-                  className="h-11 min-w-0 rounded-xl border border-outline bg-surface px-3 text-heading outline-none placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20"
-                />
-              </label>
-
-              <Button
-                variant="ghost"
-                className="min-h-11 justify-self-end"
-                onClick={() => {
-                  setSearch("");
-                  setStatus("");
-                  setPage(1);
-                }}
-              >
-                <FilterX size={17} />
-                Limpiar filtros
-              </Button>
-            </div>
-
-            <div className="md:max-w-xs">
-              <Choice
-                label="Estado"
-                value={status}
-                onValueChange={(value) => {
-                  setStatus(value);
-                  setPage(1);
-                }}
-                options={[
-                  {
-                    value: "",
-                    label: "Todos los estados",
-                  },
-                  ...Object.entries(statusLabels).map(
-                    ([value, label]) => ({
-                      value,
-                      label,
-                    })
-                  ),
-                ]}
-              />
-            </div>
-          </div>
-
-          {details.error && (
-            <Notice>
-              {details.error}{" "}
-              <Button variant="secondary" onClick={details.refresh}>
-                Reintentar detalles
-              </Button>
-            </Notice>
-          )}
-
+      {listLoading ? (
+        <ProductionListState state="loading" />
+      ) : listError ? (
+        <ProductionListState
+          state="error"
+          message={
+            "No fue posible cargar la producción. Intenta de nuevo.\n" +
+            listError
+          }
+          onRetry={query.error ? query.refresh : details.refresh}
+        />
+      ) : !filtered.length ? (
+        <ProductionListState state="empty" />
+      ) : (
+        <>
           <ProductionOrderRecords
             rows={rows}
             onOpen={(id) => setSelection({ id, action: "detail" })}
           />
-
-          {!filtered.length && (
-            <Notice>No hay órdenes para estos filtros.</Notice>
-          )}
 
           <Pagination
             page={current}
