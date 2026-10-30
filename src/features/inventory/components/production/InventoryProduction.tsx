@@ -27,6 +27,7 @@ import {
 
 import { ProductionOrders } from "./components/orders/ProductionOrders";
 import { QuickProductions } from "./components/quick/QuickProductions";
+import { ProductionRecipes } from "./components/recipes/ProductionRecipes";
 import { ProductionListState } from "./components/shared/ProductionListState";
 
 const inventoryTabs = [
@@ -60,7 +61,7 @@ const productionTabs = [
     id: "recipes",
     label: "Recetas",
     Icon: BookOpen,
-    ready: false,
+    ready: true,
   },
   {
     id: "reports",
@@ -73,12 +74,10 @@ const productionTabs = [
 const navClass =
   "flex min-w-0 max-w-full gap-1 overflow-x-auto border-b border-outline pb-2";
 
-// Mismas medidas que la navegación de Compras y Movimientos.
 const inventoryTabClass =
   "flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-[12px] sm:text-[14px] " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ";
 
-// Navegación secundaria del módulo.
 const productionTabClass =
   "flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-xs " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50 ";
@@ -109,11 +108,19 @@ export function InventoryProduction() {
     return true;
   });
 
+  const requestedSection = params.get("productionTab");
+
   const section =
-    params.get("productionTab") === "quick" ? "quick" : "orders";
+    requestedSection === "quick" || requestedSection === "recipes"
+      ? requestedSection
+      : "orders";
 
   const ActivePanel =
-    section === "quick" ? QuickProductions : ProductionOrders;
+    section === "quick"
+      ? QuickProductions
+      : section === "recipes"
+        ? ProductionRecipes
+        : ProductionOrders;
 
   const plants = context.data?.plants;
   const requested = params.get("locationId") ?? "";
