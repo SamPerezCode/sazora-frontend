@@ -28,15 +28,40 @@ import {
 import { ProductionOrders } from "./components/orders/ProductionOrders";
 import { QuickProductions } from "./components/quick/QuickProductions";
 import { ProductionRecipes } from "./components/recipes/ProductionRecipes";
+import { ProductionReports } from "./components/reports/ProductionReports";
 import { ProductionListState } from "./components/shared/ProductionListState";
 
 const inventoryTabs = [
-  { id: "summary", label: "Resumen", Icon: ChartNoAxesCombined },
-  { id: "stock", label: "Existencias", Icon: Boxes },
-  { id: "purchases", label: "Compras", Icon: ReceiptText },
-  { id: "movements", label: "Movimientos", Icon: History },
-  { id: "production", label: "Producción", Icon: Factory },
-  { id: "kardex", label: "Kardex y costos", Icon: SlidersHorizontal },
+  {
+    id: "summary",
+    label: "Resumen",
+    Icon: ChartNoAxesCombined,
+  },
+  {
+    id: "stock",
+    label: "Existencias",
+    Icon: Boxes,
+  },
+  {
+    id: "purchases",
+    label: "Compras",
+    Icon: ReceiptText,
+  },
+  {
+    id: "movements",
+    label: "Movimientos",
+    Icon: History,
+  },
+  {
+    id: "production",
+    label: "Producción",
+    Icon: Factory,
+  },
+  {
+    id: "kardex",
+    label: "Kardex y costos",
+    Icon: SlidersHorizontal,
+  },
   {
     id: "reconciliation",
     label: "Conciliación",
@@ -67,7 +92,7 @@ const productionTabs = [
     id: "reports",
     label: "Informes",
     Icon: ChartNoAxesCombined,
-    ready: false,
+    ready: true,
   },
 ];
 
@@ -89,6 +114,7 @@ export function InventoryProduction() {
 
   const admin = isAdmin(session);
   const plant = assignedPlant(session);
+
   const allowed =
     admin || session.authorization.roles.includes("PRODUCTION");
 
@@ -111,7 +137,9 @@ export function InventoryProduction() {
   const requestedSection = params.get("productionTab");
 
   const section =
-    requestedSection === "quick" || requestedSection === "recipes"
+    requestedSection === "quick" ||
+    requestedSection === "recipes" ||
+    requestedSection === "reports"
       ? requestedSection
       : "orders";
 
@@ -120,7 +148,9 @@ export function InventoryProduction() {
       ? QuickProductions
       : section === "recipes"
         ? ProductionRecipes
-        : ProductionOrders;
+        : section === "reports"
+          ? ProductionReports
+          : ProductionOrders;
 
   const plants = context.data?.plants;
   const requested = params.get("locationId") ?? "";
@@ -196,8 +226,14 @@ export function InventoryProduction() {
             }
             options={[
               ...(admin
-                ? [{ value: "", label: "Todas las plantas" }]
+                ? [
+                    {
+                      value: "",
+                      label: "Todas las plantas",
+                    },
+                  ]
                 : []),
+
               ...(plants ?? (plant ? [plant] : [])).map((item) => ({
                 value: item.id,
                 label: item.name,
@@ -209,7 +245,10 @@ export function InventoryProduction() {
 
       <nav aria-label="Secciones de inventario" className={navClass}>
         {inventoryTabs
-          .filter((tab) => admin || tab.id === "production")
+          .filter(
+            (tab) =>
+              admin || tab.id === "stock" || tab.id === "production"
+          )
           .map(({ id, label, Icon }) => (
             <button
               key={id}

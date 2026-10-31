@@ -10,11 +10,14 @@ import {
   Settings,
   Tags,
 } from "lucide-react";
+
 import type { LucideIcon } from "lucide-react";
+
 import type {
   CurrentSession,
   RoleCode,
 } from "../features/auth/types/auth.types";
+
 import { resolveSessionAccess } from "../features/auth/utils/resolve-session-access";
 import { ROLE_PRESENTATION } from "../features/auth/role-presentation";
 
@@ -30,7 +33,15 @@ interface NavigationBase {
 }
 
 export type NavigationLeaf = NavigationBase &
-  ({ status: "ready"; to: string } | { status: "planned" });
+  (
+    | {
+        status: "ready";
+        to: string;
+      }
+    | {
+        status: "planned";
+      }
+  );
 
 export type NavigationItem =
   | NavigationLeaf
@@ -60,7 +71,6 @@ const navigation: readonly NavigationItem[] = [
     status: "ready",
     to: "/ventas",
   },
-
   {
     id: "kitchen",
     label: "Cocina",
@@ -76,7 +86,7 @@ const navigation: readonly NavigationItem[] = [
     label: "Inventario",
     description: "Existencias, movimientos y producción.",
     icon: Boxes,
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "PRODUCTION"],
     group: "main",
     status: "ready",
     to: "/inventario",
@@ -163,7 +173,10 @@ export function getNavigation(
       const children = item.children.filter(allowed);
 
       if (children.length) {
-        visible.push({ ...item, children });
+        visible.push({
+          ...item,
+          children,
+        });
       }
     } else if (allowed(item)) {
       visible.push(
@@ -192,7 +205,22 @@ export function getNavigation(
   }
 
   for (const workspace of access.workspaces) {
-    if (visible.some((item) => item.id === workspace.id)) {
+    // Un módulo puede tener un nombre distinto al espacio
+    // de trabajo, pero compartir su misma ruta.
+    // Por ejemplo: Inventario y Producción → /inventario.
+    if (
+      visible.some(
+        (item) =>
+          item.id === workspace.id ||
+          (item.status === "ready" && item.to === workspace.path) ||
+          (item.status === "group" &&
+            item.children.some(
+              (child) =>
+                child.status === "ready" &&
+                child.to === workspace.path
+            ))
+      )
+    ) {
       continue;
     }
 
