@@ -189,6 +189,8 @@ export function WriteModal({
   onSaved,
   wide = false,
   submitLabel = "Revisar y confirmar",
+  reviewBeforeSave = true,
+  submitVariant = "primary",
   onContinue,
   onBack,
 }: {
@@ -197,6 +199,8 @@ export function WriteModal({
   dirty: boolean;
   wide?: boolean;
   submitLabel?: string;
+  reviewBeforeSave?: boolean;
+  submitVariant?: "primary" | "danger";
   onContinue?: () => void;
   onBack?: () => void;
   prepare: () => {
@@ -231,9 +235,18 @@ export function WriteModal({
   }
 
   function check() {
+    if (lock.current || uncertain) return;
+
     try {
       setError("");
-      setReview(prepare());
+
+      const operation = prepare();
+
+      if (reviewBeforeSave) {
+        setReview(operation);
+      } else {
+        void save(operation);
+      }
     } catch (error) {
       setError(
         error instanceof z.ZodError
@@ -247,8 +260,8 @@ export function WriteModal({
     }
   }
 
-  async function save() {
-    if (!review || lock.current || uncertain) return;
+  async function save(operation: ReturnType<typeof prepare>) {
+    if (lock.current || uncertain) return;
 
     lock.current = true;
     setBusy(true);
@@ -258,7 +271,7 @@ export function WriteModal({
     controller.current = request;
 
     try {
-      await review.save(request.signal);
+      await operation.save(request.signal);
 
       if (!request.signal.aborted) {
         onSaved();
@@ -315,6 +328,8 @@ export function WriteModal({
             )}
 
             <Button
+              variant={submitVariant}
+              loading={busy}
               disabled={busy || uncertain}
               onClick={onContinue ?? check}
             >
@@ -351,7 +366,11 @@ export function WriteModal({
               >
                 Volver al formulario
               </Button>
-              <Button loading={busy} onClick={() => void save()}>
+
+              <Button
+                loading={busy}
+                onClick={() => void save(review)}
+              >
                 Confirmar registro
               </Button>
             </>
@@ -373,6 +392,7 @@ export function WriteModal({
               >
                 Seguir editando
               </Button>
+
               <Button variant="danger" onClick={onClose}>
                 Descartar
               </Button>

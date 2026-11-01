@@ -20,9 +20,13 @@ const nonnegative = (digits: number) =>
 
 export const amount = nonnegative(6);
 
-export const positive = amount.refine(
-  (value) => fixed(value) > 0n,
-  "El valor debe ser mayor que cero."
+export const positive = amount.pipe(
+  z
+    .string()
+    .refine(
+      (value) => fixed(value) > 0n,
+      "El valor debe ser mayor que cero."
+    )
 );
 
 export const stockQuantity = nonnegative(3);
@@ -216,18 +220,39 @@ export const itemInputSchema = z
     baseUnit: baseUnitSchema,
     minimumStock: stockQuantity,
     openingQuantity: stockQuantity,
-    openingUnitCost: positive.nullable(),
+
+    openingUnitCost: z.preprocess(
+      (value) =>
+        typeof value === "string" && value.trim() === ""
+          ? null
+          : value,
+      positive.nullable()
+    ),
   })
   .superRefine((value, context) => {
-    if (
-      fixed(value.openingQuantity) > 0n !==
-      (value.openingUnitCost !== null)
-    ) {
+    const parsedQuantity = stockQuantity.safeParse(
+      value.openingQuantity
+    );
+
+    if (!parsedQuantity.success) return;
+
+    const hasStock = fixed(parsedQuantity.data) > 0n;
+
+    if (hasStock && value.openingUnitCost === null) {
       context.addIssue({
         code: "custom",
         path: ["openingUnitCost"],
         message:
-          "Una existencia inicial positiva requiere costo unitario.",
+          "Ingresa el costo unitario inicial porque la existencia inicial es mayor que cero.",
+      });
+    }
+
+    if (!hasStock && value.openingUnitCost !== null) {
+      context.addIssue({
+        code: "custom",
+        path: ["openingUnitCost"],
+        message:
+          "Deja el costo unitario inicial vacío cuando la existencia inicial sea cero.",
       });
     }
   });

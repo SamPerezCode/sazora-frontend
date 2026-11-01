@@ -11,11 +11,14 @@ import type {
   InventoryWorkspace,
   ItemWrite,
 } from "../services/inventory-location.service";
+
 import {
   editInputSchema,
   itemInputSchema,
   positive,
+  stockQuantity,
 } from "../schemas/inventory-location.schema";
+
 import {
   canValue,
   cost,
@@ -297,21 +300,33 @@ function Editor({
         minimumStock: minimum,
       };
 
-      operation =
-        action.kind === "create"
-          ? {
-              kind: "create",
-              body: itemInputSchema.parse({
-                ...body,
-                openingQuantity: opening,
-                openingUnitCost: fixed(opening) === 0n ? null : price,
-              }),
-            }
-          : {
-              kind: "edit",
-              itemId: item!.id,
-              body: editInputSchema.parse(body),
-            };
+      if (action.kind === "create") {
+        const parsedQuantity = stockQuantity.safeParse(opening);
+
+        if (!parsedQuantity.success) {
+          throw new Error(
+            "La existencia inicial debe ser cero o un número positivo, con máximo 3 decimales. Usa punto decimal, sin separadores de miles."
+          );
+        }
+
+        const openingQuantity = parsedQuantity.data;
+
+        operation = {
+          kind: "create",
+          body: itemInputSchema.parse({
+            ...body,
+            openingQuantity,
+            openingUnitCost:
+              fixed(openingQuantity) === 0n ? null : price,
+          }),
+        };
+      } else {
+        operation = {
+          kind: "edit",
+          itemId: item!.id,
+          body: editInputSchema.parse(body),
+        };
+      }
     } else if (action.kind === "valuation") {
       if (!eligible || !balance || !canValue(balance)) {
         throw new Error(
@@ -420,6 +435,17 @@ function Editor({
   return (
     <WriteModal
       title={labels[action.kind]}
+      reviewBeforeSave={action.kind !== "status"}
+      submitLabel={
+        action.kind === "status"
+          ? labels.status
+          : "Revisar y confirmar"
+      }
+      submitVariant={
+        action.kind === "status" && item?.isActive
+          ? "danger"
+          : "primary"
+      }
       dirty={dirty}
       prepare={prepare}
       onClose={onClose}
@@ -572,6 +598,7 @@ function Editor({
       {action.kind === "status" && (
         <Notice>
           El cambio de estado afecta al artículo en todo el negocio.
+          El historial, los saldos y los costos se conservan.
         </Notice>
       )}
     </WriteModal>
