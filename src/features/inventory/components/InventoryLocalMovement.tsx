@@ -189,7 +189,7 @@ export function InventoryLocalMovement({
               })}
 
               <Notice>
-                La API validará los saldos y costos al confirmar.
+                El sistema validará los saldos y costos al confirmar.
               </Notice>
             </div>
           ),
