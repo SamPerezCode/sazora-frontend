@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { id, numeric } from "../../../schemas/inventory-location.schema";
+import {
+  id,
+  numeric,
+} from "../../../schemas/inventory-location.schema";
 import {
   baseUnitSchema,
   inventoryItemSchema,
@@ -156,7 +159,14 @@ export const wasteSchema = z.object({
   recordedByName: z.string(),
   createdAt: date,
   lines: z.array(
-    recipeLineSchema.extend({
+    z.object({
+      inventoryMovementLineId: id,
+      inventoryItemId: id,
+      inventoryItemName: z.string(),
+      inventoryItemSku: z.string().nullable(),
+      baseUnit: baseUnitSchema,
+      quantity: numeric,
+      notes: z.string().nullable(),
       unitCost: numeric.nullable(),
       totalCost: numeric.nullable(),
     })

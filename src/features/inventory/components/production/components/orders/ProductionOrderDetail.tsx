@@ -337,7 +337,7 @@ export function ProductionOrderDetail({
             label="Desperdicios registrados"
             rows={waste.flatMap((record) =>
               record.lines.map((line) => ({
-                id: record.id + ":" + line.id,
+                id: record.id + ":" + line.inventoryMovementLineId,
                 fields: [
                   {
                     label: "Artículo / SKU",
