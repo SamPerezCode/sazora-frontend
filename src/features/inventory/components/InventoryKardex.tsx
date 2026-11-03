@@ -492,6 +492,7 @@ export function InventoryKardex({
             label="Registro físico y valorizado"
             rows={rows}
             wide
+            verticalAlign="middle"
           />
 
           {!entries.length && (
@@ -524,6 +525,7 @@ export function InventoryKardex({
           <InventoryResponsiveRecords
             label="Compras y variación del costo"
             rows={purchaseRows}
+            verticalAlign="middle"
           />
 
           {!purchases.length && (

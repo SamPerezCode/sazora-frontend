@@ -58,6 +58,7 @@ export function DateField({
   const focusDay = useRef(false);
 
   const [open, setOpen] = useState(false);
+  const [opening, setOpening] = useState(0);
 
   const [today, setToday] = useState(() => calendarToday(timeZone));
 
@@ -119,30 +120,6 @@ export function DateField({
 
     setCursor(clamped);
     setView(clamped.slice(0, 7) + "-01");
-  }
-
-  function show() {
-    if (unavailable) return;
-
-    if (panel.current?.matches(":popover-open")) {
-      close();
-      return;
-    }
-
-    const currentToday = calendarToday(timeZone);
-
-    setToday(currentToday);
-    move(validValue ? value : currentToday);
-
-    const popup = panel.current;
-    if (!popup) return;
-
-    // Permite medirlo sin mostrar una posición provisional.
-    popup.style.visibility = "hidden";
-    popup.showPopover();
-
-    // Calcula la posición desde useLayoutEffect antes del pintado.
-    setOpen(true);
   }
 
   function select(next: string) {
@@ -254,7 +231,7 @@ export function DateField({
 
       window.visualViewport?.removeEventListener("scroll", position);
     };
-  }, [open, cursor, view]);
+  }, [open, opening, cursor, view]);
 
   const previous = addCalendarMonths(month, -1);
   const next = addCalendarMonths(month, 1);
@@ -293,7 +270,8 @@ export function DateField({
         type="button"
         className="date-field-trigger"
         disabled={unavailable}
-        onClick={show}
+        popoverTarget={panelId}
+        popoverTargetAction="toggle"
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={panelId}
@@ -320,7 +298,25 @@ export function DateField({
         role="dialog"
         aria-label={"Elegir " + label}
         className="date-calendar"
-        onToggle={(event) => setOpen(event.newState === "open")}
+        onBeforeToggle={(event) => {
+          if (event.newState !== "open") return;
+
+          const currentToday = calendarToday(timeZone);
+
+          setToday(currentToday);
+          move(validValue ? value : currentToday);
+
+          event.currentTarget.style.visibility = "hidden";
+        }}
+        onToggle={(event) => {
+          const isOpen = event.currentTarget.matches(":popover-open");
+
+          setOpen(isOpen);
+
+          if (isOpen) {
+            setOpening((current) => current + 1);
+          }
+        }}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             event.preventDefault();

@@ -287,6 +287,7 @@ export function InventoryReconciliation({
           <InventoryResponsiveRecords
             label="Artículos con incidencias"
             rows={rows}
+            verticalAlign="middle"
           />
 
           {!items.length && (
