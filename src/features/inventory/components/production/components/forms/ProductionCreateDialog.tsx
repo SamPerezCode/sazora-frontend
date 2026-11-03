@@ -72,8 +72,8 @@ export function ProductionCreateDialog(props: ProductionCreateProps) {
           ? "Transformación inmediata de inventario sin receta"
           : "Paso " +
             step +
-            " de 3 · " +
-            ["Planificación", "Proyección", "Revisión"][step - 1]}
+            " de 2 · " +
+            ["Datos generales", "Proyección y revisión"][step - 1]}
       </p>
 
       <div
@@ -216,7 +216,7 @@ export function ProductionCreateDialog(props: ProductionCreateProps) {
 
               {!quick && <ProductionRecipeProjection model={model} />}
 
-              {!quick && step === 3 && (
+              {!quick && step === 2 && (
                 <Notice>
                   Planta:{" "}
                   {

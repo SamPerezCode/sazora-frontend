@@ -381,7 +381,7 @@ export function useProductionCreateForm({
       validate();
       setError("");
       setConfirmed(false);
-      setStep((value) => value + 1);
+      setStep((value) => Math.min(value + 1, 2));
       top();
     } catch (caught) {
       setError(errorText(caught));
@@ -464,7 +464,7 @@ export function useProductionCreateForm({
     }
   }
 
-  const last = step === (quick ? 2 : 3);
+  const last = step === 2;
   const controlClass =
     "h-9 w-full min-w-0 rounded-xl border border-outline bg-surface px-3 text-sm text-heading shadow-sm outline-none placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60";
 
