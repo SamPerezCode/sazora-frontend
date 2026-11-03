@@ -14,7 +14,7 @@ export const productionMovementSummary = movementSummary.extend({
 
 export const quickProductionSchema = movementDetail.extend({
   movementType: z.literal("PRODUCTION"),
-  sourceType: z.literal("PRODUCTION_BATCH"),
+  sourceType: z.literal("PRODUCTION_BATCH").nullable(),
   sourceId: z.string().nullable(),
   lines: z.array(
     movementLine.extend({

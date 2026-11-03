@@ -70,7 +70,11 @@ export async function listQuickProductions(
   );
 
   return rows
-    .filter((row) => row.sourceType === "PRODUCTION_BATCH")
+    .filter(
+      (row) =>
+        row.sourceType === "PRODUCTION_BATCH" ||
+        (row.sourceType === null && row.sourceId === null)
+    )
     .sort((a, b) => {
       const byDate =
         Date.parse(b.createdAt) - Date.parse(a.createdAt);

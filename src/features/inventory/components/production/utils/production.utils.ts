@@ -9,7 +9,10 @@ import {
   subtract,
   divide,
 } from "../../../utils/inventory-value";
-import { formatQuantity, dayKey } from "../../../utils/inventory-format";
+import {
+  formatQuantity,
+  dayKey,
+} from "../../../utils/inventory-format";
 import type {
   Status,
   Action,
@@ -38,9 +41,35 @@ export const actionLabels: Record<Action, string> = {
   movement: "Ver movimiento valorizado",
 };
 
+function displayDecimal(value: string): string {
+  if (!/^-?\d+(\.\d+)?$/.test(value)) {
+    throw new Error("Decimal inválido.");
+  }
+
+  const negative = value.startsWith("-");
+  const [whole, fraction = ""] = (
+    negative ? value.slice(1) : value
+  ).split(".");
+
+  const cents =
+    BigInt(whole) * 100n +
+    BigInt(fraction.slice(0, 2).padEnd(2, "0")) +
+    (fraction.length > 2 && fraction[2] >= "5" ? 1n : 0n);
+
+  const sign = negative && cents !== 0n ? "-" : "";
+
+  return formatQuantity(
+    sign +
+      (cents / 100n).toString() +
+      "." +
+      (cents % 100n).toString().padStart(2, "0")
+  );
+}
+
 export function cash(value: string | null, currency: string) {
   if (value === null) return "Sin valoración";
-  return currency ? money(value, currency) : formatQuantity(value);
+
+  return currency ? money(value, currency) : displayDecimal(value);
 }
 
 export function cost(
@@ -52,11 +81,11 @@ export function cost(
 
   return value === null
     ? "Sin valoración"
-    : formatQuantity(value) + "/" + unit(base);
+    : displayDecimal(value) + "/" + unit(base);
 }
 
 export function percentage(value: string | null) {
-  return value === null ? "—" : formatQuantity(value) + " %";
+  return value === null ? "—" : displayDecimal(value) + " %";
 }
 
 export function timestamp(value: string | null, zone: string) {

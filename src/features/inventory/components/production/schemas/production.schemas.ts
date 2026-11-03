@@ -117,14 +117,38 @@ export const performanceLineSchema = orderLineSchema
     declaredWasteCost: numeric,
   });
 
+const reportDecimal = z
+  .string()
+  .regex(/^-?\d+(\.\d+)?$/, "Decimal inválido en el informe.")
+  .transform((value) => {
+    const negative = value.startsWith("-");
+    const unsigned = negative ? value.slice(1) : value;
+    const [whole, fraction = ""] = unsigned.split(".");
+
+    const rounded =
+      BigInt(whole) * 1_000_000n +
+      BigInt(fraction.slice(0, 6).padEnd(6, "0")) +
+      (fraction.length > 6 && fraction[6] >= "5" ? 1n : 0n);
+
+    const sign = negative && rounded !== 0n ? "-" : "";
+
+    return (
+      sign +
+      (rounded / 1_000_000n).toString() +
+      "." +
+      (rounded % 1_000_000n).toString().padStart(6, "0")
+    );
+  })
+  .pipe(numeric);
+
 export const costSummarySchema = z.object({
-  expectedInputCostAtActualRate: numeric.nullable(),
-  actualInputCost: numeric.nullable(),
-  inputCostDifference: numeric.nullable(),
-  inputCostVariationPercentage: numeric.nullable(),
-  declaredWasteCost: numeric,
-  totalResourceCost: numeric.nullable(),
-  producedInventoryValue: numeric.nullable(),
+  expectedInputCostAtActualRate: reportDecimal.nullable(),
+  actualInputCost: reportDecimal.nullable(),
+  inputCostDifference: reportDecimal.nullable(),
+  inputCostVariationPercentage: reportDecimal.nullable(),
+  declaredWasteCost: reportDecimal,
+  totalResourceCost: reportDecimal.nullable(),
+  producedInventoryValue: reportDecimal.nullable(),
 });
 
 export const performanceSchema = z.object({
