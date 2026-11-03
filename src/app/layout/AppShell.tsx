@@ -141,7 +141,11 @@ export function AppShell() {
         <main
           id="app-content"
           tabIndex={-1}
-          className="shell-content"
+          className={
+            isInventory
+              ? "shell-content shell-content--inventory"
+              : "shell-content"
+          }
         >
           {error && !isSettings && (
             <Alert className="mb-5">

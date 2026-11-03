@@ -1141,3 +1141,10 @@
     transition: none;
   }
 }
+
+/* Espacio lateral del contenido de Inventario en escritorio. */
+@media (min-width: 80rem) {
+  .app-shell .shell-content--inventory {
+    padding-inline: 1.5rem;
+  }
+}
