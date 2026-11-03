@@ -1119,7 +1119,6 @@
     display 260ms allow-discrete,
     overlay 260ms allow-discrete;
 }
-
 .shell-flyout:popover-open {
   opacity: 1;
   transform: translateX(0) scale(1);
@@ -1133,7 +1132,6 @@
 }
 
 /* Accesibilidad: respeta la preferencia de movimiento reducido. */
-
 @media (prefers-reduced-motion: reduce) {
   .shell-submenu-collapse,
   .shell-submenu-chevron,
@@ -1142,9 +1140,9 @@
   }
 }
 
-/* Espacio lateral del contenido de Inventario en escritorio. */
+/* Espacio lateral del contenido de todos los módulos en escritorio. */
 @media (min-width: 80rem) {
-  .app-shell .shell-content--inventory {
+  .app-shell .shell-content {
     padding-inline: 1.5rem;
   }
 }
