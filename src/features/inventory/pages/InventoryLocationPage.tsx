@@ -190,7 +190,7 @@ export function InventoryLocationPage() {
     },
     {
       id: "reconciliation",
-      label: "Conciliación",
+      label: "Auditoría de inventario",
       Icon: ClipboardCheck,
       disabled: true,
     },

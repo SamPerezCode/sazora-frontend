@@ -64,7 +64,7 @@ const inventoryTabs = [
   },
   {
     id: "reconciliation",
-    label: "Conciliación",
+    label: "Auditoría de inventario",
     Icon: ClipboardCheck,
   },
 ];

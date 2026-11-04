@@ -18,7 +18,7 @@ import { InventoryResponsiveRecords } from "./InventoryResponsiveRecords";
 import { InventoryReconciliationDetail } from "./InventoryReconciliationDetail";
 
 const issues = {
-  PHYSICAL_STOCK_MISMATCH: "Diferencia física",
+  PHYSICAL_STOCK_MISMATCH: "Descuadre de saldos",
   NEGATIVE_LOCATION_STOCK: "Saldo negativo",
   UNVALUED_LOCATION_STOCK: "Sin valorar",
 };
@@ -65,7 +65,7 @@ export function InventoryReconciliation({
           tone: red,
         },
         {
-          label: "Diferencias físicas",
+          label: "Artículos con descuadre de saldos",
           value: summary.physicalMismatchCount,
           tone: red,
         },
@@ -109,15 +109,15 @@ export function InventoryReconciliation({
           ),
         },
         {
-          label: "Existencia global",
+          label: "Saldo global heredado",
           value: formatQuantity(item.globalStock),
         },
         {
-          label: "Suma por ubicaciones",
+          label: "Existencias registradas por ubicación",
           value: formatQuantity(item.locationStock),
         },
         {
-          label: "Diferencia",
+          label: "Descuadre de saldos",
           value: (
             <span
               className={
@@ -202,10 +202,10 @@ export function InventoryReconciliation({
                 )}
 
                 {!summary.isPhysicallyConsistent
-                  ? "Se encontraron diferencias"
+                  ? "Se encontraron inconsistencias en los saldos"
                   : summary.hasLegacyAuditGaps
                     ? "Existen alertas de valoración"
-                    : "El inventario está conciliado"}
+                    : "No se detectaron descuadres ni saldos negativos"}
               </span>
             )
           )}
@@ -233,8 +233,11 @@ export function InventoryReconciliation({
       </div>
 
       <p className="text-xs leading-5 text-muted">
-        La conciliación compara la existencia global con todas las
-        ubicaciones del negocio.
+        Esta auditoría compara el saldo global heredado con las
+        existencias registradas en todas las ubicaciones del negocio.
+        También revisa saldos negativos y alertas de valoración e
+        historial. No sustituye un conteo físico ni modifica el
+        inventario.
       </p>
 
       {query.error && <Notice>{query.error}</Notice>}

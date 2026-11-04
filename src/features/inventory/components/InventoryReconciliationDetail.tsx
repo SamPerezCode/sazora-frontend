@@ -5,6 +5,9 @@ import type { AuthSession } from "../../auth/types/auth.types";
 import { useInventoryQuery } from "../hooks/useInventoryQuery";
 import { loadItemDetail } from "../services/inventory-location.service";
 
+import { useSearchParams } from "react-router";
+import { useAppShell } from "../../../app/layout/shell-context";
+
 import {
   itemTypeLabels,
   unitLabels,
@@ -36,6 +39,24 @@ export function InventoryReconciliationDetail({
   revision: number;
   onClose: () => void;
 }) {
+  const { session } = useAppShell();
+  const [, setParams] = useSearchParams();
+
+  const isAdmin = session.authorization.roles.includes("ADMIN");
+
+  function openKardex() {
+    if (!isAdmin) return;
+
+    onClose();
+
+    setParams(
+      new URLSearchParams({
+        tab: "kardex",
+        inventoryItemId: itemId,
+      })
+    );
+  }
+
   const loader = useCallback(
     (session: AuthSession, signal: AbortSignal) =>
       loadItemDetail(session, signal, itemId),
@@ -83,15 +104,15 @@ export function InventoryReconciliationDetail({
   const totals = item
     ? [
         {
-          label: "Existencia global",
+          label: "Saldo global heredado",
           value: item.currentStock,
         },
         {
-          label: "Suma de ubicaciones",
+          label: "Existencias registradas por ubicación",
           value: locationStock,
         },
         {
-          label: "Diferencia física",
+          label: "Descuadre de saldos",
           value: difference,
         },
       ]
@@ -155,13 +176,25 @@ export function InventoryReconciliationDetail({
       wide
       onClose={onClose}
       footer={
-        <Button
-          variant="secondary"
-          className="min-h-11"
-          onClick={onClose}
-        >
-          Cerrar
-        </Button>
+        <>
+          {isAdmin && (
+            <Button
+              className="min-h-11"
+              disabled={query.pending || !!query.error || !item}
+              onClick={openKardex}
+            >
+              Ver kardex
+            </Button>
+          )}
+
+          <Button
+            variant="secondary"
+            className="min-h-11"
+            onClick={onClose}
+          >
+            Cerrar
+          </Button>
+        </>
       }
     >
       {query.pending && (
@@ -208,6 +241,18 @@ export function InventoryReconciliationDetail({
             </p>
           </div>
 
+          {fixed(difference) !== 0n && (
+            <Notice>
+              El saldo global heredado registra{" "}
+              {quantity(item.currentStock, item.baseUnit)}, pero las
+              ubicaciones suman{" "}
+              {quantity(locationStock, item.baseUnit)}. Consulta el
+              kardex para investigar el origen del descuadre antes de
+              solicitar una corrección del saldo global. Esta revisión
+              no modifica el inventario.
+            </Notice>
+          )}
+
           <dl className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-3">
             {totals.map((field) => (
               <div key={field.label} className="min-w-0">
@@ -218,7 +263,7 @@ export function InventoryReconciliationDetail({
                 <dd
                   className={
                     "m-0 mt-1 text-sm font-medium [overflow-wrap:anywhere] " +
-                    (field.label === "Diferencia física" &&
+                    (field.label === "Descuadre de saldos" &&
                     fixed(field.value) !== 0n
                       ? "text-red-600 dark:text-red-400"
                       : "text-heading")
