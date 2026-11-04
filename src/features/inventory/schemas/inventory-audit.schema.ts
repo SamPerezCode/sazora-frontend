@@ -28,8 +28,7 @@ export const movementSummary = z.object({
   movementType,
 
   sourceType: z.string().nullable().optional(),
-  sourceId: id.nullable().optional(),
-
+  sourceId: z.string().nullable().optional(),
   externalReference: z.string().nullable(),
   notes: z.string().nullable(),
   createdByName: z.string(),
