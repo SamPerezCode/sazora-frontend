@@ -17,6 +17,7 @@ export const movementLabels = {
   PRODUCTION: "Producción automática",
   SALE: "Venta automática",
   REVERSAL: "Reversión automática",
+  TRANSFER: "Transferencia",
 };
 
 export const manualTypes = [

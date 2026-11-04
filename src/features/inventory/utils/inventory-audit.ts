@@ -19,6 +19,7 @@ export const movementLabels = {
   WASTE: "Desperdicio",
   RETURN: "Devolución",
   REVERSAL: "Reversión",
+  TRANSFER: "Transferencia",
 };
 
 export function estimateProduction(

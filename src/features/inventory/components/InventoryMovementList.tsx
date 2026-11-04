@@ -6,6 +6,9 @@ import { DateField } from "../../../components/forms/DateField";
 import { Pagination } from "../../../components/ui/Pagination";
 import { InventoryMobileCards } from "./InventoryMobileCards";
 
+import { useAppShell } from "../../../app/layout/shell-context";
+import { InventoryTransferDialog } from "./InventoryTransferDialog";
+
 import { useInventoryQuery } from "../hooks/useInventoryQuery";
 import {
   loadActivity,
@@ -16,6 +19,7 @@ import { dayKey, searchKey } from "../utils/inventory-format";
 import { movementLabels } from "../utils/inventory-audit";
 import {
   add,
+  fixed,
   money,
   quantity,
   subtract,
@@ -87,6 +91,78 @@ function economicImpact(movement: Movement) {
   return subtract(total("IN"), total("OUT"));
 }
 
+function transferTypeLabel(
+  row: Awaited<ReturnType<typeof loadActivity>>[number],
+  all: Awaited<ReturnType<typeof loadActivity>>
+) {
+  if (row.movementType !== "TRANSFER") {
+    return movementLabels[row.movementType];
+  }
+
+  const outgoing = row.sourceType === "INVENTORY_TRANSFER_OUT";
+
+  const incoming = row.sourceType === "INVENTORY_TRANSFER_IN";
+
+  const pair =
+    row.sourceId &&
+    all.find(
+      (entry) =>
+        entry.movementType === "TRANSFER" &&
+        entry.sourceId === row.sourceId &&
+        entry.sourceType ===
+          (outgoing
+            ? "INVENTORY_TRANSFER_IN"
+            : "INVENTORY_TRANSFER_OUT")
+    );
+
+  const other = pair ? pair.location?.code : undefined;
+
+  return (
+    <div>
+      <p>Transferencia</p>
+
+      <p className="mt-1 text-xs text-muted">
+        {outgoing
+          ? "Salida"
+          : incoming
+            ? "Entrada"
+            : "Movimiento interno"}
+
+        {other
+          ? (outgoing ? " · Enviada a " : " · Recibida desde ") +
+            other
+          : ""}
+      </p>
+    </div>
+  );
+}
+
+function transferReference(
+  row: Awaited<ReturnType<typeof loadActivity>>[number]
+) {
+  if (row.movementType !== "TRANSFER" || !row.sourceId) {
+    return row.externalReference ?? "M-" + row.id;
+  }
+
+  return (
+    <div>
+      <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-xs font-medium">
+        Transferencia #{row.sourceId}
+      </span>
+
+      {row.externalReference && (
+        <p className="mt-1 text-xs text-muted">
+          {row.externalReference}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function impactLabel(value: string, currency: string) {
+  return (fixed(value) > 0n ? "+" : "") + money(value, currency);
+}
+
 export function InventoryMovementList({
   items,
   locationId,
@@ -104,6 +180,11 @@ export function InventoryMovementList({
   canCreate: boolean;
   onCreate: () => void;
 }) {
+  const { session } = useAppShell();
+
+  const [transferring, setTransferring] = useState(false);
+
+  const admin = session.authorization.roles.includes("ADMIN");
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -136,6 +217,9 @@ export function InventoryMovementList({
         searchKey(
           [
             row.id,
+            row.movementType === "TRANSFER" && row.sourceId
+              ? "Transferencia #" + row.sourceId
+              : "",
             row.externalReference,
             row.createdByName,
             row.notes,
@@ -206,11 +290,25 @@ export function InventoryMovementList({
 
   return (
     <div className="grid min-w-0 gap-4">
-      <div>
-        <Button disabled={!canCreate} onClick={onCreate}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Button
+          variant="secondary"
+          disabled={!canCreate}
+          onClick={onCreate}
+        >
           <Plus size={16} aria-hidden="true" />
           Registrar movimiento
         </Button>
+
+        {admin && (
+          <Button
+            disabled={!canCreate}
+            onClick={() => setTransferring(true)}
+          >
+            <Plus size={16} aria-hidden />
+            Nueva transferencia
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-4 border-b border-outline pb-4">
@@ -336,7 +434,7 @@ export function InventoryMovementList({
                     },
                     {
                       label: "Tipo",
-                      value: movementLabels[row.movementType],
+                      value: transferTypeLabel(row, query.data ?? []),
                     },
                     {
                       label: "Ubicación",
@@ -348,7 +446,7 @@ export function InventoryMovementList({
                     },
                     {
                       label: "Referencia",
-                      value: row.externalReference ?? "M-" + row.id,
+                      value: transferReference(row),
                     },
                     {
                       label: "Responsable",
@@ -372,13 +470,15 @@ export function InventoryMovementList({
                       value:
                         impact === null
                           ? "Sin valoración completa"
-                          : money(impact, currency),
+                          : impactLabel(impact, currency),
                     },
                     {
                       label: "Estado",
                       value: (
                         <span className="text-emerald-700 dark:text-emerald-400">
-                          Registrado
+                          {row.movementType === "TRANSFER"
+                            ? "Completada"
+                            : "Registrado"}{" "}
                         </span>
                       ),
                     },
@@ -402,7 +502,7 @@ export function InventoryMovementList({
                 };
               })}
           />
-          <div className="hidden min-w-0 md:block [&_table]:bg-surface">
+          <div className="hidden min-w-0 md:block [&_table]:bg-surface [&_td]:align-middle">
             <DataTable
               headers={[
                 "Fecha y hora",
@@ -436,7 +536,9 @@ export function InventoryMovementList({
                         }).format(new Date(row.createdAt))}
                       </td>
 
-                      <td>{movementLabels[row.movementType]}</td>
+                      <td>
+                        {transferTypeLabel(row, query.data ?? [])}
+                      </td>
 
                       <td>
                         {row.location
@@ -447,7 +549,7 @@ export function InventoryMovementList({
                       </td>
 
                       <td>
-                        {row.externalReference ?? "M-" + row.id}
+                        <td>{transferReference(row)}</td>{" "}
                       </td>
 
                       <td>{row.createdByName}</td>
@@ -470,13 +572,15 @@ export function InventoryMovementList({
                             Sin valoración completa
                           </span>
                         ) : (
-                          money(impact, currency)
+                          impactLabel(impact, currency)
                         )}
                       </td>
 
                       <td>
                         <span className="text-emerald-700 dark:text-emerald-400">
-                          Registrado
+                          {row.movementType === "TRANSFER"
+                            ? "Completada"
+                            : "Registrado"}{" "}
                         </span>
                       </td>
 
@@ -515,6 +619,15 @@ export function InventoryMovementList({
             }}
           />
         </>
+      )}
+
+      {transferring && admin && (
+        <InventoryTransferDialog
+          initialLocationId={locationId}
+          currency={currency}
+          timezone={timezone}
+          onClose={() => setTransferring(false)}
+        />
       )}
 
       {opened && (

@@ -344,6 +344,8 @@ export function movementReference(row: MovementRow | MovementDetail) {
     ORDER_ITEM: "Ítem de pedido",
     INVENTORY_ITEM: "Artículo",
     PRODUCTION: "Producción",
+    INVENTORY_TRANSFER_OUT: "Transferencia",
+    INVENTORY_TRANSFER_IN: "Transferencia",
   };
 
   return (

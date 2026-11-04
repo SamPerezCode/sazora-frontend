@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { ApiError } from "../../../lib/http/client";
+import { subscribeInventoryInvalidation } from "../../../lib/inventory-invalidation";
 import type {
   AuthSession,
   RoleCode,
@@ -15,6 +16,16 @@ export function useInventoryQuery<T>(
   const { session } = useAppShell();
 
   const [attempt, setAttempt] = useState(0);
+
+  const businessId = session.business.id;
+
+  useEffect(
+    () =>
+      subscribeInventoryInvalidation(businessId, () => {
+        setAttempt((value) => value + 1);
+      }),
+    [businessId]
+  );
 
   const [snapshot, setSnapshot] = useState<{
     scope: string;

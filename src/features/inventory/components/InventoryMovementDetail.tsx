@@ -202,7 +202,22 @@ export function InventoryMovementDetail({
               Referencia: movement.externalReference ?? "—",
               Responsable: movement.createdByName,
               "Motivo / notas": movement.notes ?? "—",
-              Estado: "Registrado",
+              Estado:
+                movement.movementType === "TRANSFER"
+                  ? "Completada"
+                  : "Registrado",
+
+              ...(movement.movementType === "TRANSFER" &&
+              movement.sourceId
+                ? {
+                    Transferencia: "#" + movement.sourceId,
+
+                    Sentido:
+                      movement.sourceType === "INVENTORY_TRANSFER_OUT"
+                        ? "Salida"
+                        : "Entrada",
+                  }
+                : {}),
             }).map(([label, value]) => (
               <div key={label} className="min-w-0">
                 <dt className="text-xs leading-5 text-muted">

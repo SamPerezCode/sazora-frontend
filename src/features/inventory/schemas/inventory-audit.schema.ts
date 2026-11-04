@@ -18,6 +18,7 @@ export const movementType = z.enum([
   "WASTE",
   "RETURN",
   "REVERSAL",
+  "TRANSFER",
 ]);
 
 export const movementSummary = z.object({
@@ -25,6 +26,10 @@ export const movementSummary = z.object({
   businessId: id,
   location: locationSchema.nullable(),
   movementType,
+
+  sourceType: z.string().nullable().optional(),
+  sourceId: id.nullable().optional(),
+
   externalReference: z.string().nullable(),
   notes: z.string().nullable(),
   createdByName: z.string(),

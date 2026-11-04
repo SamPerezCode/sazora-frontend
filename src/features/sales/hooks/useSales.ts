@@ -19,6 +19,7 @@ import { getOrderKitchenTickets } from "../../kitchen-flow/kitchen-flow.service"
 import { kitchenErrorMessage } from "../../kitchen-flow/kitchen-flow.schema";
 
 import { useKitchenSettings } from "../../kitchen-flow/useKitchenSettings";
+import { subscribeInventoryInvalidation } from "../../../lib/inventory-invalidation";
 
 import { ApiError } from "../../../lib/http/client";
 import { isOperationalOrder } from "../utils/sales-board";
@@ -388,6 +389,40 @@ export function useSales(
     setNotice,
     printing,
   ]);
+
+  useEffect(() => {
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const unsubscribe = subscribeInventoryInvalidation(
+      businessId,
+      () => {
+        inventoryRefreshRequired.current = true;
+
+        clearTimeout(retryTimer);
+
+        const update = () => {
+          if (!alive.current) return;
+
+          if (
+            locked.current ||
+            document.visibilityState !== "visible"
+          ) {
+            retryTimer = setTimeout(update, 500);
+            return;
+          }
+
+          void refresh();
+        };
+
+        retryTimer = setTimeout(update, 0);
+      }
+    );
+
+    return () => {
+      clearTimeout(retryTimer);
+      unsubscribe();
+    };
+  }, [businessId, refresh]);
 
   useEffect(() => {
     alive.current = true;
