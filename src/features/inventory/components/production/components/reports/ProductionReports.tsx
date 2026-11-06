@@ -315,9 +315,17 @@ export function ProductionReports({
 
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
-      <h3 className="text-sm font-semibold">
-        Rendimiento e informes
-      </h3>
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold">
+          Informes de órdenes de producción
+        </h3>
+
+        <p className="text-xs leading-5 text-muted">
+          Estos informes incluyen únicamente órdenes de producción.
+          Las producciones rápidas se consultan en la pestaña
+          Producción rápida y en el kardex.
+        </p>
+      </div>
 
       <ReportMetrics
         summary={visibleSummary}

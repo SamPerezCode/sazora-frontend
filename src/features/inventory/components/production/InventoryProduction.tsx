@@ -90,7 +90,7 @@ const productionTabs = [
   },
   {
     id: "reports",
-    label: "Informes",
+    label: "Informes de órdenes",
     Icon: ChartNoAxesCombined,
     ready: true,
   },
