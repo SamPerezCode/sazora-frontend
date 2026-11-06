@@ -9,6 +9,8 @@ import { ApiError } from "../../../lib/http/client";
 
 import { ResponsiveFilter } from "../../../components/ui/ResponsiveFilter";
 
+import { Pagination } from "../../../components/ui/Pagination";
+
 import {
   getOrdersForStatuses,
   locationErrorCodes,
@@ -81,6 +83,7 @@ export function SalesHistory({
   const [until, setUntil] = useState("");
   const [sort, setSort] = useState("recent");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [opened, setOpened] = useState<OrderSummary | null>(null);
 
   const searchId = useId();
@@ -162,9 +165,12 @@ export function SalesHistory({
           );
         });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / 20));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filtered.length / pageSize)
+  );
 
-  const currentPage = Math.min(page, totalPages);
+  const currentPage = Math.max(1, Math.min(page, totalPages));
 
   const closed = filtered.filter((row) => row.status === "CLOSED");
 
@@ -403,7 +409,10 @@ export function SalesHistory({
 
               <tbody role="rowgroup">
                 {filtered
-                  .slice((currentPage - 1) * 20, currentPage * 20)
+                  .slice(
+                    (currentPage - 1) * pageSize,
+                    currentPage * pageSize
+                  )
                   .map((row) => (
                     <tr key={row.id} role="row">
                       <td className="mp-history-order" role="cell">
@@ -479,27 +488,18 @@ export function SalesHistory({
             </p>
           )}
 
-          <div className="mp-history-pagination">
-            <Button
-              variant="secondary"
-              disabled={currentPage === 1}
-              onClick={() => setPage(currentPage - 1)}
-            >
-              Anterior
-            </Button>
-
-            <span>
-              Página {currentPage} de {totalPages}
-            </span>
-
-            <Button
-              variant="secondary"
-              disabled={currentPage === totalPages}
-              onClick={() => setPage(currentPage + 1)}
-            >
-              Siguiente
-            </Button>
-          </div>
+          <Pagination
+            page={currentPage}
+            pageSize={pageSize}
+            totalItems={filtered.length}
+            itemLabel="órdenes"
+            disabled={loading}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
 
           <p className="mp-updated">
             Importes calculados con el subtotal de las órdenes
