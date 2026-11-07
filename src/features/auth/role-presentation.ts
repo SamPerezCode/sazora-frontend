@@ -1,4 +1,5 @@
 import {
+  Boxes,
   ChefHat,
   ClipboardList,
   Factory,
@@ -34,8 +35,15 @@ export const ROLE_PRESENTATION: Record<RoleCode, RolePresentation> = {
   },
   PRODUCTION: {
     label: "Producción",
-    description: "Procesos de planta, producción y productos terminados.",
+    description:
+      "Procesos de planta, producción y productos terminados.",
     icon: Factory,
+  },
+  INVENTORY_MANAGER: {
+    label: "Inventario",
+    description:
+      "Gestiona existencias, compras, movimientos, transferencias y costos.",
+    icon: Boxes,
   },
   PUBLIC_ORDER_MANAGER: {
     label: "Gestor de pedidos",
@@ -50,5 +58,8 @@ export const ROLE_PRESENTATION: Record<RoleCode, RolePresentation> = {
 };
 
 export const ROLE_LABELS = Object.fromEntries(
-  Object.entries(ROLE_PRESENTATION).map(([code, role]) => [code, role.label])
+  Object.entries(ROLE_PRESENTATION).map(([code, role]) => [
+    code,
+    role.label,
+  ])
 ) as Record<RoleCode, string>;

@@ -5,6 +5,7 @@ export const roleSchema = z.enum([
   "WAITER",
   "KITCHEN",
   "PRODUCTION",
+  "INVENTORY_MANAGER",
   "PUBLIC_ORDER_MANAGER",
   "DELIVERY_DRIVER",
 ]);
