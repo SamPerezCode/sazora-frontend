@@ -1,9 +1,15 @@
 import { createContext } from "react";
-import type { AuthState, LoginRequest } from "../types/auth.types";
+import type {
+  AuthState,
+  LoginRequest,
+  RoleChoice,
+} from "../types/auth.types";
 
 export interface AuthContextValue {
   state: AuthState;
   login: (input: LoginRequest, signal?: AbortSignal) => Promise<void>;
+  selectRole: (choice: RoleChoice) => Promise<void>;
+  cancelRoleSelection: () => void;
   logout: () => void;
   retrySession: () => void;
   refreshSession: () => Promise<void>;

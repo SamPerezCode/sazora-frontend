@@ -245,8 +245,19 @@ export function acquireSessionSocket(credentials: Credentials) {
 
       if (current.refs === 0) {
         current.destroy();
-        entries.delete(key);
+
+        if (entries.get(key) === current) {
+          entries.delete(key);
+        }
       }
     },
   };
+}
+
+export function disconnectSessionSockets(): void {
+  for (const entry of entries.values()) {
+    entry.destroy();
+  }
+
+  entries.clear();
 }

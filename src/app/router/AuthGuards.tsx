@@ -45,39 +45,52 @@ export function SessionBoundary() {
 export function RequireAuth() {
   const { state } = useAuth();
 
-  return state.status === "authenticated" ? (
-    <Outlet />
-  ) : (
-    <Navigate to="/login" replace />
+  if (state.status === "authenticated") {
+    return <Outlet />;
+  }
+
+  return (
+    <Navigate
+      to={
+        state.status === "selecting-role"
+          ? "/seleccionar-rol"
+          : "/login"
+      }
+      replace
+    />
   );
 }
 
 export function GuestOnly() {
   const { state } = useAuth();
 
-  return state.status === "authenticated" ? (
-    <Navigate
-      to={resolveSessionAccess(state.session.authorization).home}
-      replace
-    />
-  ) : (
-    <Outlet />
-  );
+  if (state.status === "selecting-role") {
+    return <Navigate to="/seleccionar-rol" replace />;
+  }
+
+  if (state.status === "authenticated") {
+    return (
+      <Navigate
+        to={resolveSessionAccess(state.session.authorization).home}
+        replace
+      />
+    );
+  }
+
+  return <Outlet />;
 }
 
 export function SessionHome() {
   const { state } = useAuth();
 
-  return (
-    <Navigate
-      to={
-        state.status === "authenticated"
-          ? resolveSessionAccess(state.session.authorization).home
-          : "/login"
-      }
-      replace
-    />
-  );
+  const target =
+    state.status === "authenticated"
+      ? resolveSessionAccess(state.session.authorization).home
+      : state.status === "selecting-role"
+        ? "/seleccionar-rol"
+        : "/login";
+
+  return <Navigate to={target} replace />;
 }
 
 export function RequireAccess() {

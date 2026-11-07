@@ -9,6 +9,26 @@ import type { SalesLocation } from "../services/sales.service";
 
 const selectedLocations = new Map<string, string>();
 
+export function clearSalesLocationSelections(): void {
+  selectedLocations.clear();
+
+  try {
+    const keys: string[] = [];
+
+    for (let index = 0; index < sessionStorage.length; index++) {
+      const key = sessionStorage.key(index);
+
+      if (key?.startsWith("sazora:pos:")) {
+        keys.push(key);
+      }
+    }
+
+    keys.forEach((key) => sessionStorage.removeItem(key));
+  } catch {
+    // La memoria ya quedó limpia.
+  }
+}
+
 function readSelection(key: string): string {
   const cached = selectedLocations.get(key);
 

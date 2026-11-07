@@ -5,7 +5,9 @@ import {
   Factory,
   ShieldCheck,
   Truck,
+  UserRound,
   Utensils,
+  Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { RoleCode } from "./types/auth.types";
@@ -57,9 +59,38 @@ export const ROLE_PRESENTATION: Record<RoleCode, RolePresentation> = {
   },
 };
 
-export const ROLE_LABELS = Object.fromEntries(
+export const ROLE_LABELS: Record<string, string> = Object.fromEntries(
   Object.entries(ROLE_PRESENTATION).map(([code, role]) => [
     code,
     role.label,
   ])
-) as Record<RoleCode, string>;
+);
+
+ROLE_LABELS.CASHIER = "Caja";
+
+export function getRolePresentation(code: string): RolePresentation {
+  if (Object.prototype.hasOwnProperty.call(ROLE_PRESENTATION, code)) {
+    return ROLE_PRESENTATION[code as RoleCode];
+  }
+
+  if (code === "CASHIER") {
+    return {
+      label: "Caja",
+      description: "Pedidos, cobros, aperturas y cierres de caja.",
+      icon: Wallet,
+    };
+  }
+
+  const readable = code
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .toLocaleLowerCase("es-CO");
+
+  return {
+    label:
+      readable.charAt(0).toLocaleUpperCase("es-CO") +
+      readable.slice(1),
+    description: "Acceso según los permisos asignados a este rol.",
+    icon: UserRound,
+  };
+}

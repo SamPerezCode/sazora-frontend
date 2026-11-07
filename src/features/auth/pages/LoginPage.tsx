@@ -2,7 +2,13 @@ import { BrandLogo } from "../../../components/ui/BrandLogo";
 import { ThemeToggleButton } from "../../../components/ui/ThemeToggleButton";
 import { LoginForm } from "../components/LoginForm";
 
+import { Alert } from "../../../components/feedback/Alert";
+import { useAuth } from "../hooks/useAuth";
+
 export function LoginPage() {
+  const { state } = useAuth();
+  const message = state.status === "guest" ? state.message : "";
+
   return (
     <div className="auth-background login-page">
       <header className="login-header">
@@ -45,6 +51,12 @@ export function LoginPage() {
           <p className="login-subtitle">
             Ingresa las credenciales de tu establecimiento
           </p>
+
+          {message && (
+            <div className="mt-5">
+              <Alert>{message}</Alert>
+            </div>
+          )}
 
           <LoginForm />
 

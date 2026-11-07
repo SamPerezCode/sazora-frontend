@@ -1,127 +1,182 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import {
   ApiError,
   subscribeToUnauthorized,
 } from "../../../lib/http/client";
+import { disconnectSessionSockets } from "../../../lib/realtime/session-socket";
+import { clearSalesLocationSelections } from "../../sales/hooks/useSalesLocations";
 import {
   clearStoredSession,
   readStoredSession,
   writeStoredSession,
 } from "../services/auth-storage";
 import {
+  clearPendingRoleSelection,
+  readPendingRoleSelection,
+  writePendingRoleSelection,
+} from "../services/role-selection-storage";
+import {
+  selectSessionRole,
   startSession,
   validateSession,
 } from "../services/auth.service";
+import { loginDataSchema } from "../schemas/auth.schema";
 import type {
   AuthSession,
   AuthState,
+  LoginData,
   LoginRequest,
+  RoleChoice,
 } from "../types/auth.types";
-import { resolveSessionAccess } from "../utils/resolve-session-access";
 import { AuthContext } from "./auth-context";
 
-interface AuthProviderProps {
-  children: ReactNode;
+const EXPIRED_MESSAGE =
+  "La selección de rol venció. Ingresa nuevamente tus credenciales.";
+
+function clearRuntime(): void {
+  disconnectSessionSockets();
+  clearSalesLocationSelections();
 }
 
-// Compara la configuración de acceso.
-// El orden de los roles o ubicaciones no cuenta como un cambio.
-function accessKey(session: AuthSession): string {
-  const { roles, locationAccess } = session.authorization;
+function selectionErrorMessage(error: unknown): string | null {
+  if (!(error instanceof ApiError)) return null;
 
-  return JSON.stringify({
-    roles: [...new Set(roles)].sort(),
-    hasGlobalAccess: locationAccess.hasGlobalAccess,
-    defaultLocationId: locationAccess.defaultLocationId,
-    locations: locationAccess.locations
-      .map((location) => ({
-        id: location.id,
-        code: location.code,
-        name: location.name,
-        locationType: location.locationType,
-        isDefault: location.isDefault,
-        isActive: location.isActive !== false,
-      }))
-      .sort((a, b) => a.id.localeCompare(b.id)),
-  });
+  switch (error.code) {
+    case "INVALID_ROLE_SELECTION_TOKEN":
+      return EXPIRED_MESSAGE;
+
+    case "ROLE_ASSIGNMENTS_CHANGED":
+      return "Tus roles cambiaron. Inicia sesión nuevamente.";
+
+    case "ROLE_NOT_ASSIGNED":
+      return "El rol seleccionado ya no está disponible. Inicia sesión nuevamente.";
+
+    default:
+      return null;
+  }
 }
 
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     status: "checking",
   });
 
-  const [retryCount, setRetryCount] = useState(0);
+  const stateRef = useRef<AuthState>(state);
   const version = useRef(0);
+  const operation = useRef<AbortController | null>(null);
+  const refreshing = useRef<AbortController | null>(null);
 
-  const refreshController = useRef<AbortController | null>(null);
-
+  const [retryCount, setRetryCount] = useState(0);
   const [refreshingSession, setRefreshingSession] = useState(false);
-
   const [sessionRefreshMessage, setSessionRefreshMessage] =
     useState("");
 
-  const logout = useCallback(() => {
-    version.current += 1;
-
-    refreshController.current?.abort();
-    refreshController.current = null;
-
-    setRefreshingSession(false);
-    setSessionRefreshMessage("");
-
-    clearStoredSession();
-    setState({ status: "guest" });
+  const publish = useCallback((next: AuthState) => {
+    stateRef.current = next;
+    setState(next);
   }, []);
 
-  // Restauración inicial y reintento cuando no se pudo
-  // comprobar la sesión.
+  const resetGuest = useCallback(
+    (message?: string) => {
+      version.current += 1;
+
+      operation.current?.abort();
+      operation.current = null;
+
+      refreshing.current?.abort();
+      refreshing.current = null;
+
+      clearStoredSession();
+      clearPendingRoleSelection();
+      clearRuntime();
+
+      setRefreshingSession(false);
+      setSessionRefreshMessage("");
+      publish({ status: "guest", message });
+    },
+    [publish]
+  );
+
+  const logout = useCallback(() => {
+    resetGuest();
+  }, [resetGuest]);
+
+  const cancelRoleSelection = useCallback(() => {
+    resetGuest();
+  }, [resetGuest]);
+
+  const commitSession = useCallback(
+    (session: AuthSession) => {
+      writeStoredSession(session);
+      clearPendingRoleSelection();
+      publish({ status: "authenticated", session });
+    },
+    [publish]
+  );
+
+  useEffect(
+    () =>
+      subscribeToUnauthorized((token) => {
+        if (readStoredSession()?.accessToken === token) {
+          resetGuest("Tu sesión venció. Inicia sesión nuevamente.");
+        }
+      }),
+    [resetGuest]
+  );
+
   useEffect(() => {
     const controller = new AbortController();
-    const currentVersion = version.current;
+    const expectedVersion = version.current;
     const stored = readStoredSession();
 
-    const unsubscribe = subscribeToUnauthorized((token) => {
-      if (readStoredSession()?.accessToken === token) {
-        logout();
-      }
-    });
+    const isCurrent = () =>
+      !controller.signal.aborted &&
+      version.current === expectedVersion;
 
-    const restoration = stored
-      ? validateSession(stored, controller.signal)
-      : Promise.resolve(null);
+    if (!stored) {
+      queueMicrotask(() => {
+        if (!isCurrent()) return;
 
-    void restoration
-      .then((session) => {
-        if (
-          controller.signal.aborted ||
-          version.current !== currentVersion
-        ) {
+        const pending = readPendingRoleSelection();
+
+        if (pending && pending.expiresAt > Date.now()) {
+          publish({ status: "selecting-role", pending });
           return;
         }
 
-        if (session) {
-          writeStoredSession(session);
-          setState({ status: "authenticated", session });
-        } else {
-          setState({ status: "guest" });
-        }
+        clearPendingRoleSelection();
+
+        publish({
+          status: "guest",
+          message: pending ? EXPIRED_MESSAGE : undefined,
+        });
+      });
+
+      return () => controller.abort();
+    }
+
+    clearPendingRoleSelection();
+
+    void validateSession(stored, controller.signal)
+      .then((session) => {
+        if (isCurrent()) commitSession(session);
       })
       .catch((error: unknown) => {
-        if (
-          controller.signal.aborted ||
-          version.current !== currentVersion
-        ) {
-          return;
-        }
+        if (!isCurrent()) return;
 
         if (error instanceof ApiError && error.status === 401) {
-          logout();
+          resetGuest("Tu sesión venció. Inicia sesión nuevamente.");
           return;
         }
 
-        setState({
+        publish({
           status: "unavailable",
           message:
             error instanceof ApiError
@@ -130,161 +185,339 @@ export function AuthProvider({ children }: AuthProviderProps) {
         });
       });
 
-    return () => {
-      controller.abort();
-      unsubscribe();
-    };
-  }, [logout, retryCount]);
+    return () => controller.abort();
+  }, [retryCount, commitSession, publish, resetGuest]);
 
-  // Actualiza la sesión conservando la pantalla visible.
+  useEffect(() => {
+    if (state.status !== "selecting-role") return;
+
+    const pending = state.pending;
+
+    const expire = () => {
+      const current = stateRef.current;
+
+      if (
+        current.status === "selecting-role" &&
+        current.pending.roleSelectionToken ===
+          pending.roleSelectionToken &&
+        Date.now() >= pending.expiresAt
+      ) {
+        resetGuest(EXPIRED_MESSAGE);
+      }
+    };
+
+    const timer = window.setTimeout(
+      expire,
+      Math.max(0, pending.expiresAt - Date.now())
+    );
+
+    window.addEventListener("focus", expire);
+    document.addEventListener("visibilitychange", expire);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("focus", expire);
+      document.removeEventListener("visibilitychange", expire);
+    };
+  }, [state, resetGuest]);
+
+  async function completeIdentity(
+    identity: LoginData,
+    signal: AbortSignal,
+    expectedVersion: number
+  ): Promise<void> {
+    signal.throwIfAborted();
+
+    if (version.current !== expectedVersion) return;
+
+    // Conserva el token definitivo para reintentar GET /auth/session
+    // si la red falla después de completar el login o la selección.
+    writeStoredSession(identity);
+    clearPendingRoleSelection();
+
+    try {
+      const session = await validateSession(identity, signal);
+
+      if (!signal.aborted && version.current === expectedVersion) {
+        commitSession(session);
+      }
+    } catch (error: unknown) {
+      if (signal.aborted || version.current !== expectedVersion) {
+        return;
+      }
+
+      if (error instanceof ApiError && error.status === 401) {
+        resetGuest("Tu sesión venció. Inicia sesión nuevamente.");
+        return;
+      }
+
+      publish({
+        status: "unavailable",
+        message:
+          error instanceof ApiError
+            ? error.message
+            : "No pudimos comprobar tu sesión.",
+      });
+    }
+  }
+
+  async function login(
+    input: LoginRequest,
+    externalSignal?: AbortSignal
+  ): Promise<void> {
+    if (operation.current) {
+      throw new ApiError(
+        409,
+        "REQUEST_PENDING",
+        "Espera a que termine la solicitud."
+      );
+    }
+
+    const controller = new AbortController();
+    const signal = externalSignal
+      ? AbortSignal.any([controller.signal, externalSignal])
+      : controller.signal;
+
+    const expectedVersion = ++version.current;
+    const startedAt = Date.now();
+
+    operation.current = controller;
+    refreshing.current?.abort();
+    refreshing.current = null;
+
+    clearStoredSession();
+    clearPendingRoleSelection();
+    clearRuntime();
+
+    setRefreshingSession(false);
+    setSessionRefreshMessage("");
+
+    try {
+      const result = await startSession(input, signal);
+
+      signal.throwIfAborted();
+
+      if (version.current !== expectedVersion) return;
+
+      if (result.requiresRoleSelection) {
+        const pending = {
+          ...result,
+          expiresAt:
+            startedAt + result.roleSelectionExpiresInSeconds * 1000,
+        };
+
+        if (pending.expiresAt <= Date.now()) {
+          resetGuest(EXPIRED_MESSAGE);
+          return;
+        }
+
+        writePendingRoleSelection(pending);
+        publish({ status: "selecting-role", pending });
+        return;
+      }
+
+      const identity = loginDataSchema.parse({
+        ...result,
+        membership: {
+          ...result.membership,
+          assignedRoles: result.membership.roles,
+        },
+      });
+
+      await completeIdentity(identity, signal, expectedVersion);
+    } finally {
+      if (operation.current === controller) {
+        operation.current = null;
+      }
+    }
+  }
+
+  async function selectRole(choice: RoleChoice): Promise<void> {
+    const current = stateRef.current;
+
+    if (current.status !== "selecting-role") {
+      throw new ApiError(
+        401,
+        "INVALID_ROLE_SELECTION_TOKEN",
+        EXPIRED_MESSAGE
+      );
+    }
+
+    if (operation.current) {
+      throw new ApiError(
+        409,
+        "REQUEST_PENDING",
+        "Espera a que termine la solicitud."
+      );
+    }
+
+    const controller = new AbortController();
+    const expectedVersion = ++version.current;
+    operation.current = controller;
+
+    try {
+      const identity = await selectSessionRole(
+        current.pending,
+        choice,
+        controller.signal
+      );
+
+      controller.signal.throwIfAborted();
+
+      if (version.current !== expectedVersion) return;
+
+      // La selección ya terminó: dejamos de mostrar el formulario
+      // y de aplicar el vencimiento del token temporal.
+      writeStoredSession(identity);
+      clearPendingRoleSelection();
+      publish({ status: "checking" });
+
+      await completeIdentity(
+        identity,
+        controller.signal,
+        expectedVersion
+      );
+    } catch (error: unknown) {
+      if (
+        controller.signal.aborted ||
+        version.current !== expectedVersion
+      ) {
+        return;
+      }
+
+      const message = selectionErrorMessage(error);
+
+      if (message) {
+        resetGuest(message);
+        return;
+      }
+
+      if (Date.now() >= current.pending.expiresAt) {
+        resetGuest(EXPIRED_MESSAGE);
+        return;
+      }
+
+      // Los errores de red mantienen la selección para reintentar.
+      throw error;
+    } finally {
+      if (operation.current === controller) {
+        operation.current = null;
+      }
+    }
+  }
+
   const refreshSession = useCallback(async (): Promise<void> => {
-    if (
-      state.status !== "authenticated" ||
-      refreshController.current
-    ) {
+    const current = stateRef.current;
+
+    if (current.status !== "authenticated" || refreshing.current) {
       return;
     }
 
-    const previous = state.session;
     const controller = new AbortController();
-    const currentVersion = version.current;
+    const expectedVersion = version.current;
+    refreshing.current = controller;
 
-    refreshController.current = controller;
     setRefreshingSession(true);
     setSessionRefreshMessage("");
 
     try {
       const session = await validateSession(
-        previous,
+        current.session,
         controller.signal
       );
 
       if (
         controller.signal.aborted ||
-        version.current !== currentVersion ||
-        readStoredSession()?.accessToken !== previous.accessToken
+        version.current !== expectedVersion
       ) {
         return;
       }
 
-      writeStoredSession(session);
-      setState({ status: "authenticated", session });
-
-      const access = resolveSessionAccess(session.authorization);
-
-      if (access.kind === "blocked") {
-        setSessionRefreshMessage(
-          accessKey(previous) === accessKey(session)
-            ? "Tu configuración todavía no ha cambiado."
-            : "Tu configuración cambió, pero todavía necesita ser corregida por un administrador."
-        );
-      }
-
-      // Si el acceso ya es válido, los guards existentes
-      // redirigen usando la nueva sesión.
+      commitSession(session);
+      setSessionRefreshMessage("Acceso actualizado.");
     } catch (error: unknown) {
       if (
         controller.signal.aborted ||
-        version.current !== currentVersion
+        version.current !== expectedVersion
       ) {
         return;
       }
 
       if (error instanceof ApiError && error.status === 401) {
-        logout();
+        resetGuest("Tu sesión venció. Inicia sesión nuevamente.");
         return;
       }
 
       setSessionRefreshMessage(
         error instanceof ApiError
           ? error.message
-          : "No pudimos comprobar tu acceso. Intenta nuevamente."
+          : "No pudimos actualizar tu acceso."
       );
     } finally {
-      if (refreshController.current === controller) {
-        refreshController.current = null;
+      if (refreshing.current === controller) {
+        refreshing.current = null;
         setRefreshingSession(false);
       }
     }
-  }, [state, logout]);
+  }, [commitSession, resetGuest]);
 
-  const accessToken =
-    state.status === "authenticated"
-      ? state.session.accessToken
-      : null;
+  const authenticated = state.status === "authenticated";
 
-  // Reutiliza la misma actualización al regresar a la pestaña.
   useEffect(() => {
-    if (!accessToken) return;
+    if (!authenticated) return;
 
-    function revalidate(): void {
-      if (!document.hidden) {
-        void refreshSession();
-      }
-    }
+    const revalidate = () => {
+      if (!document.hidden) void refreshSession();
+    };
+
+    const timer = window.setInterval(revalidate, 60_000);
 
     window.addEventListener("focus", revalidate);
     document.addEventListener("visibilitychange", revalidate);
 
-    const timer = window.setInterval(revalidate, 60_000);
-
     return () => {
+      window.clearInterval(timer);
       window.removeEventListener("focus", revalidate);
       document.removeEventListener("visibilitychange", revalidate);
-      window.clearInterval(timer);
     };
-  }, [accessToken, refreshSession]);
+  }, [authenticated, refreshSession]);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       version.current += 1;
-      refreshController.current?.abort();
-      refreshController.current = null;
-    };
-  }, []);
-
-  async function login(
-    input: LoginRequest,
-    signal?: AbortSignal
-  ): Promise<void> {
-    const currentVersion = ++version.current;
-
-    refreshController.current?.abort();
-    refreshController.current = null;
-
-    setRefreshingSession(false);
-    setSessionRefreshMessage("");
-
-    const session = await startSession(input, signal);
-
-    signal?.throwIfAborted();
-
-    if (version.current !== currentVersion) {
-      throw new DOMException("Solicitud cancelada", "AbortError");
-    }
-
-    writeStoredSession(session);
-    setState({ status: "authenticated", session });
-  }
+      operation.current?.abort();
+      refreshing.current?.abort();
+      disconnectSessionSockets();
+    },
+    []
+  );
 
   function retrySession(): void {
     version.current += 1;
-
-    refreshController.current?.abort();
-    refreshController.current = null;
+    operation.current?.abort();
+    operation.current = null;
+    refreshing.current?.abort();
+    refreshing.current = null;
 
     setRefreshingSession(false);
     setSessionRefreshMessage("");
-
-    setState({ status: "checking" });
-    setRetryCount((current) => current + 1);
+    publish({ status: "checking" });
+    setRetryCount((value) => value + 1);
   }
+
+  // Desmonta consultas y estado de pantallas si cambia la autorización.
+  const contentKey =
+    state.status === "authenticated"
+      ? JSON.stringify(state.session.authorization)
+      : state.status;
 
   return (
     <AuthContext.Provider
       value={{
         state,
         login,
+        selectRole,
+        cancelRoleSelection,
         logout,
         retrySession,
         refreshSession,
@@ -292,7 +525,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         sessionRefreshMessage,
       }}
     >
-      {children}
+      <Fragment key={contentKey}>{children}</Fragment>
     </AuthContext.Provider>
   );
 }

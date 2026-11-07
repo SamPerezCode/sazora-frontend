@@ -10,6 +10,7 @@ import { InventoryPage } from "../../features/inventory/pages/InventoryPage";
 import { ConfigurationPage } from "../../features/business/pages/ConfigurationPage";
 import { ReportsPage } from "../../features/reports/ReportsPage";
 import { AppShell } from "../layout/AppShell";
+import { RoleSelectionPage } from "../../features/auth/pages/RoleSelectionPage";
 import {
   GuestOnly,
   RequireAuth,
@@ -25,6 +26,11 @@ export function AppRouter() {
         <Route element={<GuestOnly />}>
           <Route path="/login" element={<LoginPage />} />
         </Route>
+
+        <Route
+          path="/seleccionar-rol"
+          element={<RoleSelectionPage />}
+        />
 
         <Route element={<RequireAuth />}>
           <Route element={<RequireAccess />}>

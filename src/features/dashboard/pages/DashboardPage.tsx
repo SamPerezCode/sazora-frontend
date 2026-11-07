@@ -57,7 +57,7 @@ function WelcomePanel() {
                   key={role}
                   className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-heading"
                 >
-                  {ROLE_LABELS[role]}
+                  {ROLE_LABELS[role] ?? role}
                 </li>
               ))}
             </ul>

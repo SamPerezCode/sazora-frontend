@@ -102,13 +102,13 @@ export function UserMenu({
               aria-label="Roles en este negocio"
             >
               {session.authorization.roles.map((role) => (
-                <li key={role} title={ROLE_LABELS[role]}>
+                <li key={role} title={ROLE_LABELS[role] ?? role}>
                   <ShieldCheck
                     aria-hidden="true"
                     size={12}
                     strokeWidth={1.75}
                   />
-                  {ROLE_LABELS[role]}
+                  {ROLE_LABELS[role] ?? role}
                 </li>
               ))}
             </ul>

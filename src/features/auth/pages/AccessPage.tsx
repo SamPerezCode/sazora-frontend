@@ -168,7 +168,7 @@ export function AccessPage() {
 
           <p className="text-muted">
             {session.roles
-              .map((role) => ROLE_LABELS[role])
+              .map((role) => ROLE_LABELS[role] ?? role)
               .join(" · ")}
           </p>
         </div>
