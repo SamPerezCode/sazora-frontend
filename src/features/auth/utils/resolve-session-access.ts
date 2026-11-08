@@ -1,6 +1,7 @@
 import type { CurrentSession, RoleCode } from "../types/auth.types";
 
 import {
+  canAccessDashboard,
   canAccessKitchenDashboard,
   hasEveryPermission,
   hasPermission,
@@ -142,15 +143,7 @@ export function resolveSessionAccess(
     workspaces.map((workspace) => workspace.path)
   );
 
-  const inventoryOnly =
-    session.roles.length === 1 &&
-    session.roles[0] === "INVENTORY_MANAGER";
-
-  if (
-    !inventoryOnly &&
-    hasPermission(session, "dashboard.read") &&
-    hasLocation(null)
-  ) {
+  if (canAccessDashboard(session)) {
     paths.add("/panel");
   }
 
@@ -172,13 +165,13 @@ export function resolveSessionAccess(
     paths.add("/estadisticas");
   }
 
-  if (access.hasGlobalAccess && paths.has("/panel")) {
+  if (canAccessDashboard(session)) {
     return {
       kind: "global",
       home: "/panel",
-      allowedPaths: [...paths],
+      allowedPaths: [...paths, "/espacios"],
       workspaces,
-      entryWorkspaces: [],
+      entryWorkspaces: workspaces,
       defaultLocation,
       issue: null,
     };

@@ -191,7 +191,7 @@ export function getNavigation(
     }
   }
 
-  if (access.kind === "choose") {
+  if (access.allowedPaths.includes("/espacios")) {
     visible.unshift({
       id: "workspaces",
       label: "Espacios de trabajo",

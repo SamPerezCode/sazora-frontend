@@ -1,10 +1,12 @@
 import { Link, Navigate, useLocation } from "react-router";
-import { MapPin, TriangleAlert } from "lucide-react";
+import { LayoutDashboard, MapPin, TriangleAlert } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { useAuth } from "../hooks/useAuth";
 import { ROLE_LABELS, ROLE_PRESENTATION } from "../role-presentation";
 import { resolveSessionAccess } from "../utils/resolve-session-access";
+
+import { canAccessDashboard } from "../utils/permissions";
 
 const locationLabels = {
   POINT_OF_SALE: "Punto de venta",
@@ -64,7 +66,8 @@ export function AccessPage() {
     (item) => item.path === path
   );
 
-  const choosing = access.kind === "choose" && path === "/espacios";
+  const choosing =
+    path === "/espacios" && access.allowedPaths.includes("/espacios");
 
   const message = access.issue ? messages[access.issue] : null;
 
@@ -176,6 +179,29 @@ export function AccessPage() {
 
       {choosing && (
         <div className="grid gap-3 sm:grid-cols-2">
+          {canAccessDashboard(session) && (
+            <Link
+              to="/panel"
+              className="flex min-w-0 items-start gap-3 rounded-2xl border border-outline p-4 text-heading transition-colors hover:border-accent hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+            >
+              <LayoutDashboard
+                aria-hidden="true"
+                size={22}
+                className="shrink-0 text-accent"
+              />
+
+              <span className="min-w-0">
+                <span className="block font-semibold">
+                  Resumen general
+                </span>
+
+                <span className="mt-1 block text-sm text-muted">
+                  Consultar el resumen del negocio
+                </span>
+              </span>
+            </Link>
+          )}
+
           {access.entryWorkspaces.map((item) => {
             const WorkspaceIcon = ROLE_PRESENTATION[item.role].icon;
 
@@ -209,7 +235,7 @@ export function AccessPage() {
       )}
 
       <div className="flex flex-wrap items-center justify-end gap-3 border-t border-outline pt-4">
-        {access.kind === "choose" && !choosing && (
+        {access.allowedPaths.includes("/espacios") && !choosing && (
           <Link
             to="/espacios"
             className="rounded-xl px-3 py-2 text-sm font-semibold text-heading focus-visible:outline-2 focus-visible:outline-accent"

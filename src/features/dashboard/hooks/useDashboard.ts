@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "../../../lib/http/client";
 import type { AuthSession } from "../../auth/types/auth.types";
+import { canAccessDashboard } from "../../auth/utils/permissions";
 import { getDashboard } from "../services/dashboard.service";
-import { resolveSessionAccess } from "../../auth/utils/resolve-session-access";
 import type {
   DashboardData,
   DashboardResource,
@@ -23,26 +23,19 @@ export function useDashboard(
   const [attempt, setAttempt] = useState(0);
 
   const allowed = Boolean(
-    active &&
-    session &&
-    resolveSessionAccess(session.authorization).allowedPaths.includes(
-      "/panel"
-    )
+    active && session && canAccessDashboard(session)
   );
 
-  const businessId = session?.business.id;
-  const accessToken = session?.accessToken;
-
   const scope = session
-    ? `${session.business.id}:${session.membership.id}`
+    ? `${session.business.id}:${session.membership.id}:${session.accessToken}`
     : "";
 
   useEffect(() => {
-    if (!allowed || !businessId || !accessToken) return;
+    if (!allowed || !session) return;
 
     const controller = new AbortController();
 
-    void getDashboard(accessToken, businessId, controller.signal)
+    void getDashboard(session, controller.signal)
       .then((data) => {
         if (!controller.signal.aborted) {
           setSnapshot({
@@ -78,7 +71,7 @@ export function useDashboard(
       });
 
     return () => controller.abort();
-  }, [allowed, businessId, accessToken, scope, attempt]);
+  }, [allowed, session, scope, attempt]);
 
   const current =
     allowed && snapshot?.scope === scope ? snapshot : null;

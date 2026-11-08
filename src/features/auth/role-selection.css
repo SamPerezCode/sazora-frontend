@@ -205,3 +205,194 @@
     }
   }
 }
+
+@layer components {
+  .login-page.role-selection-page {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .role-selection-page .login-main {
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+    align-content: stretch;
+    align-items: center;
+  }
+
+  /* La tarjeta ocupa el espacio disponible sin desplazar la página. */
+  .role-selection-page .role-selection-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    max-height: min(100%, 48rem);
+    align-self: center;
+    overflow: hidden;
+    scrollbar-gutter: auto;
+  }
+
+  .role-selection-header,
+  .role-selection-page .role-selection-card > .login-help {
+    flex: 0 0 auto;
+  }
+
+  /* El formulario puede encogerse dentro de la tarjeta. */
+  .role-selection-page .role-selection-form {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    min-height: 0;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+  }
+
+  .role-selection-page .role-selection-legend {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  /* Única zona con desplazamiento. */
+  .role-selection-list {
+    display: grid;
+    flex: 1 1 0;
+    grid-auto-rows: max-content;
+    align-content: start;
+    min-width: 0;
+    min-height: 0;
+    gap: 0.625rem;
+    padding: 6px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: var(--sazora-outline) transparent;
+    scroll-padding-block: 6px;
+  }
+
+  .role-selection-list .role-selection-option {
+    scroll-margin-block: 6px;
+  }
+
+  .role-selection-message {
+    flex: 0 0 auto;
+  }
+
+  /* Los botones quedan fuera de la lista desplazable. */
+  .role-selection-actions {
+    display: grid;
+    flex: 0 0 auto;
+    gap: 0.5rem;
+  }
+
+  .role-selection-actions .role-selection-submit {
+    margin-top: 0;
+  }
+
+  .role-selection-actions .role-selection-back {
+    width: 100%;
+  }
+
+  .role-selection-page .role-selection-card > .login-help {
+    margin-top: 0.75rem;
+  }
+
+  /* Personalización de la barra en Chrome, Edge y Safari. */
+  @supports selector(::-webkit-scrollbar) {
+    .role-selection-list {
+      scrollbar-width: auto;
+      scrollbar-color: auto;
+    }
+
+    .role-selection-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .role-selection-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .role-selection-list::-webkit-scrollbar-thumb {
+      border-radius: 999px;
+      background: var(--sazora-outline);
+    }
+
+    .role-selection-list::-webkit-scrollbar-button {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+
+    .role-selection-list::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+  }
+
+  @media (max-width: 63.999rem) {
+    .role-selection-page .login-main {
+      padding-block: 0.75rem;
+    }
+  }
+
+  /* Reduce espacios y coloca los botones juntos en pantallas bajas. */
+  @media (max-height: 38rem) {
+    .login-page.role-selection-page {
+      gap: 0.5rem;
+      padding-block: 0.5rem;
+    }
+
+    .role-selection-page .login-main {
+      padding-block: 0.25rem;
+    }
+
+    .role-selection-page .role-selection-card {
+      --login-card-padding: 0.75rem;
+    }
+
+    .role-selection-page .role-selection-form {
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .role-selection-page .login-title {
+      font-size: 1.5rem;
+    }
+
+    .role-selection-actions {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .role-selection-actions .role-selection-submit,
+    .role-selection-actions .role-selection-back {
+      min-height: 2.75rem;
+    }
+
+    .role-selection-page .role-selection-card > .login-help {
+      margin-top: 0.5rem;
+    }
+  }
+
+  @media (max-height: 30rem) {
+    .role-selection-page .login-intro,
+    .role-selection-page .login-footer {
+      display: none;
+    }
+
+    .role-selection-page .login-brand {
+      width: 2.625rem;
+    }
+
+    .role-selection-page .login-main {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .role-selection-page .role-selection-card {
+      justify-self: center;
+      margin-inline: auto;
+    }
+  }
+}

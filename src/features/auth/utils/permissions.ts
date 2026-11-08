@@ -98,3 +98,7 @@ export function getInitialAssignedLocationId(
 export function canAccessKitchenDashboard(source: Source): boolean {
   return hasPermission(source, "kitchen.dashboard.read");
 }
+
+export function canAccessDashboard(source: Source): boolean {
+  return hasPermission(source, "dashboard.read");
+}

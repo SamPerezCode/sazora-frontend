@@ -117,7 +117,7 @@ function RoleSelectionForm({
   }
 
   return (
-    <div className="auth-background login-page">
+    <div className="auth-background login-page role-selection-page">
       <header className="login-header">
         <div className="login-brand">
           <BrandLogo className="login-brand-image" />
@@ -125,7 +125,6 @@ function RoleSelectionForm({
 
         <ThemeToggleButton />
       </header>
-
       <main className="login-main">
         <section
           aria-labelledby="brand-heading"
@@ -148,33 +147,39 @@ function RoleSelectionForm({
           className="login-card role-selection-card"
           aria-labelledby="role-selection-heading"
         >
-          <h1
-            ref={heading}
-            tabIndex={-1}
-            id="role-selection-heading"
-            className="login-title"
-          >
-            Acceso
-          </h1>
+          <div className="role-selection-header">
+            <h1
+              ref={heading}
+              tabIndex={-1}
+              id="role-selection-heading"
+              className="login-title"
+            >
+              Acceso
+            </h1>
 
-          <p className="login-subtitle">
-            Ingresa las credenciales de tu establecimiento
-          </p>
+            <p className="login-subtitle">
+              Ingresa las credenciales de tu establecimiento
+            </p>
+          </div>
 
           <form
             className="role-selection-form"
             onSubmit={submit}
             aria-busy={submitting}
           >
-            <fieldset
-              disabled={submitting}
-              className="role-selection-options"
+            <div
+              id="role-selection-label"
+              className="role-selection-legend"
             >
-              <legend className="role-selection-legend">
-                <span>Tienes varios roles asignados</span>
-                <span>¿Con cuál deseas iniciar sesión?</span>
-              </legend>
+              <span>Tienes varios roles asignados</span>
+              <span>¿Con cuál deseas iniciar sesión?</span>
+            </div>
 
+            <div
+              className="role-selection-list"
+              role="radiogroup"
+              aria-labelledby="role-selection-label"
+            >
               {options.map((option) => {
                 const Icon = option.icon;
                 const checked = selectedValue === option.value;
@@ -189,6 +194,7 @@ function RoleSelectionForm({
                       name="session-role"
                       value={option.value}
                       checked={checked}
+                      disabled={submitting}
                       onChange={() => {
                         setChoice(option.choice);
                         setMessage("");
@@ -208,30 +214,36 @@ function RoleSelectionForm({
                   </label>
                 );
               })}
-            </fieldset>
+            </div>
 
-            {message && <Alert>{message}</Alert>}
+            {message && (
+              <div className="role-selection-message" role="status">
+                <Alert>{message}</Alert>
+              </div>
+            )}
 
-            <Button
-              type="submit"
-              className="role-selection-submit"
-              loading={submitting}
-              loadingText="Ingresando…"
-              disabled={!validChoice}
-            >
-              Continuar
-              <ArrowRight size={18} aria-hidden="true" />
-            </Button>
+            <div className="role-selection-actions">
+              <Button
+                type="submit"
+                className="role-selection-submit"
+                loading={submitting}
+                loadingText="Ingresando…"
+                disabled={!validChoice}
+              >
+                Continuar
+                <ArrowRight size={18} aria-hidden="true" />
+              </Button>
 
-            <button
-              type="button"
-              className="role-selection-back"
-              disabled={submitting}
-              onClick={cancelRoleSelection}
-            >
-              <ArrowLeft size={16} aria-hidden="true" />
-              Volver
-            </button>
+              <button
+                type="button"
+                className="role-selection-back"
+                disabled={submitting}
+                onClick={cancelRoleSelection}
+              >
+                <ArrowLeft size={16} aria-hidden="true" />
+                Volver
+              </button>
+            </div>
           </form>
 
           <p className="login-help">
@@ -240,7 +252,6 @@ function RoleSelectionForm({
           </p>
         </section>
       </main>
-
       <footer className="login-footer">
         Ventas · Cocina · Inventario · Equipo
       </footer>
