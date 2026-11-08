@@ -3,8 +3,10 @@ import { z } from "zod";
 import type { AuthSession } from "../../auth/types/auth.types";
 import { ApiError } from "../../../lib/http/client";
 import { invalidateInventory } from "../../../lib/inventory-invalidation";
-import { getLocations } from "../../business/services/organization.service";
-
+import {
+  canAccessLocation,
+  hasPermission,
+} from "../../auth/utils/permissions";
 import { baseUnitSchema } from "../schemas/inventory.schema";
 
 import {
@@ -17,7 +19,10 @@ import {
 
 import type { Balance } from "../schemas/inventory-location.schema";
 
-import { inventoryRequest } from "./inventory-location.service";
+import {
+  inventoryRequest,
+  loadInventoryLocations,
+} from "./inventory-location.service";
 import { fixed, multiply, quantity } from "../utils/inventory-value";
 
 const optionalText = (max: number) =>
@@ -124,8 +129,8 @@ export const transferSchema = z.object({
 export type TransferInput = z.output<typeof transferInput>;
 export type Transfer = z.infer<typeof transferSchema>;
 
-function assertAdmin(session: AuthSession) {
-  if (!session.authorization.roles.includes("ADMIN")) {
+function assertTransferAccess(session: AuthSession) {
+  if (!hasPermission(session, "inventory.transfers.create")) {
     throw new ApiError(
       403,
       "FORBIDDEN",
@@ -138,16 +143,9 @@ export async function loadTransferLocations(
   session: AuthSession,
   signal: AbortSignal
 ) {
-  assertAdmin(session);
+  assertTransferAccess(session);
 
-  const locations = await getLocations(session, signal);
-
-  return locations.filter(
-    (location) =>
-      location.businessId === session.business.id &&
-      location.isActive &&
-      location.isInventoryLocation
-  );
+  return loadInventoryLocations(session, signal);
 }
 
 export async function loadTransferBalances(
@@ -155,7 +153,7 @@ export async function loadTransferBalances(
   signal: AbortSignal,
   locationId: string
 ) {
-  assertAdmin(session);
+  assertTransferAccess(session);
 
   if (!locationId) return [];
 
@@ -237,9 +235,19 @@ export async function createTransfer(
   signal: AbortSignal,
   raw: TransferInput
 ) {
-  assertAdmin(session);
-
+  assertTransferAccess(session);
   const body = transferInput.parse(raw);
+
+  if (
+    !canAccessLocation(session, body.sourceLocationId) ||
+    !canAccessLocation(session, body.destinationLocationId)
+  ) {
+    throw new ApiError(
+      403,
+      "LOCATION_ACCESS_DENIED",
+      "Debes tener acceso tanto al origen como al destino."
+    );
+  }
 
   const { transfer } = await inventoryRequest(
     session,

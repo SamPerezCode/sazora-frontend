@@ -9,6 +9,18 @@ import { useSalesLocations } from "../../sales/hooks/useSalesLocations";
 import type { SalesLocation } from "../../sales/services/sales.service";
 import { WORKFLOW_LABELS } from "../../kitchen-flow/kitchen-flow.schema";
 
+import { Navigate } from "react-router";
+
+import {
+  firstAuthorizedModule,
+  resolveSessionAccess,
+} from "../../auth/utils/resolve-session-access";
+
+import {
+  canAccessKitchenDashboard,
+  hasGlobalLocationAccess,
+} from "../../auth/utils/permissions";
+
 import { useKitchen } from "../hooks/useKitchen";
 import { useKitchenSound } from "../hooks/useKitchenSound";
 import { KitchenHeader } from "../components/KitchenHeader";
@@ -33,7 +45,7 @@ function LocationPicker({
   disabled?: boolean;
 }) {
   const fixed =
-    !session.authorization.roles.includes("ADMIN") &&
+    !hasGlobalLocationAccess(session) &&
     locations.options.length === 1 &&
     locations.location;
 
@@ -62,13 +74,17 @@ function LocationPicker({
 export function KitchenPage() {
   const { session } = useAppShell();
 
-  if (
-    !session.authorization.roles.some(
-      (role) =>
-        role === "ADMIN" || role === "KITCHEN" || role === "WAITER"
-    )
-  ) {
-    return <Alert>No tienes acceso a Cocina.</Alert>;
+  if (!canAccessKitchenDashboard(session)) {
+    const access = resolveSessionAccess(session.authorization);
+    const destination = firstAuthorizedModule(access);
+
+    return destination ? (
+      <Navigate to={destination} replace />
+    ) : (
+      <Alert>
+        Acceso denegado. No tienes otro módulo autorizado.
+      </Alert>
+    );
   }
 
   return (

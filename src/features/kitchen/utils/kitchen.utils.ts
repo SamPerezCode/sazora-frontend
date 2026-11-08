@@ -4,6 +4,8 @@ import type {
   KitchenTicket,
 } from "../schemas/kitchen.schema";
 
+import type { CurrentSession } from "../../auth/types/auth.types";
+
 // Umbral visual temporal hasta disponer de configuración del backend.
 export const KITCHEN_DELAY_THRESHOLD_MINUTES = 20;
 export const KITCHEN_POLL_MS = 15_000;
@@ -63,10 +65,25 @@ export function nextTicketStatus(
     : null;
 }
 
-export function kitchenPermissions(roles: readonly string[]) {
+export function kitchenPermissions(
+  session: Pick<CurrentSession, "roles" | "permissions">
+) {
+  const canUpdate = session.permissions.includes(
+    "kitchen.tickets.update"
+  );
+
   return {
-    prepare: roles.includes("ADMIN") || roles.includes("KITCHEN"),
-    deliver: roles.includes("ADMIN") || roles.includes("WAITER"),
+    prepare:
+      canUpdate &&
+      session.roles.some(
+        (role) => role === "ADMIN" || role === "KITCHEN"
+      ),
+
+    deliver:
+      canUpdate &&
+      session.roles.some(
+        (role) => role === "ADMIN" || role === "WAITER"
+      ),
   };
 }
 

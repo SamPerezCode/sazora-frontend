@@ -94,3 +94,7 @@ export function getInitialAssignedLocationId(
     ""
   );
 }
+
+export function canAccessKitchenDashboard(source: Source): boolean {
+  return hasPermission(source, "kitchen.dashboard.read");
+}

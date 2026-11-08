@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { ApiError, request } from "../../../lib/http/client";
 import type { AuthSession } from "../../auth/types/auth.types";
+
+import { hasPermission } from "../../auth/utils/permissions";
+
 import {
   fiscalFormSchema,
   fiscalProfileSchema,
@@ -105,6 +108,14 @@ export async function getLocations(
   signal: AbortSignal,
   filters: { activeOnly?: boolean } = {}
 ) {
+  if (!hasPermission(session, "locations.read")) {
+    throw new ApiError(
+      403,
+      "FORBIDDEN",
+      "No tienes permiso para consultar ubicaciones."
+    );
+  }
+
   const query =
     filters.activeOnly === undefined
       ? ""
@@ -114,14 +125,24 @@ export async function getLocations(
     "/locations" + query,
     locationsResponse,
     {
-      ...options(session, signal),
+      accessToken: session.accessToken,
+      signal,
       cache: "no-store",
     }
   );
 
-  return response.data.locations.map((value) =>
-    verify(value, session)
-  );
+  const access = session.authorization.locationAccess;
+
+  return response.data.locations
+    .map((value) => verify(value, session))
+    .filter(
+      (location) =>
+        access.hasGlobalAccess ||
+        access.locations.some(
+          (assigned) =>
+            assigned.id === location.id && assigned.isActive !== false
+        )
+    );
 }
 
 export async function getLocation(

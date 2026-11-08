@@ -3,6 +3,7 @@ import { ApiError, request } from "../../../lib/http/client";
 import type { AuthSession } from "../../auth/types/auth.types";
 import { productDetailSchema } from "../../products/schemas/product.schema";
 import { getProductDetail } from "../../products/services/product.service";
+import { canConfigureProductInventory } from "../utils/inventory-access";
 import {
   inventoryItemSchema,
   baseUnitSchema,
@@ -60,11 +61,11 @@ const responseSchema = z.object({
 });
 
 function authorize(session: AuthSession) {
-  if (!session.authorization.roles.includes("ADMIN")) {
+  if (!canConfigureProductInventory(session)) {
     throw new ApiError(
       403,
       "FORBIDDEN",
-      "No tienes acceso al inventario."
+      "No tienes permiso para configurar el inventario de este producto."
     );
   }
 }

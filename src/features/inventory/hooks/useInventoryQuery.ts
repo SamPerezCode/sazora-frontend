@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { ApiError } from "../../../lib/http/client";
 import { subscribeInventoryInvalidation } from "../../../lib/inventory-invalidation";
+import { hasPermission } from "../../auth/utils/permissions";
 import type {
   AuthSession,
   RoleCode,
@@ -11,7 +12,7 @@ export function useInventoryQuery<T>(
   key: string,
   load: (session: AuthSession, signal: AbortSignal) => Promise<T>,
   revision = 0,
-  allowedRoles: readonly RoleCode[] = ["ADMIN"]
+  allowedRoles?: readonly RoleCode[]
 ) {
   const { session } = useAppShell();
 
@@ -40,13 +41,16 @@ export function useInventoryQuery<T>(
     session.business.id,
     session.membership.id,
     session.accessToken,
+    session.authorization,
   ]);
 
   const requestKey = JSON.stringify([scope, revision, attempt]);
 
-  const allowed = allowedRoles.some((role) =>
-    session.authorization.roles.includes(role)
-  );
+  const allowed = allowedRoles
+    ? allowedRoles.some((role) =>
+        session.authorization.roles.includes(role)
+      )
+    : hasPermission(session, "inventory.items.read");
 
   useEffect(() => {
     if (!allowed) return;

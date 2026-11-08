@@ -8,6 +8,8 @@ import {
 } from "../schemas/inventory.schema";
 import { getInventoryItems } from "./inventory.service";
 
+import { hasPermission } from "../../auth/utils/permissions";
+
 export const movementLabels = {
   PURCHASE: "Entrada por compra",
   ADJUSTMENT: "Ajuste",
@@ -227,12 +229,16 @@ const linkSchema = z.object({
 
 export type InventoryLink = z.infer<typeof linkSchema>;
 
-function options(session: AuthSession, signal: AbortSignal) {
-  if (!session.authorization.roles.includes("ADMIN")) {
+function options(
+  session: AuthSession,
+  signal: AbortSignal,
+  permission = "inventory.items.read"
+) {
+  if (!hasPermission(session, permission)) {
     throw new ApiError(
       403,
       "FORBIDDEN",
-      "No tienes permiso para administrar inventario."
+      "No tienes permiso para realizar esta operación de inventario."
     );
   }
 
@@ -265,7 +271,7 @@ export async function readItem(
   const response = await request(
     "/inventory-items/" + encodeURIComponent(id),
     itemResponse,
-    options(session, signal)
+    options(session, signal, "inventory.items.manage")
   );
 
   const item = checked(response.data.item, session);
@@ -283,7 +289,7 @@ export async function readItems(
   session: AuthSession,
   signal: AbortSignal
 ) {
-  options(session, signal);
+  options(session, signal, "inventory.items.read");
 
   const items = await getInventoryItems(session.accessToken, signal);
 
@@ -303,7 +309,7 @@ export async function readLinks(
         links: z.array(linkSchema),
       }),
     }),
-    options(session, signal)
+    options(session, signal, "inventory.links.manage")
   );
 
   return response.data.links
@@ -321,7 +327,7 @@ export async function saveItem(
     "/inventory-items/" + encodeURIComponent(id),
     itemResponse,
     {
-      ...options(session, signal),
+      ...options(session, signal, "inventory.items.manage"),
       method: "PATCH",
       body,
     }
@@ -340,7 +346,7 @@ export async function saveStatus(
     "/inventory-items/" + encodeURIComponent(id) + "/status",
     itemResponse,
     {
-      ...options(session, signal),
+      ...options(session, signal, "inventory.items.manage"),
       method: "PATCH",
       body: { isActive },
     }
@@ -358,7 +364,7 @@ export async function saveMovement(
     "/inventory-movements",
     movementResponse,
     {
-      ...options(session, signal),
+      ...options(session, signal, "inventory.movements.create"),
       method: "POST",
       body,
     }

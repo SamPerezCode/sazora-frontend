@@ -7,6 +7,8 @@ import { Pagination } from "../../../components/ui/Pagination";
 import type { AuthSession } from "../../auth/types/auth.types";
 import { useInventoryQuery } from "../hooks/useInventoryQuery";
 import { InventoryMobileCards } from "./InventoryMobileCards";
+import { useAppShell } from "../../../app/layout/shell-context";
+import { canRunInventoryAction } from "../utils/inventory-access";
 
 import {
   loadPurchase,
@@ -39,6 +41,7 @@ export function InventoryLocationPurchases({
   revision: number;
   onCreate: () => void;
 }) {
+  const { session } = useAppShell();
   const today = calendarToday(timezone);
 
   const [from, setFrom] = useState(today.slice(0, 7) + "-01");
@@ -131,12 +134,14 @@ export function InventoryLocationPurchases({
   }
   return (
     <div className="grid min-w-0 gap-5">
-      <div>
-        <Button onClick={onCreate}>
-          <Plus size={16} />
-          Registrar compra
-        </Button>
-      </div>
+      {canRunInventoryAction(session, "purchase") && (
+        <div>
+          <Button onClick={onCreate}>
+            <Plus size={16} />
+            Registrar compra
+          </Button>
+        </div>
+      )}
 
       <div className="grid min-w-0 grid-cols-1 items-end gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:gap-3">
         <div className="min-w-0">

@@ -5,7 +5,10 @@ import { Button } from "../../components/ui/Button";
 import { useAuth } from "../../features/auth/hooks/useAuth";
 import type { ReactNode } from "react";
 import type { RoleCode } from "../../features/auth/types/auth.types";
-import { resolveSessionAccess } from "../../features/auth/utils/resolve-session-access";
+import {
+  firstAuthorizedModule,
+  resolveSessionAccess,
+} from "../../features/auth/utils/resolve-session-access";
 
 export function SessionBoundary() {
   const { state, retrySession, logout } = useAuth();
@@ -94,36 +97,53 @@ export function SessionHome() {
 }
 
 export function RequireAccess() {
-  const { state } = useAuth();
+  const { state, logout } = useAuth();
   const { pathname } = useLocation();
 
   if (state.status !== "authenticated") {
-    return <Navigate to="/login" replace />;
-  }
-
-  const access = resolveSessionAccess(state.session.authorization);
-
-  const path = pathname.replace(/\/+$/, "") || "/";
-
-  if (
-    path === "/estadisticas" &&
-    !state.session.authorization.roles.includes("ADMIN")
-  ) {
     return (
-      <main className="p-6">
-        <Alert>
-          No tienes permisos para consultar estos informes.
-        </Alert>
-      </main>
+      <Navigate
+        to={
+          state.status === "selecting-role"
+            ? "/seleccionar-rol"
+            : "/login"
+        }
+        replace
+      />
     );
   }
 
-  return access.allowedPaths.includes(path) ? (
-    <Outlet />
-  ) : (
-    <Navigate to={access.home} replace />
+  const access = resolveSessionAccess(state.session.authorization);
+  const path = pathname.replace(/\/+$/, "") || "/";
+
+  if (access.allowedPaths.includes(path)) {
+    return <Outlet />;
+  }
+
+  const destination = firstAuthorizedModule(access);
+
+  if (destination) {
+    return <Navigate to={destination} replace />;
+  }
+
+  return (
+    <main className="grid gap-4 p-6">
+      <h1 className="text-xl font-bold text-heading">
+        Acceso denegado
+      </h1>
+
+      <Alert>
+        Tu sesión no tiene permisos para abrir esta pantalla ni otro
+        módulo disponible.
+      </Alert>
+
+      <Button variant="secondary" onClick={logout}>
+        Cerrar sesión
+      </Button>
+    </main>
   );
 }
+
 export function RequireRole({
   role,
   children,

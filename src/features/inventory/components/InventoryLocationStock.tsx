@@ -19,6 +19,10 @@ import type { InventoryWorkspace } from "../services/inventory-location.service"
 import type { ItemAction } from "./InventoryItemLocationDialog";
 import type { Balance } from "../schemas/inventory-location.schema";
 import { useSearchParams } from "react-router";
+
+import { useAppShell } from "../../../app/layout/shell-context";
+import { canRunInventoryAction } from "../utils/inventory-access";
+
 import {
   aggregate,
   canValue,
@@ -54,6 +58,7 @@ export function InventoryLocationStock({
   onAction: (action: ItemAction) => void;
   onMovement: (itemId: string, locationId: string) => void;
 }) {
+  const { session } = useAppShell();
   const [params, setParams] = useSearchParams();
 
   const [attention, setAttention] = useState(
@@ -233,7 +238,9 @@ export function InventoryLocationStock({
                 locationId: selectedLocation,
               }),
           },
-        ]}
+        ].filter((action) =>
+          canRunInventoryAction(session, action.id)
+        )}
       />
     );
   }

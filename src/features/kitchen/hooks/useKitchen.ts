@@ -104,7 +104,7 @@ export function useKitchen(
   const userId = session.user.id;
 
   const { prepare, deliver } = kitchenPermissions(
-    session.authorization.roles
+    session.authorization
   );
 
   useEffect(() => {

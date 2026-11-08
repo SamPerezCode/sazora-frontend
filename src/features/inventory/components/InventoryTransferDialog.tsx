@@ -21,7 +21,7 @@ import {
 import { useAppShell } from "../../../app/layout/shell-context";
 import { BottomSheet } from "../../../components/layout/BottomSheet";
 import { ApiError } from "../../../lib/http/client";
-
+import { canRunInventoryAction } from "../utils/inventory-access";
 import type { AuthSession } from "../../auth/types/auth.types";
 
 import { useInventoryQuery } from "../hooks/useInventoryQuery";
@@ -106,8 +106,7 @@ export function InventoryTransferDialog({
   const { session } = useAppShell();
   const modalId = useId();
 
-  const admin = session.authorization.roles.includes("ADMIN");
-
+  const canTransfer = canRunInventoryAction(session, "transfer");
   const [source, setSource] = useState(initialLocationId);
   const [destination, setDestination] = useState("");
   const [reference, setReference] = useState("");
@@ -262,7 +261,7 @@ export function InventoryTransferDialog({
 
   async function submit() {
     if (
-      !admin ||
+      !canTransfer ||
       sending.current ||
       locked ||
       !confirmed ||
@@ -352,7 +351,7 @@ export function InventoryTransferDialog({
     }
   }
 
-  if (!admin) {
+  if (!canTransfer) {
     return (
       <Notice>
         No tienes permiso para realizar transferencias.

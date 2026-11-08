@@ -38,8 +38,18 @@ import { loadInventoryWorkspace } from "../services/inventory-location.service";
 
 import { InventorySummary } from "../components/InventorySummary";
 
+import { hasGlobalLocationAccess } from "../../auth/utils/permissions";
+
+import {
+  canConfigureProductInventory,
+  canOpenInventoryTab,
+  canOpenInventoryWorkspace,
+  canRunInventoryAction,
+} from "../utils/inventory-access";
+
 export function InventoryLocationPage() {
-  const { session, settings } = useAppShell();
+  const { session } = useAppShell();
+  const globalAccess = hasGlobalLocationAccess(session);
   const [params, setParams] = useSearchParams();
 
   const productId =
@@ -71,8 +81,7 @@ export function InventoryLocationPage() {
       ? selectedTab
       : "stock";
 
-  const locationId = params.get("locationId") ?? "";
-
+  const requestedLocationId = params.get("locationId") ?? "";
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState("");
   const [action, setAction] = useState<ItemAction | null>(null);
@@ -89,6 +98,21 @@ export function InventoryLocationPage() {
     loadInventoryWorkspace,
     revision
   );
+
+  const availableLocations = query.data?.locations ?? [];
+
+  const preferredLocationId =
+    session.authorization.locationAccess.defaultLocationId;
+
+  const initialLocationId =
+    availableLocations.find(
+      (location) => location.id === preferredLocationId
+    )?.id ??
+    availableLocations[0]?.id ??
+    "";
+
+  const locationId =
+    requestedLocationId || (globalAccess ? "" : initialLocationId);
 
   const refresh = () => setRevision((previous) => previous + 1);
 
@@ -146,19 +170,20 @@ export function InventoryLocationPage() {
 
     refresh();
   }
-  if (!session.authorization.roles.includes("ADMIN")) {
+  if (!canOpenInventoryWorkspace(session)) {
     return <Notice>No tienes acceso al inventario.</Notice>;
   }
 
-  if (settings.loading || (!query.data && query.pending)) {
-    return <InventorySkeleton />;
-  }
+  if (!query.data) {
+    if (query.pending) {
+      return <InventorySkeleton />;
+    }
 
-  if (!settings.data || settings.error) {
     return (
       <Notice>
-        {settings.error ?? "No pudimos cargar la configuración."}
-        <Button variant="soft" onClick={settings.retry}>
+        {query.error ?? "No pudimos cargar el inventario."}
+
+        <Button variant="soft" onClick={query.refresh}>
           Reintentar
         </Button>
       </Notice>
@@ -194,10 +219,10 @@ export function InventoryLocationPage() {
       Icon: ClipboardCheck,
       disabled: true,
     },
-  ];
+  ].filter((entry) => canOpenInventoryTab(session, entry.id));
 
-  const currency = settings.data.currencyCode;
-  const timezone = settings.data.timezone;
+  const currency = data.metadata.currencyCode;
+  const timezone = data.metadata.timezone;
 
   return (
     <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 text-heading">
@@ -214,7 +239,18 @@ export function InventoryLocationPage() {
             label="Ubicación"
             value={tab === "reconciliation" ? "" : locationId}
             disabled={query.pending || tab === "reconciliation"}
-            onValueChange={(value) =>
+            onValueChange={(value) => {
+              if (!value && !globalAccess) return;
+
+              if (
+                value &&
+                !data.locations.some(
+                  (location) => location.id === value
+                )
+              ) {
+                return;
+              }
+
               setParams((previous) => {
                 const result = new URLSearchParams(previous);
 
@@ -225,10 +261,12 @@ export function InventoryLocationPage() {
                 }
 
                 return result;
-              })
-            }
+              });
+            }}
             options={[
-              { value: "", label: "Todas las ubicaciones" },
+              ...(globalAccess
+                ? [{ value: "", label: "Todas las ubicaciones" }]
+                : []),
               ...(data?.locations ?? []).map((location) => ({
                 value: location.id,
                 label: location.name + " · " + location.code,
@@ -327,14 +365,16 @@ export function InventoryLocationPage() {
                     Existencias
                   </Button>
 
-                  <Button
-                    variant={consumption ? "soft" : "ghost"}
-                    size="compact"
-                    aria-current={consumption ? "page" : undefined}
-                    onClick={() => openTab("consumption")}
-                  >
-                    Consumo por producto
-                  </Button>
+                  {canOpenInventoryTab(session, "consumption") && (
+                    <Button
+                      variant={consumption ? "soft" : "ghost"}
+                      size="compact"
+                      aria-current={consumption ? "page" : undefined}
+                      onClick={() => openTab("consumption")}
+                    >
+                      Consumo por producto
+                    </Button>
+                  )}
                 </div>
 
                 <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
@@ -366,6 +406,7 @@ export function InventoryLocationPage() {
                   <Button
                     className="order-1 sm:order-2"
                     disabled={
+                      !canRunInventoryAction(session, "create") ||
                       query.pending ||
                       !data.locations.length ||
                       !!query.error
@@ -403,16 +444,24 @@ export function InventoryLocationPage() {
                   data={data}
                   locationId={locationId}
                   currency={currency}
-                  onAction={(action) => {
-                    if (!query.pending && !query.error) {
-                      setAction(action);
+                  onAction={(nextAction) => {
+                    if (
+                      !query.pending &&
+                      !query.error &&
+                      canRunInventoryAction(session, nextAction.kind)
+                    ) {
+                      setAction(nextAction);
                     }
                   }}
-                  onMovement={(itemId, locationId) => {
-                    if (!query.pending && !query.error) {
+                  onMovement={(itemId, targetLocationId) => {
+                    if (
+                      !query.pending &&
+                      !query.error &&
+                      canRunInventoryAction(session, "movement")
+                    ) {
                       setMovement({
                         itemId,
-                        locationId,
+                        locationId: targetLocationId,
                       });
                     }
                   }}
@@ -431,9 +480,10 @@ export function InventoryLocationPage() {
               revision={revision}
               onCreate={() => {
                 if (
+                  canRunInventoryAction(session, "purchase") &&
                   !query.pending &&
                   !query.error &&
-                  data.locations.length
+                  data.locations.length > 0
                 ) {
                   setPurchase(true);
                 }
@@ -451,6 +501,7 @@ export function InventoryLocationPage() {
               timezone={timezone}
               revision={revision}
               canCreate={
+                canRunInventoryAction(session, "movement") &&
                 !query.pending &&
                 !query.error &&
                 data.locations.length > 0
@@ -512,14 +563,15 @@ export function InventoryLocationPage() {
             />
           )}
 
-          {configureProductId && (
-            <ProductInventorySetupDialog
-              key={configureProductId}
-              productId={configureProductId}
-              onClose={finishConfiguration}
-              onResolved={finishConfiguration}
-            />
-          )}
+          {configureProductId &&
+            canConfigureProductInventory(session) && (
+              <ProductInventorySetupDialog
+                key={configureProductId}
+                productId={configureProductId}
+                onClose={finishConfiguration}
+                onResolved={finishConfiguration}
+              />
+            )}
 
           {action && (
             <InventoryItemLocationDialog

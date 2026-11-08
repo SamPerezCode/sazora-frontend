@@ -5,6 +5,7 @@ import type { AuthSession } from "../../auth/types/auth.types";
 import { DateField } from "../../../components/forms/DateField";
 import { Pagination } from "../../../components/ui/Pagination";
 import { InventoryMobileCards } from "./InventoryMobileCards";
+import { canRunInventoryAction } from "../utils/inventory-access";
 
 import { useAppShell } from "../../../app/layout/shell-context";
 import { InventoryTransferDialog } from "./InventoryTransferDialog";
@@ -184,7 +185,8 @@ export function InventoryMovementList({
 
   const [transferring, setTransferring] = useState(false);
 
-  const admin = session.authorization.roles.includes("ADMIN");
+  const canTransfer = canRunInventoryAction(session, "transfer");
+  const canRegister = canRunInventoryAction(session, "movement");
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -291,18 +293,20 @@ export function InventoryMovementList({
   return (
     <div className="grid min-w-0 gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button
-          variant="secondary"
-          disabled={!canCreate}
-          onClick={onCreate}
-        >
-          <Plus size={16} aria-hidden="true" />
-          Registrar movimiento
-        </Button>
-
-        {admin && (
+        {canRegister && (
           <Button
+            variant="secondary"
             disabled={!canCreate}
+            onClick={onCreate}
+          >
+            <Plus size={16} aria-hidden="true" />
+            Registrar movimiento
+          </Button>
+        )}
+
+        {canTransfer && (
+          <Button
+            disabled={query.pending || !!query.error}
             onClick={() => setTransferring(true)}
           >
             <Plus size={16} aria-hidden />
@@ -621,7 +625,7 @@ export function InventoryMovementList({
         </>
       )}
 
-      {transferring && admin && (
+      {transferring && canTransfer && (
         <InventoryTransferDialog
           initialLocationId={locationId}
           currency={currency}

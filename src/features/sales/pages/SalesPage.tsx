@@ -36,6 +36,11 @@ import { SalesHistory } from "../components/SalesHistory";
 import { WORKFLOW_LABELS } from "../../kitchen-flow/kitchen-flow.schema";
 
 import {
+  hasEveryPermission,
+  hasGlobalLocationAccess,
+} from "../../auth/utils/permissions";
+
+import {
   getBoardTables,
   matchesOrder,
   SALES_FILTERS,
@@ -64,7 +69,7 @@ function LocationControl({
   disabled?: boolean;
 }) {
   const { session } = useAppShell();
-  const isAdmin = session.authorization.roles.includes("ADMIN");
+  const globalAccess = hasGlobalLocationAccess(session);
 
   return (
     <div className="mp-location-control">
@@ -72,7 +77,7 @@ function LocationControl({
         <Store size={22} />
       </span>
 
-      {!isAdmin && locations.options.length === 1 && value ? (
+      {!globalAccess && locations.options.length === 1 && value ? (
         <div>
           <small>Punto de venta</small>
           <strong>
@@ -99,9 +104,11 @@ function LocationControl({
 export function SalesPage() {
   const { session } = useAppShell();
 
-  const allowed = session.authorization.roles.some(
-    (role) => role === "ADMIN" || role === "WAITER"
-  );
+  const allowed = hasEveryPermission(session, [
+    "orders.read",
+    "tables.read",
+    "catalog.read",
+  ]);
 
   if (!allowed) {
     return <Alert>No tienes acceso a Mesas y pedidos.</Alert>;

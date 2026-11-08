@@ -6,6 +6,7 @@ import { useAuth } from "../../auth/hooks/useAuth";
 import { getLocations } from "../../business/services/organization.service";
 
 import type { SalesLocation } from "../services/sales.service";
+import { hasGlobalLocationAccess } from "../../auth/utils/permissions";
 
 const selectedLocations = new Map<string, string>();
 
@@ -69,16 +70,13 @@ export function initialSalesLocation(
   session: AuthSession,
   options: SalesLocation[]
 ): string {
-  if (session.authorization.roles.includes("ADMIN")) {
-    return options.length === 1 ? options[0].id : "";
-  }
-
   const preferred =
     session.authorization.locationAccess.defaultLocationId;
 
   return (
     options.find((location) => location.id === preferred)?.id ??
-    (options.length === 1 ? options[0].id : "")
+    options[0]?.id ??
+    ""
   );
 }
 
@@ -106,14 +104,14 @@ export function useSalesLocations(session: AuthSession) {
     error: string;
   } | null>(null);
 
-  const isAdmin = session.authorization.roles.includes("ADMIN");
+  const globalAccess = hasGlobalLocationAccess(session);
 
   useEffect(() => {
     const controller = new AbortController();
 
     const run = async () => {
       try {
-        const available = isAdmin
+        const available = globalAccess
           ? (
               await getLocations(session, controller.signal, {
                 activeOnly: true,
@@ -163,12 +161,12 @@ export function useSalesLocations(session: AuthSession) {
     void run();
 
     return () => controller.abort();
-  }, [session, isAdmin, revision, selectionKey]);
+  }, [session, globalAccess, revision, selectionKey]);
 
   const options =
     snapshot?.revision === revision ? snapshot.options : [];
 
-  const permitted = isAdmin
+  const permitted = globalAccess
     ? options
     : options.filter((option) =>
         assignedSalesLocations(session).some(

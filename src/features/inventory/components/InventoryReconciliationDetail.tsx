@@ -4,6 +4,7 @@ import { CircleAlert } from "lucide-react";
 import type { AuthSession } from "../../auth/types/auth.types";
 import { useInventoryQuery } from "../hooks/useInventoryQuery";
 import { loadItemDetail } from "../services/inventory-location.service";
+import { hasPermission } from "../../auth/utils/permissions";
 
 import { useSearchParams } from "react-router";
 import { useAppShell } from "../../../app/layout/shell-context";
@@ -42,10 +43,13 @@ export function InventoryReconciliationDetail({
   const { session } = useAppShell();
   const [, setParams] = useSearchParams();
 
-  const isAdmin = session.authorization.roles.includes("ADMIN");
+  const canReadKardex = hasPermission(
+    session,
+    "inventory.reports.read"
+  );
 
   function openKardex() {
-    if (!isAdmin) return;
+    if (!canReadKardex) return;
 
     onClose();
 
@@ -177,7 +181,7 @@ export function InventoryReconciliationDetail({
       onClose={onClose}
       footer={
         <>
-          {isAdmin && (
+          {canReadKardex && (
             <Button
               className="min-h-11"
               disabled={query.pending || !!query.error || !item}

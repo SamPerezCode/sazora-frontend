@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ApiError, request } from "../../../lib/http/client";
 import type { AuthSession } from "../../auth/types/auth.types";
 import { productListSchema } from "../../products/schemas/product.schema";
+import { hasPermission } from "../../auth/utils/permissions";
 import {
   baseUnitSchema,
   inventoryItemSchema,
@@ -73,12 +74,16 @@ export type MovementRow = z.infer<typeof summarySchema> & {
   lines?: MovementDetail["lines"];
 };
 
-function options(session: AuthSession, signal: AbortSignal) {
-  if (!session.authorization.roles.includes("ADMIN")) {
+function options(
+  session: AuthSession,
+  signal: AbortSignal,
+  permission: string
+) {
+  if (!hasPermission(session, permission)) {
     throw new ApiError(
       403,
       "FORBIDDEN",
-      "No tienes acceso al inventario."
+      "No tienes permiso para realizar esta operación."
     );
   }
 
@@ -87,7 +92,6 @@ function options(session: AuthSession, signal: AbortSignal) {
     signal,
   };
 }
-
 function checked<T extends { businessId: string }>(
   value: T,
   session: AuthSession
@@ -117,7 +121,7 @@ export async function createItem(
       }),
     }),
     {
-      ...options(session, signal),
+      ...options(session, signal, "inventory.items.manage"),
       method: "POST",
       body: newItemSchema.parse(draft),
     }
@@ -138,7 +142,7 @@ export async function loadMovements(
         movements: z.array(summarySchema),
       }),
     }),
-    options(session, signal)
+    options(session, signal, "inventory.movements.read")
   );
 
   return response.data.movements.map((row) => checked(row, session));
@@ -157,7 +161,7 @@ export async function loadMovement(
         movement: detailSchema,
       }),
     }),
-    options(session, signal)
+    options(session, signal, "inventory.movements.read")
   );
 
   const movement = checked(response.data.movement, session);
@@ -233,7 +237,7 @@ export async function loadLinks(
         links: z.array(linkSchema),
       }),
     }),
-    options(session, signal)
+    options(session, signal, "inventory.links.manage")
   );
 
   return response.data.links.map((link) => checked(link, session));
@@ -246,7 +250,7 @@ export async function loadProducts(
   const first = await request(
     "/products",
     productListSchema,
-    options(session, signal)
+    options(session, signal, "catalog.read")
   );
 
   const products = [...first.data.products];
@@ -261,7 +265,7 @@ export async function loadProducts(
       const response = await request(
         "/products?page=" + page + "&pageSize=" + pagination.pageSize,
         productListSchema,
-        options(session, signal)
+        options(session, signal, "catalog.read")
       );
 
       products.push(...response.data.products);
@@ -296,7 +300,7 @@ export async function saveLink(
       }),
     }),
     {
-      ...options(session, signal),
+      ...options(session, signal, "inventory.links.manage"),
       method: id ? "PATCH" : "POST",
       body: id
         ? {
@@ -325,7 +329,7 @@ export async function setLinkStatus(
       }),
     }),
     {
-      ...options(session, signal),
+      ...options(session, signal, "inventory.links.manage"),
       method: "PATCH",
       body: { isActive },
     }

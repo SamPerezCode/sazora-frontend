@@ -25,7 +25,7 @@ const messages = {
   incompatible: {
     title: "Configuración de acceso incompatible",
     description:
-      "Tus roles y tu ubicación predeterminada no permiten abrir un espacio de trabajo. Solicita a un administrador que revise tu configuración.",
+      "Tus permisos y ubicaciones asignadas no permiten abrir un espacio de trabajo disponible. Solicita a un administrador que revise tu configuración.",
   },
 };
 
@@ -95,7 +95,7 @@ export function AccessPage() {
         <p className="text-sm leading-relaxed text-muted">
           {message?.description ??
             (choosing
-              ? "Selecciona el módulo al que deseas entrar. Todos utilizan tu ubicación predeterminada."
+              ? "Selecciona el módulo al que deseas entrar. Cada módulo utiliza las ubicaciones compatibles que tienes autorizadas."
               : `Tienes acceso a ${workspace?.label}. El módulo operativo todavía se está preparando.`)}
         </p>
       </div>

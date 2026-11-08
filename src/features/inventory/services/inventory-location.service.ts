@@ -20,6 +20,12 @@ import {
 } from "../schemas/inventory-location.schema";
 import type { PurchaseRow } from "../schemas/inventory-location.schema";
 
+import {
+  canAccessLocation,
+  hasGlobalLocationAccess,
+  hasPermission,
+} from "../../auth/utils/permissions";
+
 export async function inventoryRequest<T>(
   session: AuthSession,
   path: string,
@@ -28,11 +34,144 @@ export async function inventoryRequest<T>(
   method: "GET" | "POST" | "PATCH" | "PUT" = "GET",
   body?: unknown
 ): Promise<T> {
-  if (!session.authorization.roles.includes("ADMIN")) {
+  const [pathname, search = ""] = path.split("?");
+  const params = new URLSearchParams(search);
+  const reading = method === "GET";
+
+  let permission: string | null = null;
+
+  if (pathname === "/inventory-reports/reconciliation") {
+    permission = "inventory.reconciliation.read";
+
+    if (!hasGlobalLocationAccess(session)) {
+      throw new ApiError(
+        403,
+        "FORBIDDEN",
+        "La auditoría de inventario requiere acceso global."
+      );
+    }
+  } else if (pathname.startsWith("/inventory-reports/")) {
+    permission = "inventory.reports.read";
+
+    if (
+      !hasGlobalLocationAccess(session) &&
+      !params.get("locationId")
+    ) {
+      throw new ApiError(
+        403,
+        "LOCATION_ACCESS_DENIED",
+        "Selecciona una ubicación autorizada para consultar el informe."
+      );
+    }
+  } else if (pathname === "/inventory-items/location-balances") {
+    permission = "inventory.balances.read";
+
+    if (
+      !hasGlobalLocationAccess(session) &&
+      !params.get("locationId")
+    ) {
+      throw new ApiError(
+        403,
+        "LOCATION_ACCESS_DENIED",
+        "Selecciona una ubicación autorizada."
+      );
+    }
+  } else if (
+    /^\/inventory-items\/[^/]+\/locations\/[^/]+\/valuation$/.test(
+      pathname
+    )
+  ) {
+    permission = "inventory.valuation.manage";
+  } else if (
+    /^\/inventory-items\/[^/]+\/purchase-presentations$/.test(
+      pathname
+    )
+  ) {
+    permission = reading
+      ? "inventory.purchases.read"
+      : "inventory.purchases.create";
+  } else if (
+    pathname === "/inventory-items" ||
+    pathname.startsWith("/inventory-items/")
+  ) {
+    permission =
+      reading && pathname === "/inventory-items"
+        ? "inventory.items.read"
+        : "inventory.items.manage";
+  } else if (pathname === "/inventory-movements/transfers") {
+    permission = "inventory.transfers.create";
+  } else if (
+    pathname === "/inventory-movements/purchases" ||
+    pathname.startsWith("/inventory-movements/purchases/")
+  ) {
+    permission = reading
+      ? "inventory.purchases.read"
+      : "inventory.purchases.create";
+  } else if (
+    pathname === "/inventory-movements" ||
+    pathname.startsWith("/inventory-movements/")
+  ) {
+    permission = reading
+      ? "inventory.movements.read"
+      : "inventory.movements.create";
+  } else if (
+    pathname === "/production" ||
+    pathname.startsWith("/production/")
+  ) {
+    permission = reading
+      ? "production.reports.read"
+      : "production.quick.create";
+  }
+
+  if (!permission || !hasPermission(session, permission)) {
     throw new ApiError(
       403,
       "FORBIDDEN",
-      "No tienes permiso para gestionar inventario."
+      "No tienes permiso para realizar esta operación."
+    );
+  }
+
+  const locationIds: string[] = [];
+
+  const requestedLocation = params.get("locationId");
+
+  if (requestedLocation) {
+    locationIds.push(requestedLocation);
+  }
+
+  const valuationLocation = pathname.match(
+    /^\/inventory-items\/[^/]+\/locations\/([^/]+)\/valuation$/
+  )?.[1];
+
+  if (valuationLocation) {
+    locationIds.push(decodeURIComponent(valuationLocation));
+  }
+
+  if (body && typeof body === "object") {
+    for (const key of [
+      "locationId",
+      "sourceLocationId",
+      "destinationLocationId",
+    ]) {
+      if (key in body) {
+        const value = (body as Record<string, unknown>)[key];
+
+        if (typeof value === "string" && value) {
+          locationIds.push(value);
+        }
+      }
+    }
+  }
+
+  if (
+    locationIds.some(
+      (locationId) => !canAccessLocation(session, locationId)
+    )
+  ) {
+    throw new ApiError(
+      403,
+      "LOCATION_ACCESS_DENIED",
+      "La operación contiene una ubicación que no tienes autorizada."
     );
   }
 
@@ -54,27 +193,143 @@ export async function inventoryRequest<T>(
   return result.data;
 }
 
-export async function loadInventoryWorkspace(
+export async function loadInventoryLocations(
   session: AuthSession,
   signal: AbortSignal
 ) {
-  const [items, locations, result] = await Promise.all([
-    readItems(session, signal),
-    getLocations(session, signal),
-    inventoryRequest(
+  const locations = await getLocations(session, signal);
+
+  return locations.filter(
+    (location) =>
+      location.businessId === session.business.id &&
+      location.isActive &&
+      location.isInventoryLocation &&
+      canAccessLocation(session, location.id)
+  );
+}
+
+async function readAccessibleBalances(
+  session: AuthSession,
+  signal: AbortSignal,
+  locations?: Awaited<ReturnType<typeof loadInventoryLocations>>
+) {
+  if (hasGlobalLocationAccess(session)) {
+    const result = await inventoryRequest(
       session,
       "/inventory-items/location-balances",
       balancesSchema,
       signal
-    ),
+    );
+
+    return result.balances;
+  }
+
+  const available =
+    locations ?? (await loadInventoryLocations(session, signal));
+
+  const results = await Promise.all(
+    available.map(async (location) => {
+      const result = await inventoryRequest(
+        session,
+        "/inventory-items/location-balances?locationId=" +
+          encodeURIComponent(location.id),
+        balancesSchema,
+        signal
+      );
+
+      if (
+        result.scope.type !== "LOCATION" ||
+        result.scope.location.id !== location.id ||
+        result.balances.some(
+          (balance) => balance.location.id !== location.id
+        )
+      ) {
+        throw new ApiError(
+          502,
+          "INVALID_RESPONSE",
+          "Los saldos no corresponden a la ubicación consultada."
+        );
+      }
+
+      return result.balances;
+    })
+  );
+
+  return results.flat();
+}
+
+export async function loadInventoryWorkspace(
+  session: AuthSession,
+  signal: AbortSignal
+) {
+  const [items, locations] = await Promise.all([
+    readItems(session, signal),
+    loadInventoryLocations(session, signal),
+  ]);
+
+  const preferred =
+    session.authorization.locationAccess.defaultLocationId;
+
+  const initialLocationId =
+    locations.find((location) => location.id === preferred)?.id ??
+    locations[0]?.id ??
+    "";
+
+  if (!hasGlobalLocationAccess(session) && !initialLocationId) {
+    throw new ApiError(
+      403,
+      "LOCATION_ACCESS_DENIED",
+      "No tienes una ubicación activa habilitada para inventario."
+    );
+  }
+
+  const loadMetadata = async () => {
+    const response = await request(
+      "/auth/context",
+      z.object({
+        status: z.literal("success"),
+        data: z.object({
+          context: z.object({
+            businessId: z.string().min(1),
+            currencyCode: z.string().regex(/^[A-Z]{3}$/),
+            timezone: z.string().trim().min(1),
+          }),
+        }),
+      }),
+      {
+        method: "GET",
+        accessToken: session.accessToken,
+        signal,
+        cache: "no-store",
+      }
+    );
+
+    const context = response.data.context;
+
+    if (context.businessId !== session.business.id) {
+      throw new ApiError(
+        502,
+        "INVALID_RESPONSE",
+        "El contexto recibido no corresponde al negocio actual."
+      );
+    }
+
+    return {
+      currencyCode: context.currencyCode,
+      timezone: context.timezone,
+    };
+  };
+
+  const [balances, metadata] = await Promise.all([
+    readAccessibleBalances(session, signal, locations),
+    loadMetadata(),
   ]);
 
   return {
     items,
-    locations: locations.filter(
-      (location) => location.isActive && location.isInventoryLocation
-    ),
-    balances: result.balances,
+    locations,
+    balances,
+    metadata,
   };
 }
 
@@ -156,21 +411,16 @@ export async function loadItemDetail(
   signal: AbortSignal,
   itemId: string
 ) {
-  const [item, presentations, result] = await Promise.all([
+  const [item, presentations, balances] = await Promise.all([
     readItem(itemId, session, signal),
     loadPresentations(session, signal, itemId),
-    inventoryRequest(
-      session,
-      "/inventory-items/location-balances",
-      balancesSchema,
-      signal
-    ),
+    readAccessibleBalances(session, signal),
   ]);
 
   return {
     item,
     presentations,
-    balances: result.balances.filter(
+    balances: balances.filter(
       (balance) => balance.inventoryItemId === itemId
     ),
   };

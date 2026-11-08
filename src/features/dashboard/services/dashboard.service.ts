@@ -5,16 +5,19 @@ import type { DashboardData } from "../types/dashboard.types";
 export async function getDashboard(
   accessToken: string,
   businessId: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  locationId = ""
 ): Promise<DashboardData> {
-  const response = await request(
-    "/dashboard",
-    dashboardResponseSchema,
-    {
-      accessToken,
-      signal,
-    }
-  );
+  const path =
+    "/dashboard" +
+    (locationId
+      ? "?locationId=" + encodeURIComponent(locationId)
+      : "");
+
+  const response = await request(path, dashboardResponseSchema, {
+    accessToken,
+    signal,
+  });
 
   if (response.data.business.id !== businessId) {
     throw new ApiError(

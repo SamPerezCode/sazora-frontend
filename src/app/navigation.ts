@@ -76,7 +76,7 @@ const navigation: readonly NavigationItem[] = [
     label: "Cocina",
     description: "Comandas y áreas de preparación.",
     icon: Flame,
-    roles: ["ADMIN", "KITCHEN", "WAITER"],
+    roles: null,
     group: "main",
     status: "ready",
     to: "/cocina",
