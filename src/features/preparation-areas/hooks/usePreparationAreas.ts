@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../../auth/hooks/useAuth";
 import type { AuthSession } from "../../auth/types/auth.types";
-import { resolveSessionAccess } from "../../auth/utils/resolve-session-access";
+import { getSessionDestination } from "../../auth/services/session-navigation";
 import { getLocations } from "../../business/services/organization.service";
 import { useTimedMessage } from "../../../hooks/useTimedMessage";
 import { ApiError } from "../../../lib/http/client";
@@ -72,16 +72,13 @@ export function usePreparationAreas(session: AuthSession) {
         }
 
         if (error.code === "FORBIDDEN") {
-          void navigate(
-            resolveSessionAccess(session.authorization).home,
-            {
-              replace: true,
-              state: {
-                accessNotice:
-                  "No tienes permisos para administrar las áreas de preparación.",
-              },
-            }
-          );
+          void navigate(getSessionDestination(session), {
+            replace: true,
+            state: {
+              accessNotice:
+                "No tienes permisos para administrar las áreas de preparación.",
+            },
+          });
         }
 
         return true;
@@ -112,14 +109,7 @@ export function usePreparationAreas(session: AuthSession) {
 
       return false;
     },
-    [
-      logout,
-      navigate,
-      refreshSession,
-      retry,
-      session.authorization,
-      setNotice,
-    ]
+    [logout, navigate, refreshSession, retry, session, setNotice]
   );
 
   useEffect(() => {

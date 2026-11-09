@@ -11,10 +11,7 @@ import { WORKFLOW_LABELS } from "../../kitchen-flow/kitchen-flow.schema";
 
 import { Navigate } from "react-router";
 
-import {
-  firstAuthorizedModule,
-  resolveSessionAccess,
-} from "../../auth/utils/resolve-session-access";
+import { getSessionDestination } from "../../auth/services/session-navigation";
 
 import {
   canAccessKitchenDashboard,
@@ -75,16 +72,7 @@ export function KitchenPage() {
   const { session } = useAppShell();
 
   if (!canAccessKitchenDashboard(session)) {
-    const access = resolveSessionAccess(session.authorization);
-    const destination = firstAuthorizedModule(access);
-
-    return destination ? (
-      <Navigate to={destination} replace />
-    ) : (
-      <Alert>
-        Acceso denegado. No tienes otro módulo autorizado.
-      </Alert>
-    );
+    return <Navigate to={getSessionDestination(session)} replace />;
   }
 
   return (

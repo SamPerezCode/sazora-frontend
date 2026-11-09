@@ -55,13 +55,6 @@ export function AppRouter() {
               />
 
               <Route path="/acceso" element={<AccessPage />} />
-              <Route path="/espacios" element={<AccessPage />} />
-              <Route path="/produccion" element={<AccessPage />} />
-              <Route
-                path="/pedidos-publicos"
-                element={<AccessPage />}
-              />
-              <Route path="/domicilios" element={<AccessPage />} />
             </Route>
           </Route>
         </Route>

@@ -37,6 +37,11 @@ import type {
 } from "../types/auth.types";
 import { AuthContext } from "./auth-context";
 
+import {
+  clearLastModule,
+  syncNavigationContext,
+} from "../services/session-navigation";
+
 const EXPIRED_MESSAGE =
   "La selección de rol venció. Ingresa nuevamente tus credenciales.";
 
@@ -114,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const commitSession = useCallback(
     (session: AuthSession) => {
+      syncNavigationContext(session);
       writeStoredSession(session);
       clearPendingRoleSelection();
       publish({ status: "authenticated", session });
@@ -141,6 +147,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       version.current === expectedVersion;
 
     if (!stored) {
+      clearLastModule();
+
       queueMicrotask(() => {
         if (!isCurrent()) return;
 
@@ -368,6 +376,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // La selección ya terminó: dejamos de mostrar el formulario
       // y de aplicar el vencimiento del token temporal.
+      clearLastModule();
       writeStoredSession(identity);
       clearPendingRoleSelection();
       publish({ status: "checking" });

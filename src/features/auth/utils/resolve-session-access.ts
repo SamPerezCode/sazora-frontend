@@ -1,237 +1,187 @@
-import type { CurrentSession, RoleCode } from "../types/auth.types";
+import type { CurrentSession } from "../types/auth.types";
+import { hasPermission } from "./permissions";
 
-import {
-  canAccessDashboard,
-  canAccessKitchenDashboard,
-  hasEveryPermission,
-  hasPermission,
-} from "./permissions";
-
-import {
-  canOpenInventoryWorkspace,
-  canOpenProduction,
-} from "../../inventory/utils/inventory-access";
-
-type SessionLocation =
-  CurrentSession["locationAccess"]["locations"][number];
-
-export interface Workspace {
+interface ModuleDefinition {
   id: string;
-  role: Exclude<RoleCode, "ADMIN">;
   label: string;
   path: string;
-  locationType: SessionLocation["locationType"] | null;
-  pending: boolean;
+  permission: string;
+  available: boolean;
 }
 
-type AccessIssue = "no-locations" | "no-default" | "incompatible";
+const modules: readonly ModuleDefinition[] = [
+  {
+    id: "panel",
+    label: "Resumen general",
+    path: "/panel",
+    permission: "dashboard.read",
+    available: true,
+  },
+  {
+    id: "sales",
+    label: "Mesas y pedidos",
+    path: "/ventas",
+    permission: "orders.read",
+    available: true,
+  },
+  {
+    id: "kitchen",
+    label: "Cocina",
+    path: "/cocina",
+    permission: "kitchen.dashboard.read",
+    available: true,
+  },
+  {
+    id: "inventory",
+    label: "Inventario",
+    path: "/inventario",
+    permission: "inventory.balances.read",
+    available: true,
+  },
+  {
+    id: "production",
+    label: "Producción",
+    path: "/inventario",
+    permission: "production.orders.read",
+    available: true,
+  },
+  {
+    id: "public-orders",
+    label: "Pedidos públicos",
+    path: "/pedidos-publicos",
+    permission: "public_orders.read",
+    available: false,
+  },
+  {
+    id: "deliveries",
+    label: "Domicilios",
+    path: "/domicilios",
+    permission: "deliveries.read",
+    available: false,
+  },
+  {
+    id: "statistics",
+    label: "Dashboard e informes",
+    path: "/estadisticas",
+    permission: "sales.reports.read",
+    available: true,
+  },
+  {
+    id: "products",
+    label: "Productos",
+    path: "/productos",
+    permission: "catalog.manage",
+    available: true,
+  },
+  {
+    id: "settings",
+    label: "Configuración",
+    path: "/configuracion",
+    permission: "business.settings.read",
+    available: true,
+  },
+];
 
-export interface AccessResolution {
-  kind: "global" | "blocked" | "single" | "choose";
-  home: string;
-  allowedPaths: readonly string[];
-  workspaces: readonly Workspace[];
-  entryWorkspaces: readonly Workspace[];
-  defaultLocation: SessionLocation | null;
-  issue: AccessIssue | null;
+function authorizedModules(session: CurrentSession) {
+  return modules.filter(
+    (module) =>
+      module.available && hasPermission(session, module.permission)
+  );
+}
+
+export function authorizedModulePath(
+  session: CurrentSession,
+  target: string | null
+): string | null {
+  if (!target) return null;
+
+  const [pathname = "", query = ""] = target.split("?");
+  const path = pathname.replace(/\/+$/, "") || "/";
+  const available = authorizedModules(session);
+
+  if (path === "/inventario") {
+    const inventory = available.some(
+      (module) => module.id === "inventory"
+    );
+
+    const production = available.some(
+      (module) => module.id === "production"
+    );
+
+    if (new URLSearchParams(query).get("tab") === "production") {
+      return production ? "/inventario?tab=production" : null;
+    }
+
+    return inventory ? "/inventario" : null;
+  }
+
+  const canonical =
+    path === "/mi-negocio"
+      ? "/configuracion"
+      : path === "/productos/categorias"
+        ? "/productos"
+        : path;
+
+  return available.some((module) => module.path === canonical)
+    ? canonical
+    : null;
 }
 
 export function resolveSessionAccess(
-  session: CurrentSession
-): AccessResolution {
-  const access = session.locationAccess;
+  session: CurrentSession,
+  lastModule: string | null = null
+) {
+  const available = authorizedModules(session);
+  const paths = new Set(available.map((module) => module.path));
 
-  const locations = access.locations.filter(
-    (location) => location.isActive !== false
-  );
-
-  const defaultLocation =
-    locations.find(
-      (location) => location.id === access.defaultLocationId
-    ) ?? null;
-
-  const hasLocation = (
-    type: SessionLocation["locationType"] | null
-  ): boolean =>
-    access.hasGlobalAccess ||
-    locations.some(
-      (location) => type === null || location.locationType === type
-    );
-
-  const workspaces: Workspace[] = [];
-
-  const canReadSales = hasEveryPermission(session, [
-    "orders.read",
-    "tables.read",
-    "catalog.read",
-  ]);
-
-  if (canReadSales && hasLocation("POINT_OF_SALE")) {
-    workspaces.push({
-      id: "sales",
-      role: "WAITER",
-      label: "Mesas y pedidos",
-      path: "/ventas",
-      locationType: "POINT_OF_SALE",
-      pending: false,
-    });
-  }
-
-  if (canAccessKitchenDashboard(session)) {
-    workspaces.push({
-      id: "kitchen",
-      role: "KITCHEN",
-      label: "Cocina",
-      path: "/cocina",
-      locationType: "POINT_OF_SALE",
-      pending: false,
-    });
-  }
-
-  const inventory = canOpenInventoryWorkspace(session);
-  const production = canOpenProduction(session);
-
-  if (inventory && hasLocation(null)) {
-    workspaces.push({
-      id: "inventory",
-      role: "INVENTORY_MANAGER",
-      label: "Inventario",
-      path: "/inventario",
-      locationType: null,
-      pending: false,
-    });
-  } else if (production && hasLocation("PRODUCTION_WAREHOUSE")) {
-    workspaces.push({
-      id: "production",
-      role: "PRODUCTION",
-      label: "Producción",
-      path: "/inventario",
-      locationType: "PRODUCTION_WAREHOUSE",
-      pending: false,
-    });
-  }
-
-  if (
-    hasPermission(session, "public_orders.read") &&
-    hasLocation("POINT_OF_SALE")
-  ) {
-    workspaces.push({
-      id: "public-orders",
-      role: "PUBLIC_ORDER_MANAGER",
-      label: "Pedidos públicos",
-      path: "/pedidos-publicos",
-      locationType: "POINT_OF_SALE",
-      pending: true,
-    });
-  }
-
-  if (
-    hasPermission(session, "deliveries.read") &&
-    hasLocation("POINT_OF_SALE")
-  ) {
-    workspaces.push({
-      id: "deliveries",
-      role: "DELIVERY_DRIVER",
-      label: "Domicilios",
-      path: "/domicilios",
-      locationType: "POINT_OF_SALE",
-      pending: true,
-    });
-  }
-
-  const paths = new Set(
-    workspaces.map((workspace) => workspace.path)
-  );
-
-  if (canAccessDashboard(session)) {
-    paths.add("/panel");
-  }
-
-  if (hasPermission(session, "business.settings.read")) {
-    paths.add("/configuracion");
-    paths.add("/mi-negocio");
-  }
-
-  // Estas son las pantallas existentes de administración del catálogo.
-  if (hasPermission(session, "catalog.manage")) {
-    paths.add("/productos");
+  if (paths.has("/productos")) {
     paths.add("/productos/categorias");
   }
 
-  if (
-    hasPermission(session, "sales.reports.read") &&
-    hasLocation(null)
-  ) {
-    paths.add("/estadisticas");
+  if (paths.has("/configuracion")) {
+    paths.add("/mi-negocio");
   }
 
-  if (canAccessDashboard(session)) {
-    return {
-      kind: "global",
-      home: "/panel",
-      allowedPaths: [...paths, "/espacios"],
-      workspaces,
-      entryWorkspaces: workspaces,
-      defaultLocation,
-      issue: null,
-    };
+  const initial = available[0];
+
+  const initialPath =
+    initial?.id === "production"
+      ? "/inventario?tab=production"
+      : (initial?.path ?? null);
+
+  const home =
+    authorizedModulePath(session, lastModule) ??
+    authorizedModulePath(session, initialPath) ??
+    "/acceso";
+
+  if (home === "/acceso") {
+    paths.add("/acceso");
   }
 
-  const ready = workspaces.filter((workspace) => !workspace.pending);
+  const workspaces = available.filter(
+    (module, index) =>
+      ["sales", "kitchen", "inventory", "production"].includes(
+        module.id
+      ) &&
+      available.findIndex((item) => item.path === module.path) ===
+        index
+  );
 
-  let entries = ready.length ? ready : workspaces;
-
-  // Mesas y pedidos es la entrada principal cuando está disponible.
-  // Cocina continúa accesible desde el menú.
-  if (entries.some((workspace) => workspace.id === "sales")) {
-    entries = entries.filter(
-      (workspace) => workspace.id !== "kitchen"
-    );
-  }
-
-  const choose = entries.length > 1;
-
-  if (choose) {
-    paths.add("/espacios");
-  }
-
-  const home = choose
-    ? "/espacios"
-    : (entries[0]?.path ?? [...paths][0]);
-
-  if (!home) {
-    return {
-      kind: "blocked",
-      home: "/acceso",
-      allowedPaths: ["/acceso"],
-      workspaces: [],
-      entryWorkspaces: [],
-      defaultLocation,
-      issue:
-        !access.hasGlobalAccess && locations.length === 0
-          ? "no-locations"
-          : "incompatible",
-    };
-  }
+  const defaultLocation =
+    session.locationAccess.locations.find(
+      (location) =>
+        location.id === session.locationAccess.defaultLocationId &&
+        location.isActive !== false
+    ) ?? null;
 
   return {
-    kind: choose ? "choose" : "single",
     home,
     allowedPaths: [...paths],
     workspaces,
-    entryWorkspaces: entries,
     defaultLocation,
-    issue: null,
   };
 }
 
-export function firstAuthorizedModule(
-  access: AccessResolution
-): string | null {
-  return (
-    access.allowedPaths.find(
-      (path) =>
-        !["/acceso", "/espacios", "/mi-negocio"].includes(path)
-    ) ?? null
-  );
-}
+export type AccessResolution = ReturnType<
+  typeof resolveSessionAccess
+>;

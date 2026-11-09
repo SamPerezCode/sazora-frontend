@@ -1,14 +1,14 @@
+import { useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 import { Alert } from "../../components/feedback/Alert";
 import { LoadingState } from "../../components/feedback/LoadingState";
 import { Button } from "../../components/ui/Button";
 import { useAuth } from "../../features/auth/hooks/useAuth";
-import type { ReactNode } from "react";
-import type { RoleCode } from "../../features/auth/types/auth.types";
+import { resolveSessionAccess } from "../../features/auth/utils/resolve-session-access";
 import {
-  firstAuthorizedModule,
-  resolveSessionAccess,
-} from "../../features/auth/utils/resolve-session-access";
+  getSessionDestination,
+  rememberModule,
+} from "../../features/auth/services/session-navigation";
 
 export function SessionBoundary() {
   const { state, retrySession, logout } = useAuth();
@@ -33,6 +33,7 @@ export function SessionBoundary() {
 
           <div className="flex flex-wrap gap-3">
             <Button onClick={retrySession}>Reintentar</Button>
+
             <Button variant="secondary" onClick={logout}>
               Volver al acceso
             </Button>
@@ -73,10 +74,7 @@ export function GuestOnly() {
 
   if (state.status === "authenticated") {
     return (
-      <Navigate
-        to={resolveSessionAccess(state.session.authorization).home}
-        replace
-      />
+      <Navigate to={getSessionDestination(state.session)} replace />
     );
   }
 
@@ -88,7 +86,7 @@ export function SessionHome() {
 
   const target =
     state.status === "authenticated"
-      ? resolveSessionAccess(state.session.authorization).home
+      ? getSessionDestination(state.session)
       : state.status === "selecting-role"
         ? "/seleccionar-rol"
         : "/login";
@@ -97,10 +95,26 @@ export function SessionHome() {
 }
 
 export function RequireAccess() {
-  const { state, logout } = useAuth();
-  const { pathname } = useLocation();
+  const { state } = useAuth();
+  const { pathname, search } = useLocation();
 
-  if (state.status !== "authenticated") {
+  const session =
+    state.status === "authenticated" ? state.session : null;
+
+  const access = session
+    ? resolveSessionAccess(session.authorization)
+    : null;
+
+  const path = pathname.replace(/\/+$/, "") || "/";
+  const allowed = access?.allowedPaths.includes(path) ?? false;
+
+  useEffect(() => {
+    if (session && allowed) {
+      rememberModule(session, pathname + search);
+    }
+  }, [session, allowed, pathname, search]);
+
+  if (!session) {
     return (
       <Navigate
         to={
@@ -113,53 +127,9 @@ export function RequireAccess() {
     );
   }
 
-  const access = resolveSessionAccess(state.session.authorization);
-  const path = pathname.replace(/\/+$/, "") || "/";
-
-  if (access.allowedPaths.includes(path)) {
-    return <Outlet />;
-  }
-
-  const destination = firstAuthorizedModule(access);
-
-  if (destination) {
-    return <Navigate to={destination} replace />;
-  }
-
-  return (
-    <main className="grid gap-4 p-6">
-      <h1 className="text-xl font-bold text-heading">
-        Acceso denegado
-      </h1>
-
-      <Alert>
-        Tu sesión no tiene permisos para abrir esta pantalla ni otro
-        módulo disponible.
-      </Alert>
-
-      <Button variant="secondary" onClick={logout}>
-        Cerrar sesión
-      </Button>
-    </main>
-  );
-}
-
-export function RequireRole({
-  role,
-  children,
-}: {
-  role: RoleCode;
-  children: ReactNode;
-}) {
-  const { state } = useAuth();
-
-  if (state.status !== "authenticated") {
-    return <Navigate to="/login" replace />;
-  }
-
-  return state.session.authorization.roles.includes(role) ? (
-    children
+  return allowed ? (
+    <Outlet />
   ) : (
-    <Navigate to="/panel" replace />
+    <Navigate to={getSessionDestination(session)} replace />
   );
 }

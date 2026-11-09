@@ -1,47 +1,9 @@
-import { Link, Navigate, useLocation } from "react-router";
-import { LayoutDashboard, MapPin, TriangleAlert } from "lucide-react";
+import { Navigate } from "react-router";
+import { Alert } from "../../../components/feedback/Alert";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { useAuth } from "../hooks/useAuth";
-import { ROLE_LABELS, ROLE_PRESENTATION } from "../role-presentation";
-import { resolveSessionAccess } from "../utils/resolve-session-access";
-
-import { canAccessDashboard } from "../utils/permissions";
-
-const locationLabels = {
-  POINT_OF_SALE: "Punto de venta",
-  PRODUCTION_WAREHOUSE: "Planta de producción y bodega",
-};
-
-const messages = {
-  "no-locations": {
-    title: "Sin ubicación asignada",
-    description:
-      "Tu cuenta está activa, pero todavía no tienes una sede o planta asignada. Comunícate con un administrador.",
-  },
-  "no-default": {
-    title: "Sin ubicación predeterminada",
-    description:
-      "Tienes ubicaciones asignadas, pero un administrador debe configurar cuál utilizarás inicialmente.",
-  },
-  incompatible: {
-    title: "Configuración de acceso incompatible",
-    description:
-      "Tus permisos y ubicaciones asignadas no permiten abrir un espacio de trabajo disponible. Solicita a un administrador que revise tu configuración.",
-  },
-};
-
-function formatName(value: string): string {
-  const normalized = value
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLocaleLowerCase("es-CO");
-
-  return (
-    normalized.charAt(0).toLocaleUpperCase("es-CO") +
-    normalized.slice(1)
-  );
-}
+import { getSessionDestination } from "../services/session-navigation";
 
 export function AccessPage() {
   const {
@@ -51,209 +13,51 @@ export function AccessPage() {
     refreshingSession,
     sessionRefreshMessage,
   } = useAuth();
-  const { pathname } = useLocation();
 
   if (state.status !== "authenticated") {
-    return <Navigate to="/login" replace />;
+    return (
+      <Navigate
+        to={
+          state.status === "selecting-role"
+            ? "/seleccionar-rol"
+            : "/login"
+        }
+        replace
+      />
+    );
   }
 
-  const session = state.session.authorization;
-  const access = resolveSessionAccess(session);
-  const location = access.defaultLocation;
+  const destination = getSessionDestination(state.session);
 
-  const path = pathname.replace(/\/+$/, "");
-  const workspace = access.workspaces.find(
-    (item) => item.path === path
-  );
-
-  const choosing =
-    path === "/espacios" && access.allowedPaths.includes("/espacios");
-
-  const message = access.issue ? messages[access.issue] : null;
-
-  const Icon = workspace
-    ? ROLE_PRESENTATION[workspace.role].icon
-    : message
-      ? TriangleAlert
-      : MapPin;
-
-  if (!message && !choosing && !workspace) {
-    return <Navigate to={access.home} replace />;
+  if (destination !== "/acceso") {
+    return <Navigate to={destination} replace />;
   }
 
   return (
-    <Card className="mx-auto w-full max-w-3xl space-y-6">
-      <div className="space-y-3">
-        <Icon aria-hidden="true" size={28} className="text-accent" />
+    <Card className="mx-auto w-full max-w-2xl space-y-5">
+      <h1 className="text-xl font-bold text-heading">
+        Acceso denegado
+      </h1>
 
-        <h1 className="text-xl font-bold text-heading sm:text-2xl">
-          {message?.title ??
-            (choosing
-              ? "Elige tu espacio de trabajo"
-              : workspace?.id === "production"
-                ? "Producción en preparación"
-                : "Módulo en preparación")}
-        </h1>
+      <Alert>
+        Tu sesión no tiene un módulo operativo autorizado. Solicita al
+        administrador que revise tus permisos.
+      </Alert>
 
-        <p className="text-sm leading-relaxed text-muted">
-          {message?.description ??
-            (choosing
-              ? "Selecciona el módulo al que deseas entrar. Cada módulo utiliza las ubicaciones compatibles que tienes autorizadas."
-              : `Tienes acceso a ${workspace?.label}. El módulo operativo todavía se está preparando.`)}
+      {sessionRefreshMessage && (
+        <p role="status" className="text-sm text-muted">
+          {sessionRefreshMessage}
         </p>
-      </div>
-
-      {message && (
-        <div className="space-y-3">
-          <p className="text-sm leading-relaxed text-muted">
-            Tu acceso debe ser corregido por un administrador. Después
-            de que te asignen una ubicación compatible, pulsa
-            “Actualizar acceso”.
-          </p>
-
-          <p
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-            className="text-sm font-medium text-heading"
-          >
-            {refreshingSession
-              ? "Comprobando…"
-              : sessionRefreshMessage}
-          </p>
-        </div>
       )}
 
-      {location && (
-        <dl className="grid gap-3 rounded-2xl border border-outline bg-secondary p-4 text-sm">
-          <div>
-            <dt className="text-muted">Ubicación predeterminada</dt>
-            <dd className="mt-1 break-words font-semibold text-heading">
-              {formatName(location.name)}
-            </dd>
-          </div>
-
-          <div>
-            <dt className="text-muted">Código</dt>
-            <dd className="mt-1 break-words text-heading">
-              {location.code}
-            </dd>
-          </div>
-
-          <div>
-            <dt className="text-muted">Tipo</dt>
-            <dd className="mt-1 text-heading">
-              {locationLabels[location.locationType]}
-            </dd>
-          </div>
-
-          {location.isActive === false && (
-            <div>
-              <dt className="text-muted">Estado</dt>
-              <dd className="mt-1 text-heading">Inactiva</dd>
-            </div>
-          )}
-        </dl>
-      )}
-
-      {message && (
-        <div className="space-y-2 text-sm">
-          {!location && session.locationAccess.defaultLocationId && (
-            <p className="break-words text-muted">
-              ID de ubicación predeterminada:{" "}
-              {session.locationAccess.defaultLocationId}
-            </p>
-          )}
-
-          <p className="font-semibold text-heading">
-            Roles asignados
-          </p>
-
-          <p className="text-muted">
-            {session.roles
-              .map((role) => ROLE_LABELS[role] ?? role)
-              .join(" · ")}
-          </p>
-        </div>
-      )}
-
-      {choosing && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {canAccessDashboard(session) && (
-            <Link
-              to="/panel"
-              className="flex min-w-0 items-start gap-3 rounded-2xl border border-outline p-4 text-heading transition-colors hover:border-accent hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-            >
-              <LayoutDashboard
-                aria-hidden="true"
-                size={22}
-                className="shrink-0 text-accent"
-              />
-
-              <span className="min-w-0">
-                <span className="block font-semibold">
-                  Resumen general
-                </span>
-
-                <span className="mt-1 block text-sm text-muted">
-                  Consultar el resumen del negocio
-                </span>
-              </span>
-            </Link>
-          )}
-
-          {access.entryWorkspaces.map((item) => {
-            const WorkspaceIcon = ROLE_PRESENTATION[item.role].icon;
-
-            return (
-              <Link
-                key={item.id}
-                to={item.path}
-                className="flex min-w-0 items-start gap-3 rounded-2xl border border-outline p-4 text-heading transition-colors hover:border-accent hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-              >
-                <WorkspaceIcon
-                  aria-hidden="true"
-                  size={22}
-                  className="shrink-0 text-accent"
-                />
-
-                <span className="min-w-0">
-                  <span className="block font-semibold">
-                    {item.label}
-                  </span>
-
-                  <span className="mt-1 block text-sm text-muted">
-                    {item.pending
-                      ? "Módulo en preparación"
-                      : "Entrar al módulo"}
-                  </span>
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center justify-end gap-3 border-t border-outline pt-4">
-        {access.allowedPaths.includes("/espacios") && !choosing && (
-          <Link
-            to="/espacios"
-            className="rounded-xl px-3 py-2 text-sm font-semibold text-heading focus-visible:outline-2 focus-visible:outline-accent"
-          >
-            Cambiar espacio de trabajo
-          </Link>
-        )}
-
-        {message && (
-          <Button
-            variant="secondary"
-            loading={refreshingSession}
-            loadingText="Comprobando…"
-            onClick={() => void refreshSession()}
-          >
-            Actualizar acceso
-          </Button>
-        )}
+      <div className="flex flex-wrap gap-3">
+        <Button
+          loading={refreshingSession}
+          loadingText="Comprobando…"
+          onClick={() => void refreshSession()}
+        >
+          Actualizar acceso
+        </Button>
 
         <Button variant="secondary" onClick={logout}>
           Cerrar sesión

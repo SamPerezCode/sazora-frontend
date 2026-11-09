@@ -5,7 +5,6 @@ import {
   ChefHat,
   Flame,
   LayoutDashboard,
-  LayoutGrid,
   PackageOpen,
   Settings,
   Tags,
@@ -19,7 +18,6 @@ import type {
 } from "../features/auth/types/auth.types";
 
 import { resolveSessionAccess } from "../features/auth/utils/resolve-session-access";
-import { ROLE_PRESENTATION } from "../features/auth/role-presentation";
 
 export { ROLE_LABELS } from "../features/auth/role-presentation";
 
@@ -162,82 +160,39 @@ export function getNavigation(
   const visible: NavigationItem[] = [];
 
   const allowed = (item: NavigationLeaf): boolean =>
-    item.status === "ready"
-      ? access.allowedPaths.includes(item.to)
-      : access.kind === "global" &&
-        (item.roles?.some((role) => session.roles.includes(role)) ??
-          false);
+    item.status === "ready" && access.allowedPaths.includes(item.to);
 
   for (const item of navigation) {
     if (item.status === "group") {
       const children = item.children.filter(allowed);
 
       if (children.length) {
-        visible.push({
-          ...item,
-          children,
-        });
+        visible.push({ ...item, children });
       }
-    } else if (allowed(item)) {
-      visible.push(
-        item.id === "panel"
-          ? {
-              ...item,
-              label: "Resumen general",
-              description: "Información general de la organización.",
-            }
-          : item
-      );
-    }
-  }
 
-  if (access.allowedPaths.includes("/espacios")) {
-    visible.unshift({
-      id: "workspaces",
-      label: "Espacios de trabajo",
-      description: "Elige el módulo en el que deseas trabajar.",
-      icon: LayoutGrid,
-      roles: null,
-      group: "main",
-      status: "ready",
-      to: "/espacios",
-    });
-  }
-
-  for (const workspace of access.workspaces) {
-    // Un módulo puede tener un nombre distinto al espacio
-    // de trabajo, pero compartir su misma ruta.
-    // Por ejemplo: Inventario y Producción → /inventario.
-    if (
-      visible.some(
-        (item) =>
-          item.id === workspace.id ||
-          (item.status === "ready" && item.to === workspace.path) ||
-          (item.status === "group" &&
-            item.children.some(
-              (child) =>
-                child.status === "ready" &&
-                child.to === workspace.path
-            ))
-      )
-    ) {
       continue;
     }
 
-    const presentation = ROLE_PRESENTATION[workspace.role];
+    if (!allowed(item)) continue;
 
-    visible.push({
-      id: workspace.id,
-      label: workspace.label,
-      description: workspace.pending
-        ? "Módulo en preparación."
-        : presentation.description,
-      icon: presentation.icon,
-      roles: [workspace.role],
-      group: "main",
-      status: "ready",
-      to: workspace.path,
-    });
+    if (item.id === "panel") {
+      visible.push({
+        ...item,
+        label: "Resumen general",
+        description: "Información general de la organización.",
+      });
+    } else if (item.id === "inventory") {
+      const module = access.workspaces.find(
+        (workspace) => workspace.path === "/inventario"
+      );
+
+      visible.push({
+        ...item,
+        label: module?.label ?? item.label,
+      });
+    } else {
+      visible.push(item);
+    }
   }
 
   return visible;
