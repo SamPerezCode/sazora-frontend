@@ -1,0 +1,49 @@
+name: Desplegar frontend en producción
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: frontend-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VITE_API_BASE_URL: https://api.lemokaicoffe.com.co/api
+      S3_BUCKET: lemokaicoffe-frontend-prod
+      DISTRIBUTION_ID: E1KCF8857GT7C3
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Compilar frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Autenticarse en AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::828573071368:role/lemokaicoffe-github-frontend-prod
+          aws-region: us-west-2
+
+      - name: Publicar en S3 y actualizar CloudFront
+        run: |
+          aws s3 sync dist/ "s3://$S3_BUCKET/" --exclude "index.html" --only-show-errors
+          aws s3 cp dist/index.html "s3://$S3_BUCKET/index.html" --cache-control "no-cache" --only-show-errors
+          invalidation_id=$(aws cloudfront create-invalidation \
+            --distribution-id "$DISTRIBUTION_ID" --paths "/*" \
+            --query "Invalidation.Id" --output text)
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "$DISTRIBUTION_ID" --id "$invalidation_id"
