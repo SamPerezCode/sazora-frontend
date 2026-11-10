@@ -40,6 +40,14 @@ export const businessSettingsResponseSchema = z.object({
   }),
 });
 
+export const initializeBusinessSettingsResponseSchema =
+  businessSettingsResponseSchema.extend({
+    data: z.object({
+      settings: businessSettingsSchema,
+      created: z.boolean(),
+    }),
+  });
+
 const formSchema = z.object({
   name: z
     .string()

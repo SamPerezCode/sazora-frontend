@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AuthSession } from "../../auth/types/auth.types";
+import { hasPermission } from "../../auth/utils/permissions";
 import type { BusinessIdentity } from "../schemas/business-profile.schema";
 import type {
   BusinessMutation,
@@ -7,7 +8,7 @@ import type {
   BusinessSettingsResource,
 } from "../schemas/business-settings.schema";
 import {
-  getBusinessSettings,
+  loadBusinessSettings,
   mutateBusinessSettings,
   toBusinessIdentity,
 } from "../services/business-profile.service";
@@ -32,20 +33,37 @@ export function useBusinessProfile(session: AuthSession | null) {
 
   const businessId = session?.business.id;
   const token = session?.accessToken;
-  const allowed =
-    session?.authorization.roles.includes("ADMIN") ?? false;
+
+  const canRead = Boolean(
+    session && hasPermission(session, "business.settings.read")
+  );
+
+  const canManage = Boolean(
+    session && hasPermission(session, "business.settings.manage")
+  );
 
   const scope = session
-    ? `${session.business.id}:${session.membership.id}:${session.accessToken}`
+    ? JSON.stringify([
+        session.business.id,
+        session.membership.id,
+        session.accessToken,
+        canRead,
+        canManage,
+      ])
     : "";
 
   useEffect(() => {
-    if (!allowed || !businessId || !token) return;
+    if (!canRead || !businessId || !token) return;
 
     const controller = new AbortController();
     readController.current = controller;
 
-    void getBusinessSettings(businessId, token, controller.signal)
+    void loadBusinessSettings(
+      businessId,
+      token,
+      controller.signal,
+      canManage
+    )
       .then((data) => {
         if (!controller.signal.aborted) {
           setSnapshot({
@@ -58,43 +76,46 @@ export function useBusinessProfile(session: AuthSession | null) {
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
-          setSnapshot({
+          setSnapshot((previous) => ({
             scope,
             attempt,
-            data: null,
+            data: previous?.scope === scope ? previous.data : null,
             error:
               error instanceof ApiError
                 ? error.message
                 : "No pudimos consultar el negocio.",
-          });
+          }));
+        }
+      })
+      .finally(() => {
+        if (readController.current === controller) {
+          readController.current = null;
         }
       });
 
     return () => controller.abort();
-  }, [allowed, businessId, token, scope, attempt]);
+  }, [canRead, canManage, businessId, token, scope, attempt]);
 
   useEffect(
     () => () => {
       writeController.current?.abort();
-      writeController.current = null;
     },
-    [scope, allowed]
+    [scope]
   );
 
   const current =
-    allowed &&
-    snapshot?.scope === scope &&
-    snapshot.attempt === attempt
-      ? snapshot
-      : null;
+    canRead && snapshot?.scope === scope ? snapshot : null;
+
+  const refreshing =
+    canRead && (!current || current.attempt !== attempt);
 
   const mutate = useCallback(
     async (action: BusinessMutation): Promise<BusinessSettings> => {
-      if (!allowed || !businessId || !token) {
+      if (!canRead || !canManage || !businessId || !token) {
         throw new ApiError(
           403,
           "FORBIDDEN",
-          "No tienes acceso a la configuración."
+          "No tienes acceso para modificar la configuración."
         );
       }
 
@@ -137,7 +158,7 @@ export function useBusinessProfile(session: AuthSession | null) {
         }
       }
     },
-    [allowed, businessId, token, scope, attempt]
+    [canRead, canManage, businessId, token, scope, attempt]
   );
 
   const retry = useCallback(() => {
@@ -157,9 +178,13 @@ export function useBusinessProfile(session: AuthSession | null) {
 
   const settings: BusinessSettingsResource = {
     data: current?.data ?? null,
-    loading: allowed && current === null,
-    error: current?.error ?? null,
-    busy: pendingScope === scope,
+    loading: refreshing && !current?.data,
+    error: !canRead
+      ? "No tienes permisos para consultar la configuración."
+      : current?.attempt === attempt
+        ? current.error
+        : null,
+    busy: pendingScope === scope || refreshing,
     retry,
     mutate,
   };

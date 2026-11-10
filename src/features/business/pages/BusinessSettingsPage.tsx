@@ -145,7 +145,7 @@ export function BusinessSettingsPage({
 }) {
   const { settings, session } = useAppShell();
 
-  if (settings.loading) {
+  if (settings.loading && !settings.data) {
     return (
       <Card>
         <LoadingState message="Cargando configuración…" />
@@ -153,32 +153,36 @@ export function BusinessSettingsPage({
     );
   }
 
-  if (settings.error || !settings.data) {
-    return (
-      <Alert>
-        <p>
-          {settings.error ?? "No pudimos consultar la configuración."}
-        </p>
-
-        <Button
-          variant="secondary"
-          size="sm"
-          className="mt-3"
-          onClick={settings.retry}
-        >
-          Reintentar
-        </Button>
-      </Alert>
-    );
-  }
-
   return (
-    <BusinessSettingsEditor
-      key={`${settings.data.businessId}:${session.membership.id}`}
-      settings={settings.data}
-      resource={settings}
-      section={section}
-    />
+    <>
+      {(settings.error || !settings.data) && (
+        <Alert>
+          <p>
+            {settings.error ??
+              "No pudimos consultar la configuración."}
+          </p>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-3"
+            onClick={settings.retry}
+            disabled={settings.busy}
+          >
+            Reintentar
+          </Button>
+        </Alert>
+      )}
+
+      {settings.data && (
+        <BusinessSettingsEditor
+          key={`${settings.data.businessId}:${session.membership.id}`}
+          settings={settings.data}
+          resource={settings}
+          section={section}
+        />
+      )}
+    </>
   );
 }
 
