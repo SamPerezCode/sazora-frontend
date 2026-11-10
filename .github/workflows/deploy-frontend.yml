@@ -2,7 +2,9 @@ name: Desplegar frontend en producción
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,78 +17,35 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     env:
       VITE_API_BASE_URL: https://api.lemokaicoffe.com.co/api
+      VITE_ORGANIZATION_SLUG: ${{ vars.VITE_ORGANIZATION_SLUG }}
       S3_BUCKET: lemokaicoffe-frontend-prod
       DISTRIBUTION_ID: E1KCF8857GT7C3
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Descargar código
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
 
+      - name: Validar configuración del negocio
+        shell: bash
+        run: |
+          if [[ ! "$VITE_ORGANIZATION_SLUG" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+            echo "::error::Configura la variable VITE_ORGANIZATION_SLUG con el slug válido del negocio de producción."
+            exit 1
+          fi
+
       - name: Compilar frontend
+        shell: bash
         run: |
           npm ci
           npm run build
-
-      - name: Diagnosticar identidad OIDC
-        shell: bash
-        run: |
-          node <<'NODE'
-          async function main() {
-            const endpoint = process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
-            const requestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
-
-            if (!endpoint || !requestToken) {
-              throw new Error("No están disponibles las variables OIDC.");
-            }
-
-            const url = new URL(endpoint);
-            url.searchParams.set("audience", "sts.amazonaws.com");
-
-            const response = await fetch(url, {
-              headers: {
-                Authorization: `Bearer ${requestToken}`,
-              },
-            });
-
-            if (!response.ok) {
-              throw new Error(`La solicitud OIDC respondió HTTP ${response.status}.`);
-            }
-
-            const payload = await response.json();
-
-            if (typeof payload.value !== "string") {
-              throw new Error("GitHub no devolvió el token OIDC esperado.");
-            }
-
-            const encodedClaims = payload.value.split(".")[1];
-
-            if (!encodedClaims) {
-              throw new Error("El token OIDC tiene un formato inesperado.");
-            }
-
-            const claims = JSON.parse(
-              Buffer.from(encodedClaims, "base64url").toString("utf8")
-            );
-
-            console.log(JSON.stringify({
-              iss: claims.iss,
-              aud: claims.aud,
-              sub: claims.sub,
-              repository: claims.repository,
-              ref: claims.ref,
-            }, null, 2));
-          }
-
-          main().catch(() => {
-            console.error("No se pudo completar el diagnóstico OIDC.");
-            process.exitCode = 1;
-          });
-          NODE
 
       - name: Autenticarse en AWS
         uses: aws-actions/configure-aws-credentials@v4
@@ -95,11 +54,22 @@ jobs:
           aws-region: us-west-2
 
       - name: Publicar en S3 y actualizar CloudFront
+        shell: bash
         run: |
-          aws s3 sync dist/ "s3://$S3_BUCKET/" --exclude "index.html" --only-show-errors
-          aws s3 cp dist/index.html "s3://$S3_BUCKET/index.html" --cache-control "no-cache" --only-show-errors
+          aws s3 sync dist/ "s3://$S3_BUCKET/" \
+            --exclude "index.html" \
+            --only-show-errors
+
+          aws s3 cp dist/index.html "s3://$S3_BUCKET/index.html" \
+            --cache-control "no-cache" \
+            --only-show-errors
+
           invalidation_id=$(aws cloudfront create-invalidation \
-            --distribution-id "$DISTRIBUTION_ID" --paths "/*" \
-            --query "Invalidation.Id" --output text)
+            --distribution-id "$DISTRIBUTION_ID" \
+            --paths "/*" \
+            --query "Invalidation.Id" \
+            --output text)
+
           aws cloudfront wait invalidation-completed \
-            --distribution-id "$DISTRIBUTION_ID" --id "$invalidation_id"
+            --distribution-id "$DISTRIBUTION_ID" \
+            --id "$invalidation_id"
