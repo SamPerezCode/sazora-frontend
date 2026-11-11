@@ -110,7 +110,7 @@ export function CategoryForm({
   return (
     <form
       noValidate
-      className="space-y-4"
+      className="category-form space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
         void submit(event.currentTarget);

@@ -385,3 +385,9 @@
   border-radius: 0.625rem;
   box-shadow: 0 2px 4px rgb(0 0 0 / 6%);
 }
+
+/* Mismo radio que los campos del modal de Productos */
+.category-form input,
+.category-form textarea {
+  border-radius: 0.625rem;
+}
