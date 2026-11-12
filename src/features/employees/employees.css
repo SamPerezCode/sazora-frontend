@@ -129,3 +129,282 @@
   input:not([type="checkbox"]):not([type="radio"]) {
   background: var(--sazora-surface);
 }
+
+/* Encabezado y listado */
+
+.employees-workspace .employees-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 1rem;
+}
+
+.employees-heading > div,
+.employee-list-panel,
+.employee-table,
+.employee-card {
+  min-width: 0;
+}
+
+.employee-permissions {
+  border-block: 1px solid var(--sazora-outline);
+  padding-block: 1rem;
+  font-size: 0.875rem;
+}
+
+.employee-permissions summary {
+  cursor: pointer;
+}
+
+.employee-permissions p {
+  margin-top: 0.75rem;
+  color: var(--sazora-muted);
+  line-height: 1.5;
+}
+
+.employee-table {
+  overflow-x: auto;
+}
+
+.employee-cards {
+  display: none;
+}
+
+/* Selección de roles */
+
+.employee-role-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.employee-role-card {
+  border: 1px solid var(--sazora-outline);
+  border-radius: 1rem;
+  padding: 0.625rem;
+}
+
+.employee-role-card:has(input:checked) {
+  border-color: var(--sazora-accent);
+  background: color-mix(
+    in srgb,
+    var(--sazora-accent) 6%,
+    transparent
+  );
+}
+
+.employee-role-card > label {
+  align-items: flex-start;
+  height: 100%;
+}
+
+.employee-role-card > label > span:first-child {
+  margin-top: 0.125rem;
+}
+
+/* Encabezado y contenido del modal */
+
+.employee-step {
+  order: -1;
+  flex-shrink: 0;
+  margin: 0 3rem 0.25rem 0;
+  color: var(--sazora-brand);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.employee-modal-subtitle {
+  flex-shrink: 0;
+  margin: 0 0 1rem;
+  color: var(--sazora-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.employees-modal .employee-editor-form {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.employees-modal .employee-editor-fields {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+.employees-modal .employee-modal-footer {
+  flex-wrap: wrap;
+  background: inherit;
+}
+
+.employees-modal .employee-modal-footer > button {
+  flex: 0 1 auto;
+}
+
+/* Menús de acciones */
+
+.employees-workspace [role="menuitem"][aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.employees-workspace [role="menuitem"][aria-disabled="true"]:hover {
+  background: transparent;
+  color: var(--sazora-muted);
+}
+
+.employees-workspace [role="menuitem"][aria-disabled="true"] > span {
+  color: inherit;
+}
+
+.employees-workspace [role="menuitem"][data-separator="true"] {
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--sazora-outline);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+/* Móvil */
+
+@media (max-width: 767px) {
+  .employees-workspace,
+  .employees-modal {
+    --form-control-height: 2.75rem;
+    --field-font-size: 0.875rem;
+    --field-label-size: 0.6875rem;
+  }
+
+  .employees-workspace .employees-heading {
+    gap: 0.75rem;
+  }
+
+  .employees-workspace .employee-create-button {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border-radius: 999px;
+  }
+
+  .employee-create-button > span {
+    display: none;
+  }
+
+  .employees-workspace .employee-list-panel {
+    padding: 0.875rem;
+  }
+
+  .employee-table {
+    display: none;
+  }
+
+  .employee-cards {
+    display: grid;
+    gap: 0.75rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .employee-card {
+    border: 1px solid var(--sazora-outline);
+    border-radius: 1rem;
+    padding: 0.75rem;
+    background: var(--sazora-surface);
+  }
+
+  .employee-card > * + * {
+    margin-top: 0.5rem;
+  }
+
+  .employee-card .employee-avatar {
+    width: 2.125rem;
+    height: 2.125rem;
+    min-width: 2.125rem;
+    flex-shrink: 0;
+  }
+
+  .employee-card [data-action-trigger] {
+    flex-shrink: 0;
+  }
+
+  .employee-card-location {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .employee-card-location > div:first-child {
+    min-width: 0;
+  }
+
+  .employee-card-location > div:last-child {
+    flex-shrink: 0;
+  }
+
+  .employee-role-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :root dialog.bottom-sheet.bottom-sheet-modal.employees-modal {
+    width: calc(100% - 1rem);
+    max-width: 30rem;
+    max-height: calc(100dvh - 1rem);
+    padding: 1rem;
+    border-radius: 1rem;
+    overflow: hidden;
+    background: var(--sazora-background);
+  }
+
+  :root dialog.employees-modal.employees-modal--create,
+  :root dialog.employees-modal.employees-modal--locations {
+    height: min(48rem, calc(100dvh - 1rem));
+  }
+
+  .employees-modal > .bottom-sheet-heading {
+    min-height: 2rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .employees-modal > .bottom-sheet-heading h2 {
+    font-size: 1.125rem;
+    line-height: 1.4;
+  }
+
+  .employees-modal .employee-editor-fields {
+    padding-block: 0.5rem;
+    padding-inline-end: 0.375rem;
+  }
+
+  .employees-modal .employee-editor-fields label {
+    letter-spacing: normal;
+  }
+
+  .employees-modal .employee-modal-footer {
+    flex-direction: column-reverse;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    padding-top: 0.875rem;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-top: 1px solid var(--sazora-outline);
+  }
+
+  .employees-modal .employee-modal-footer > button {
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 2.75rem;
+    padding-inline: 0.75rem;
+    font-size: 0.875rem;
+    border-radius: 999px;
+  }
+
+  .employees-modal .employee-cancel {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}

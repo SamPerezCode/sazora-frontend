@@ -198,79 +198,67 @@ export function EmployeeList({
             Sin ubicación
           </span>
         )}
-
-        {manageButton}
+        {!primary && manageButton}{" "}
       </div>
     );
   }
 
   function actions(employee: Employee) {
     const allowed = employeePermissions(employee, ownMembershipId);
+    const self = employee.membershipId === ownMembershipId;
 
-    const entries = [
-      ...(allowed.edit
-        ? [
-            {
-              id: "edit",
-              label: "Editar datos",
-              icon: <Pencil aria-hidden="true" size={16} />,
-              onSelect: () => onEdit("edit", employee),
-            },
-          ]
-        : []),
+    const globalAccess =
+      employee.locationAccess?.hasGlobalAccess ??
+      employee.roles.includes("ADMIN");
 
-      ...(allowed.roles
-        ? [
-            {
-              id: "roles",
-              label: "Cambiar roles",
-              icon: <ShieldCheck aria-hidden="true" size={16} />,
-              onSelect: () => onEdit("roles", employee),
-            },
-          ]
-        : []),
-
-      ...(!employee.roles.includes("ADMIN")
-        ? [
-            {
-              id: "locations",
-              label: "Gestionar ubicaciones",
-              icon: <MapPin aria-hidden="true" size={16} />,
-              onSelect: () => onManageLocations(employee),
-            },
-          ]
-        : []),
-
-      ...(allowed.status
-        ? [
-            {
-              id: "status",
-              label: employee.membershipIsActive
-                ? "Desactivar"
-                : "Activar",
-              icon: <Power aria-hidden="true" size={16} />,
-              danger: employee.membershipIsActive,
-              separatorBefore: true,
-              onSelect: () => onToggle(employee),
-            },
-          ]
-        : []),
-    ];
-
-    return entries.length ? (
+    return (
       <ActionMenu
         appearance="compact"
         label={"Acciones de " + employee.fullName}
         disabled={locked}
-        actions={entries}
+        actions={[
+          {
+            id: "edit",
+            label: "Editar datos",
+            icon: <Pencil aria-hidden="true" size={16} />,
+            disabled: !allowed.edit,
+            onSelect: () => onEdit("edit", employee),
+          },
+          {
+            id: "roles",
+            label: "Cambiar roles",
+            icon: <ShieldCheck aria-hidden="true" size={16} />,
+            disabled: !allowed.roles,
+            onSelect: () => onEdit("roles", employee),
+          },
+          {
+            id: "locations",
+            label: globalAccess
+              ? "Acceso global"
+              : "Gestionar ubicaciones",
+            icon: globalAccess ? (
+              <Building2 aria-hidden="true" size={16} />
+            ) : (
+              <MapPin aria-hidden="true" size={16} />
+            ),
+            disabled: globalAccess,
+            onSelect: () => onManageLocations(employee),
+          },
+          {
+            id: "status",
+            label: self
+              ? "No puedes desactivarte"
+              : employee.membershipIsActive
+                ? "Desactivar"
+                : "Activar",
+            icon: <Power aria-hidden="true" size={16} />,
+            disabled: !allowed.status,
+            danger: employee.membershipIsActive,
+            separatorBefore: true,
+            onSelect: () => onToggle(employee),
+          },
+        ]}
       />
-    ) : (
-      <span
-        aria-label="Sin acciones disponibles"
-        className="text-muted"
-      >
-        —
-      </span>
     );
   }
 
@@ -285,7 +273,7 @@ export function EmployeeList({
   }
 
   return (
-    <div className="space-y-4 rounded-2xl border border-outline bg-surface p-4 sm:p-5">
+    <div className="employee-list-panel space-y-4 rounded-2xl border border-outline bg-surface p-4 sm:p-5">
       <div className="grid grid-cols-1 items-end gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
         <div className="employee-search min-w-0">
           <TextField
@@ -322,7 +310,6 @@ export function EmployeeList({
           }}
         />
       </div>
-
       <p id={summaryId} role="status" className="text-xs text-muted">
         {loading ? (
           "Consultando empleados…"
@@ -337,7 +324,6 @@ export function EmployeeList({
           </>
         )}
       </p>
-
       <div id={listId} aria-busy={loading}>
         {loading ? (
           <EmployeeViewState
@@ -391,7 +377,7 @@ export function EmployeeList({
           />
         ) : (
           <>
-            <div className="hidden overflow-x-auto lg:block">
+            <div className="employee-table">
               <table className="w-full min-w-[52rem] table-fixed text-left text-sm">
                 <caption className="sr-only">
                   Empleados del negocio
@@ -482,12 +468,12 @@ export function EmployeeList({
               </table>
             </div>
 
-            <ul className="divide-y divide-outline lg:hidden">
+            <ul className="employee-cards">
               {visible.map((employee) => (
                 <li
                   key={employee.membershipId}
                   className={
-                    "space-y-3 py-4 " +
+                    "employee-card " +
                     (employee.membershipIsActive ? "" : "opacity-65")
                   }
                 >
@@ -498,8 +484,9 @@ export function EmployeeList({
 
                   <EmployeeRoles roles={employee.roles} />
 
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    {locations(employee)}
+                  <div className="employee-card-location">
+                    {locations(employee, true)}
+
                     <EmployeeStatus
                       active={employee.membershipIsActive}
                       accountActive={employee.isActive}
@@ -515,7 +502,6 @@ export function EmployeeList({
           </>
         )}
       </div>
-
       {!loading && !error && employees.length > 10 && (
         <Pagination
           page={page}

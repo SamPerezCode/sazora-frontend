@@ -22,6 +22,7 @@ import { BusinessSettingsPage } from "./BusinessSettingsPage";
 import { KitchenWorkflowPanel } from "../../kitchen-flow/KitchenWorkflowPanel";
 import { PaymentMethodsPanel } from "../../payment-methods/components/PaymentMethodsPanel";
 import { hasPermission } from "../../auth/utils/permissions";
+import { TaxClassesPanel } from "../../taxes/components/TaxClassesPanel";
 
 const sections = [
   {
@@ -39,6 +40,12 @@ const sections = [
   {
     id: "fiscal",
     label: "Información legal y fiscal",
+    group: "Organización",
+    icon: Scale,
+  },
+  {
+    id: "taxes",
+    label: "Impuestos",
     group: "Organización",
     icon: Scale,
   },
@@ -90,11 +97,17 @@ export function ConfigurationPage() {
   const { session } = useAppShell();
   const [params, setParams] = useSearchParams();
 
-  const availableSections = sections.filter(
-    (section) =>
-      section.id !== "payment-methods" ||
-      hasPermission(session, "business.settings.read")
-  );
+  const availableSections = sections.filter((section) => {
+    if (section.id === "taxes") {
+      return hasPermission(session, "taxes.read");
+    }
+
+    if (section.id === "payment-methods") {
+      return hasPermission(session, "business.settings.read");
+    }
+
+    return true;
+  });
 
   const active =
     availableSections.find(
@@ -176,6 +189,8 @@ export function ConfigurationPage() {
       >
         {active.id === "fiscal" ? (
           <OrganizationFiscalPanel />
+        ) : active.id === "taxes" ? (
+          <TaxClassesPanel />
         ) : active.id === "locations" ? (
           <LocationsPanel />
         ) : active.id === "payment-methods" ? (

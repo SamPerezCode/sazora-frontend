@@ -63,7 +63,8 @@ export function EmployeeForm({
 
   const dirty =
     editor.kind === "create"
-      ? Object.values(draft).some((value) => value.length > 0) || roles.length > 0
+      ? Object.values(draft).some((value) => value.length > 0) ||
+        roles.length > 0
       : editor.kind === "roles"
         ? [...roles].sort().join("|") !==
           [...editor.employee.roles].sort().join("|")
@@ -183,7 +184,10 @@ export function EmployeeForm({
         }
 
         setMessage(
-          employeeErrorMessage(error, "No pudimos guardar el empleado.")
+          employeeErrorMessage(
+            error,
+            "No pudimos guardar el empleado."
+          )
         );
       }
 
@@ -210,189 +214,198 @@ export function EmployeeForm({
         void submit(event.currentTarget);
       }}
     >
-      <fieldset
-        disabled={busy}
-        className="employee-editor-fields min-w-0 space-y-4"
-      >
-        <legend className="sr-only">Datos del empleado</legend>
+      <div className="employee-editor-fields">
+        <fieldset disabled={busy} className="min-w-0 space-y-4">
+          <legend className="sr-only">Datos del empleado</legend>
 
-        {editor.kind !== "create" && (
-          <p className="text-sm text-muted">
-            {editor.kind === "roles"
-              ? "Los roles definen qué puede hacer " +
-                editor.employee.fullName +
-                "."
-              : "Solo se modifican el nombre y el correo."}
-          </p>
-        )}
-
-        {editor.kind !== "roles" && (
-          <>
-            <TextField
-              name="fullName"
-              label="Nombre completo"
-              placeholder="Ej. Carlos Pérez"
-              required
-              maxLength={150}
-              data-dialog-initial-focus
-              autoComplete="name"
-              value={draft.fullName}
-              error={errors.fullName}
-              onChange={(event) =>
-                change("fullName", event.target.value)
-              }
-            />
-
-            <TextField
-              name="email"
-              label="Correo electrónico"
-              placeholder="Ej. carlos@restaurante.com"
-              type="email"
-              required
-              maxLength={254}
-              autoComplete="email"
-              value={draft.email}
-              error={errors.email}
-              onChange={(event) =>
-                change("email", event.target.value)
-              }
-            />
-          </>
-        )}
-
-        {editor.kind === "create" && (
-          <>
-            <PasswordField
-              name="password"
-              label="Contraseña inicial"
-              placeholder="Mínimo 12 caracteres"
-              required
-              autoComplete="new-password"
-              disabled={busy}
-              value={draft.password}
-              error={errors.password}
-              onChange={(event) =>
-                change("password", event.target.value)
-              }
-            />
-
-            <PasswordField
-              name="passwordConfirmation"
-              label="Confirmar contraseña"
-              placeholder="Repite la contraseña"
-              required
-              autoComplete="new-password"
-              disabled={busy}
-              value={draft.passwordConfirmation}
-              error={errors.passwordConfirmation}
-              onChange={(event) =>
-                change("passwordConfirmation", event.target.value)
-              }
-            />
-
-            <p className="text-xs text-muted">
-              Usa al menos 12 caracteres. Los caracteres especiales
-              pueden ocupar más de un byte; el máximo es 72 bytes.
+          {editor.kind !== "create" && (
+            <p className="text-sm text-muted">
+              {editor.kind === "roles"
+                ? "Los roles definen qué puede hacer " +
+                  editor.employee.fullName +
+                  "."
+                : "Solo se modifican el nombre y el correo."}
             </p>
-          </>
-        )}
+          )}
 
-        {editor.kind !== "edit" && (
-          <fieldset className="employee-role-options min-w-0 space-y-2">
-            <legend
-              className={
-                editor.kind === "roles"
-                  ? "sr-only"
-                  : "mb-2 text-sm font-semibold text-heading"
-              }
-            >
-              Roles asignados
-            </legend>
+          {editor.kind !== "roles" && (
+            <>
+              <TextField
+                name="fullName"
+                label="Nombre completo"
+                placeholder="Ej. Carlos Pérez"
+                required
+                maxLength={150}
+                data-dialog-initial-focus
+                autoComplete="name"
+                value={draft.fullName}
+                error={errors.fullName}
+                onChange={(event) =>
+                  change("fullName", event.target.value)
+                }
+              />
 
-            {editor.kind === "create" && (
+              <TextField
+                name="email"
+                label="Correo electrónico"
+                placeholder="Ej. carlos@restaurante.com"
+                type="email"
+                required
+                maxLength={254}
+                autoComplete="email"
+                value={draft.email}
+                error={errors.email}
+                onChange={(event) =>
+                  change("email", event.target.value)
+                }
+              />
+            </>
+          )}
+
+          {editor.kind === "create" && (
+            <>
+              <PasswordField
+                name="password"
+                label="Contraseña inicial"
+                placeholder="Mínimo 12 caracteres"
+                required
+                autoComplete="new-password"
+                disabled={busy}
+                value={draft.password}
+                error={errors.password}
+                onChange={(event) =>
+                  change("password", event.target.value)
+                }
+              />
+
+              <PasswordField
+                name="passwordConfirmation"
+                label="Confirmar contraseña"
+                placeholder="Repite la contraseña"
+                required
+                autoComplete="new-password"
+                disabled={busy}
+                value={draft.passwordConfirmation}
+                error={errors.passwordConfirmation}
+                onChange={(event) =>
+                  change("passwordConfirmation", event.target.value)
+                }
+              />
+
               <p className="text-xs text-muted">
-                Selecciona una o varias funciones.
+                Usa al menos 12 caracteres. Los caracteres especiales
+                pueden ocupar más de un byte; el máximo es 72 bytes.
               </p>
-            )}
+            </>
+          )}
 
-            <div className="grid grid-cols-2 gap-2">
-              {assignableRoles.map((role, index) => {
-                const presentation = ROLE_PRESENTATION[role];
-                const Icon = presentation.icon;
-                return (
-                <div
-                  key={role}
-                  className="rounded-2xl border border-outline px-3 py-2"
-                >
-                  <Checkbox
-                    name="roles"
-                    value={role}
-                    className="w-full [--checkbox-size:1.125rem] [--checkbox-gap:0.5rem]"
-                    data-dialog-initial-focus={
-                      editor.kind === "roles" && index === 0
-                        ? true
-                        : undefined
-                    }
-                    label={
-                      <span className="min-w-0 text-xs font-semibold text-heading sm:text-sm">
-                        <span className="flex items-center gap-1.5">
-                          <Icon aria-hidden="true" size={16} className="shrink-0" />
-                          {presentation.label}
-                        </span>
-                        {role === "PRODUCTION" && (
-                          <span className="mt-1 block text-xs font-normal text-muted">
-                            {presentation.description}
+          {editor.kind !== "edit" && (
+            <fieldset className="employee-role-options min-w-0 space-y-2">
+              <legend
+                className={
+                  editor.kind === "roles"
+                    ? "sr-only"
+                    : "mb-2 text-sm font-semibold text-heading"
+                }
+              >
+                Roles asignados
+              </legend>
+
+              {editor.kind === "create" && (
+                <p className="text-xs text-muted">
+                  Selecciona una o varias funciones.
+                </p>
+              )}
+
+              <div className="employee-role-grid">
+                {assignableRoles.map((role, index) => {
+                  const presentation = ROLE_PRESENTATION[role];
+                  const Icon = presentation.icon;
+                  return (
+                    <div key={role} className="employee-role-card">
+                      <Checkbox
+                        name="roles"
+                        value={role}
+                        className="w-full [--checkbox-size:1.125rem] [--checkbox-gap:0.5rem]"
+                        data-dialog-initial-focus={
+                          editor.kind === "roles" && index === 0
+                            ? true
+                            : undefined
+                        }
+                        label={
+                          <span className="min-w-0 text-xs font-semibold text-heading sm:text-sm">
+                            <span className="flex items-center gap-1.5">
+                              <Icon
+                                aria-hidden="true"
+                                size={16}
+                                className="shrink-0"
+                              />
+                              {presentation.label}
+                            </span>
+                            {(role === "PRODUCTION" ||
+                              role === "KITCHEN") && (
+                              <span className="mt-1 block text-xs font-normal text-muted">
+                                {presentation.description}
+                              </span>
+                            )}
                           </span>
-                        )}
-                      </span>
-                    }
-                    checked={roles.includes(role)}
-                    disabled={busy}
-                    aria-invalid={!!errors.roles}
-                    aria-describedby={
-                      errors.roles ? rolesErrorId : undefined
-                    }
-                    onChange={(event) => {
-                      const checked = event.target.checked;
+                        }
+                        checked={roles.includes(role)}
+                        disabled={busy}
+                        aria-invalid={!!errors.roles}
+                        aria-describedby={
+                          errors.roles ? rolesErrorId : undefined
+                        }
+                        onChange={(event) => {
+                          const checked = event.target.checked;
 
-                      setRoles((previous) =>
-                        checked
-                          ? [...previous, role]
-                          : previous.filter((value) => value !== role)
-                      );
+                          setRoles((previous) =>
+                            checked
+                              ? [...previous, role]
+                              : previous.filter(
+                                  (value) => value !== role
+                                )
+                          );
 
-                      setErrors((previous) => ({
-                        ...previous,
-                        roles: "",
-                      }));
+                          setErrors((previous) => ({
+                            ...previous,
+                            roles: "",
+                          }));
 
-                      setMessage("");
-                    }}
-                  />
-                </div>
-                );
-              })}
-            </div>
+                          setMessage("");
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
 
-            <p className="text-xs text-muted">
-              Cocina atiende comandas y pedidos. Producción trabaja con procesos de planta
-              y productos destinados a inventario o despacho.
-            </p>
-
-            {editor.kind === "roles" && roles.includes("PRODUCTION") && (
-              <p role="status" className="rounded-xl border border-outline bg-secondary/30 p-3 text-sm text-heading">
-                Después de guardar, verifica que el empleado tenga acceso a una planta de producción.
+              <p className="text-xs text-muted">
+                Cocina atiende comandas y pedidos. Producción trabaja
+                con procesos de planta y productos destinados a
+                inventario o despacho.
               </p>
-            )}
 
-            {errors.roles && (
-              <p id={rolesErrorId} className="text-xs text-danger">
-                {errors.roles}
-              </p>
-            )}
-          </fieldset>
-        )}
-      </fieldset>
+              {editor.kind === "roles" &&
+                roles.includes("PRODUCTION") && (
+                  <p
+                    role="status"
+                    className="rounded-xl border border-outline bg-secondary/30 p-3 text-sm text-heading"
+                  >
+                    Después de guardar, verifica que el empleado tenga
+                    acceso a una planta de producción.
+                  </p>
+                )}
+
+              {errors.roles && (
+                <p id={rolesErrorId} className="text-xs text-danger">
+                  {errors.roles}
+                </p>
+              )}
+            </fieldset>
+          )}
+        </fieldset>
+      </div>
 
       {message && <Alert>{message}</Alert>}
 

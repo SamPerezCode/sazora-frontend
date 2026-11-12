@@ -8,6 +8,7 @@ interface Action {
   icon: ReactNode;
   danger?: boolean;
   separatorBefore?: boolean;
+  disabled?: boolean;
   onSelect: (trigger: HTMLButtonElement) => void;
 }
 
@@ -247,6 +248,7 @@ export function ActionMenu({
             type="button"
             role="menuitem"
             tabIndex={-1}
+            aria-disabled={action.disabled || undefined}
             data-danger={action.danger || undefined}
             data-separator={action.separatorBefore || undefined}
             className={[
@@ -257,6 +259,8 @@ export function ActionMenu({
               "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent",
             ].join(" ")}
             onClick={() => {
+              if (action.disabled) return;
+
               const trigger = triggerRef.current;
 
               close(true);

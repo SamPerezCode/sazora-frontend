@@ -215,7 +215,9 @@ function EmployeesContent({ session }: { session: AuthSession }) {
   const title = !modal
     ? ""
     : modal.kind === "create"
-      ? "Nuevo empleado"
+      ? step === 1
+        ? "Datos y funciones"
+        : "Ubicaciones"
       : modal.kind === "locations"
         ? "Ubicaciones de " + modal.employee.fullName
         : modal.kind === "roles"
@@ -234,7 +236,7 @@ function EmployeesContent({ session }: { session: AuthSession }) {
       />
 
       <section className="employees-workspace space-y-5">
-        <header className="flex flex-wrap items-start justify-between gap-4">
+        <header className="employees-heading">
           <div className="min-w-0">
             <h2 className="text-xl font-bold text-heading">
               Empleados y roles
@@ -247,6 +249,8 @@ function EmployeesContent({ session }: { session: AuthSession }) {
           </div>
 
           <Button
+            className="employee-create-button"
+            aria-label="Nuevo empleado"
             size="sm"
             disabled={
               busy || !!modal || resource.loading || !!resource.error
@@ -254,9 +258,19 @@ function EmployeesContent({ session }: { session: AuthSession }) {
             onClick={() => open({ kind: "create" })}
           >
             <Plus aria-hidden="true" size={16} />
-            Nuevo empleado
+            <span>Nuevo empleado</span>
           </Button>
         </header>
+
+        <details className="employee-permissions">
+          <summary>Permisos de operación comercial</summary>
+
+          <p>
+            Los roles agrupan los permisos para trabajar con pedidos,
+            ventas y caja. Las ubicaciones asignadas determinan dónde
+            puede operar cada empleado.
+          </p>
+        </details>
 
         <EmployeeList
           employees={resource.employees}
@@ -300,9 +314,11 @@ function EmployeesContent({ session }: { session: AuthSession }) {
           open
           variant="modal"
           className={
-            modal.kind === "create" || modal.kind === "locations"
-              ? "employees-modal"
-              : "employees-modal employees-modal--compact"
+            "employees-modal employees-modal--" +
+            modal.kind +
+            (modal.kind === "create" || modal.kind === "locations"
+              ? ""
+              : " employees-modal--compact")
           }
           title={title}
           busy={busy}
@@ -310,12 +326,14 @@ function EmployeesContent({ session }: { session: AuthSession }) {
         >
           {modal.kind === "create" && (
             <>
-              <p
-                role="status"
-                className="mb-4 shrink-0 text-sm text-muted"
-              >
-                Paso {step} de 2 ·{" "}
-                {step === 1 ? "Datos y funciones" : "Ubicaciones"}
+              <p role="status" className="employee-step">
+                Paso {step} de 2
+              </p>
+
+              <p className="employee-modal-subtitle">
+                {step === 1
+                  ? "Información de acceso y roles del nuevo empleado."
+                  : "Selecciona sus ubicaciones y la predeterminada."}
               </p>
 
               {!createdEmployee && (
