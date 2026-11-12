@@ -117,7 +117,7 @@ export function LocationDialog({
     kind: "create" | "edit" | "detail" | "status";
     id?: string;
   };
-  onClose: () => void;
+  onClose: (refresh?: boolean) => void;
   onSaved: (location: BusinessLocation) => void;
 }) {
   return action.kind === "create" ? (
@@ -144,7 +144,7 @@ function ExistingLocation({
 }: {
   id: string;
   kind: "edit" | "detail" | "status";
-  onClose: () => void;
+  onClose: (refresh?: boolean) => void;
   onSaved: (location: BusinessLocation) => void;
 }) {
   const modalId = useId();
@@ -169,7 +169,7 @@ function ExistingLocation({
         variant="modal"
         title="Ubicación"
         className="configuration-modal location-modal"
-        onClose={onClose}
+        onClose={() => onClose()}
       >
         {resource.pending ? (
           <LoadingState message="Consultando ubicación…" />
@@ -208,7 +208,7 @@ function LocationForm({
   onSaved,
 }: {
   original: BusinessLocation | null;
-  onClose: () => void;
+  onClose: (refresh?: boolean) => void;
   onSaved: (location: BusinessLocation) => void;
 }) {
   const id = useId();
@@ -231,7 +231,7 @@ function LocationForm({
     if (form.dirty && !form.uncertain) {
       setDiscard(true);
     } else {
-      onClose();
+      onClose(form.uncertain);
     }
   }
 
@@ -265,7 +265,7 @@ function LocationForm({
       {discard && (
         <DiscardChangesDialog
           onCancel={() => setDiscard(false)}
-          onDiscard={onClose}
+          onDiscard={() => onClose()}
         />
       )}
 
@@ -403,7 +403,7 @@ function LocationDetail({
 }: {
   location: BusinessLocation;
   status: boolean;
-  onClose: () => void;
+  onClose: (refresh?: boolean) => void;
   onSaved: (location: BusinessLocation) => void;
 }) {
   const id = useId();
@@ -414,6 +414,12 @@ function LocationDetail({
   });
 
   const canManage = hasPermission(session, "locations.manage");
+
+  function close() {
+    if (form.busy) return;
+
+    onClose(form.uncertain);
+  }
 
   async function confirm() {
     if (!canManage) return;
@@ -451,7 +457,7 @@ function LocationDetail({
           : location.name
       }
       busy={form.busy}
-      onClose={onClose}
+      onClose={close}
     >
       <UnsavedChangesGuard dirty={false} busy={form.busy} />
 
@@ -494,12 +500,12 @@ function LocationDetail({
       {form.message && <Alert>{form.message}</Alert>}
 
       <footer className="configuration-save">
-        <Button
-          variant="cancel"
-          disabled={form.busy}
-          onClick={onClose}
-        >
-          {status ? "Cancelar" : "Cerrar"}{" "}
+        <Button variant="cancel" disabled={form.busy} onClick={close}>
+          {form.uncertain
+            ? "Cerrar y consultar listado"
+            : status
+              ? "Cancelar"
+              : "Cerrar"}
         </Button>
 
         {status && (

@@ -2,24 +2,31 @@ import { useCallback, useEffect, useState } from "react";
 import { useAppShell } from "../app/layout/shell-context";
 import type { AuthSession } from "../features/auth/types/auth.types";
 import { hasPermission } from "../features/auth/utils/permissions";
+import { ApiError } from "../lib/http/client";
 
 export function useAdminResource<T>(
   load: (session: AuthSession, signal: AbortSignal) => Promise<T>,
   name: string,
-  permission?: string
+  permission?: string,
+  keepPreviousData = false
 ) {
   const { session } = useAppShell();
   const [attempt, setAttempt] = useState(0);
 
-  const key = JSON.stringify([
+  const scope = JSON.stringify([
     name,
+    permission,
+    session.user.id,
     session.business.id,
     session.membership.id,
     session.accessToken,
-    attempt,
+    session.authorization,
   ]);
 
+  const key = JSON.stringify([scope, attempt]);
+
   const [snapshot, setSnapshot] = useState<{
+    scope: string;
     key: string;
     data?: T;
     error?: string;
@@ -37,36 +44,58 @@ export function useAdminResource<T>(
     void load(session, controller.signal)
       .then((data) => {
         if (!controller.signal.aborted) {
-          setSnapshot({ key, data });
+          setSnapshot({ scope, key, data });
         }
       })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) {
-          setSnapshot({
-            key,
-            error:
-              error instanceof Error
-                ? error.message
-                : "No pudimos consultar los datos.",
-          });
-        }
+        if (controller.signal.aborted) return;
+
+        const accessDenied =
+          error instanceof ApiError &&
+          (error.status === 401 || error.status === 403);
+
+        setSnapshot((previous) => ({
+          scope,
+          key,
+          data:
+            keepPreviousData &&
+            !accessDenied &&
+            previous?.scope === scope
+              ? previous.data
+              : undefined,
+          error:
+            error instanceof Error
+              ? error.message
+              : "No pudimos consultar los datos.",
+        }));
       });
 
     return () => controller.abort();
-  }, [session, allowed, key, load]);
+  }, [session, allowed, scope, key, load, keepPreviousData]);
+
+  const sameScope = allowed && snapshot?.scope === scope;
+
+  const data =
+    sameScope && (keepPreviousData || snapshot.key === key)
+      ? snapshot.data
+      : undefined;
+
+  const pending = allowed && snapshot?.key !== key;
+
+  const refresh = useCallback(
+    () => setAttempt((value) => value + 1),
+    []
+  );
 
   return {
-    data:
-      allowed && snapshot?.key === key ? snapshot.data : undefined,
-
+    data,
     error: !allowed
       ? "No tienes acceso a Configuración."
-      : snapshot?.key === key
+      : sameScope && snapshot.key === key
         ? snapshot.error
         : undefined,
-
-    pending: allowed && snapshot?.key !== key,
-
-    refresh: useCallback(() => setAttempt((value) => value + 1), []),
+    pending,
+    refreshing: pending && data !== undefined,
+    refresh,
   };
 }

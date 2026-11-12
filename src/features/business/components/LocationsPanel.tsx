@@ -39,7 +39,8 @@ export function LocationsPanel() {
   const resource = useAdminResource(
     getConfigurationLocations,
     "configuration-locations",
-    "locations.read"
+    "locations.read",
+    true
   );
 
   const [search, setSearch] = useState("");
@@ -144,7 +145,22 @@ export function LocationsPanel() {
 
       {notice && <Alert variant="success">{notice}</Alert>}
 
-      {resource.pending || resource.error ? (
+      {items !== undefined && resource.error && (
+        <Alert>
+          <p>
+            No pudimos actualizar el listado. Se muestran los últimos
+            datos consultados.
+          </p>
+
+          <p>{resource.error}</p>
+
+          <Button variant="secondary" onClick={resource.refresh}>
+            Reintentar
+          </Button>
+        </Alert>
+      )}
+
+      {items === undefined ? (
         <ConfigurationState
           pending={resource.pending}
           error={resource.error}
@@ -276,9 +292,12 @@ export function LocationsPanel() {
           key={action.kind + ":" + (action.id ?? "new")}
           action={action}
           onSaved={saved}
-          onClose={() => {
+          onClose={(refresh = false) => {
             setAction(null);
-            resource.refresh();
+
+            if (refresh) {
+              resource.refresh();
+            }
           }}
         />
       )}
