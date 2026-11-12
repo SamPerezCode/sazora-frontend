@@ -2,6 +2,7 @@ import { useSearchParams } from "react-router";
 import {
   Building2,
   ChefHat,
+  CreditCard,
   MapPin,
   Palette,
   Printer,
@@ -19,6 +20,8 @@ import { OrganizationFiscalPanel } from "../components/OrganizationFiscalPanel";
 import { LocationsPanel } from "../components/LocationsPanel";
 import { BusinessSettingsPage } from "./BusinessSettingsPage";
 import { KitchenWorkflowPanel } from "../../kitchen-flow/KitchenWorkflowPanel";
+import { PaymentMethodsPanel } from "../../payment-methods/components/PaymentMethodsPanel";
+import { hasPermission } from "../../auth/utils/permissions";
 
 const sections = [
   {
@@ -44,6 +47,12 @@ const sections = [
     label: "Sedes y planta",
     group: "Organización",
     icon: MapPin,
+  },
+  {
+    id: "payment-methods",
+    label: "Formas de pago",
+    group: "Operación",
+    icon: CreditCard,
   },
   {
     id: "ticket",
@@ -81,8 +90,14 @@ export function ConfigurationPage() {
   const { session } = useAppShell();
   const [params, setParams] = useSearchParams();
 
+  const availableSections = sections.filter(
+    (section) =>
+      section.id !== "payment-methods" ||
+      hasPermission(session, "business.settings.read")
+  );
+
   const active =
-    sections.find(
+    availableSections.find(
       (section) => section.id === params.get("section")
     ) ?? sections[0];
 
@@ -96,7 +111,7 @@ export function ConfigurationPage() {
   function select(value: string) {
     if (
       value === active.id ||
-      !sections.some((section) => section.id === value)
+      !availableSections.some((section) => section.id === value)
     ) {
       return;
     }
@@ -111,7 +126,7 @@ export function ConfigurationPage() {
           label="Sección de configuración"
           hideLabel
           value={active.id}
-          options={sections.map((section) => ({
+          options={availableSections.map((section) => ({
             value: section.id,
             label: section.label,
             group: section.group,
@@ -128,7 +143,7 @@ export function ConfigurationPage() {
           <div key={group}>
             <h2>{group}</h2>
 
-            {sections
+            {availableSections
               .filter((section) => section.group === group)
               .map((section) => (
                 <button
@@ -152,7 +167,8 @@ export function ConfigurationPage() {
           active.group === "Operación" &&
           active.id !== "areas" &&
           active.id !== "tables" &&
-          active.id !== "ticket"
+          active.id !== "ticket" &&
+          active.id !== "payment-methods"
             ? "configuration-content w-full md:max-w-4xl"
             : "configuration-content"
         }
@@ -162,6 +178,8 @@ export function ConfigurationPage() {
           <OrganizationFiscalPanel />
         ) : active.id === "locations" ? (
           <LocationsPanel />
+        ) : active.id === "payment-methods" ? (
+          <PaymentMethodsPanel />
         ) : active.id === "tables" ? (
           <RestaurantTablesPanel />
         ) : active.id === "areas" ? (
