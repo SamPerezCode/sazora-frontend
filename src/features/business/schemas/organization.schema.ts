@@ -171,10 +171,11 @@ export const locationFormSchema = z.object({
     ),
 
   name: requiredText(150).min(2, "Mínimo dos caracteres."),
-
   locationType: z
     .string()
     .pipe(z.enum(["PRODUCTION_WAREHOUSE", "POINT_OF_SALE"])),
+
+  isSalesLocation: z.boolean(),
 
   address: optionalText(250),
   countryCode: country,
@@ -205,7 +206,8 @@ export function emptyLocationDraft(): LocationDraft {
   return {
     code: "",
     name: "",
-    locationType: "",
+    locationType: "POINT_OF_SALE",
+    isSalesLocation: true,
     address: "",
     countryCode: "CO",
     departmentCode: "",

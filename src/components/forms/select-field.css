@@ -151,3 +151,17 @@
     }
   }
 }
+
+.select-field-group-label {
+  padding: 0.65rem 0.75rem 0.35rem;
+  color: var(--sazora-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.select-field-viewport > [role="group"] + [role="group"] {
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--sazora-outline);
+}

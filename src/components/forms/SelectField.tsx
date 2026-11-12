@@ -6,6 +6,7 @@ interface SelectOption {
   value: string;
   label: string;
   disabled?: boolean;
+  group?: string;
 }
 
 interface SelectFieldProps {
@@ -47,6 +48,10 @@ export function SelectField({
 
   const [container, setContainer] = useState<HTMLElement | null>(
     null
+  );
+
+  const optionGroups = Array.from(
+    new Set(options.map((option) => option.group))
   );
 
   const selected = options.some((option) => option.value === value);
@@ -148,19 +153,39 @@ export function SelectField({
             </Select.ScrollUpButton>
 
             <Select.Viewport className="select-field-viewport">
-              {options.map((option) => (
-                <Select.Item
-                  key={option.value}
-                  value={`value:${option.value}`}
-                  disabled={option.disabled}
-                  className="select-field-option"
+              {optionGroups.map((group) => (
+                <Select.Group
+                  key={
+                    group === undefined
+                      ? "ungrouped"
+                      : "group:" + group
+                  }
                 >
-                  <Select.ItemText>{option.label}</Select.ItemText>
+                  {group !== undefined && (
+                    <Select.Label className="select-field-group-label">
+                      {group}
+                    </Select.Label>
+                  )}
 
-                  <Select.ItemIndicator className="select-field-check">
-                    <Check aria-hidden="true" size={16} />
-                  </Select.ItemIndicator>
-                </Select.Item>
+                  {options
+                    .filter((option) => option.group === group)
+                    .map((option) => (
+                      <Select.Item
+                        key={option.value}
+                        value={`value:${option.value}`}
+                        disabled={option.disabled}
+                        className="select-field-option"
+                      >
+                        <Select.ItemText>
+                          {option.label}
+                        </Select.ItemText>
+
+                        <Select.ItemIndicator className="select-field-check">
+                          <Check aria-hidden="true" size={16} />
+                        </Select.ItemIndicator>
+                      </Select.Item>
+                    ))}
+                </Select.Group>
               ))}
 
               {options.length === 0 && (

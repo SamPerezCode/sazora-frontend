@@ -1,5 +1,6 @@
 import { useCallback, useId, useState } from "react";
-import { Factory, Store } from "lucide-react";
+import { Toggle } from "../../../components/forms/Toggle";
+import { hasPermission } from "../../auth/utils/permissions";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { BottomSheet } from "../../../components/layout/BottomSheet";
 import { Button } from "../../../components/ui/Button";
@@ -47,18 +48,27 @@ const fields: SettingsField[] = [
     name: "address",
     label: "Dirección",
     max: 250,
-    wide: true,
   },
   {
     name: "countryCode",
-    label: "País (código de dos letras)",
+    label: "Código país",
     max: 2,
     required: true,
+  },
+  {
+    name: "departmentCode",
+    label: "Código departamento",
+    max: 5,
   },
   {
     name: "departmentName",
     label: "Departamento",
     max: 100,
+  },
+  {
+    name: "municipalityCode",
+    label: "Código municipio",
+    max: 10,
   },
   {
     name: "municipalityName",
@@ -82,16 +92,6 @@ const fields: SettingsField[] = [
     max: 254,
     type: "email",
   },
-  {
-    name: "departmentCode",
-    label: "Código de departamento (opcional)",
-    max: 5,
-  },
-  {
-    name: "municipalityCode",
-    label: "Código de municipio (opcional)",
-    max: 10,
-  },
 ];
 
 export function LocationCapabilities({
@@ -103,7 +103,7 @@ export function LocationCapabilities({
     <div className="configuration-badges">
       {location.isInventoryLocation && <span>Inventario</span>}
       {location.isProductionLocation && <span>Producción</span>}
-      {location.isSalesLocation && <span>Ventas</span>}
+      {location.isSalesLocation && <span>Puede vender</span>}
     </div>
   );
 }
@@ -155,7 +155,11 @@ function ExistingLocation({
     [id]
   );
 
-  const resource = useAdminResource(load, "location:" + id);
+  const resource = useAdminResource(
+    load,
+    "location:" + id,
+    "locations.read"
+  );
 
   if (!resource.data) {
     return (
@@ -164,7 +168,7 @@ function ExistingLocation({
         open
         variant="modal"
         title="Ubicación"
-        className="configuration-modal"
+        className="configuration-modal location-modal"
         onClose={onClose}
       >
         {resource.pending ? (
@@ -209,6 +213,7 @@ function LocationForm({
 }) {
   const id = useId();
   const { session } = useAppShell();
+  const canManage = hasPermission(session, "locations.manage");
 
   const form = useAdminForm<LocationDraft>(
     original
@@ -216,8 +221,9 @@ function LocationForm({
       : emptyLocationDraft()
   );
 
-  const [step, setStep] = useState(original ? 2 : 1);
   const [discard, setDiscard] = useState(false);
+
+  const disabled = form.busy || form.uncertain || !canManage;
 
   function close() {
     if (form.busy) return;
@@ -230,6 +236,8 @@ function LocationForm({
   }
 
   async function submit() {
+    if (disabled || !form.dirty) return;
+
     let saved: BusinessLocation | undefined;
 
     await form.save(
@@ -266,139 +274,104 @@ function LocationForm({
         open
         variant="modal"
         title={original ? "Editar ubicación" : "Nueva ubicación"}
-        className="configuration-modal"
+        className="configuration-modal location-modal"
         busy={form.busy}
         onClose={close}
       >
+        <p className="location-modal-description">
+          Capacidades y datos de la ubicación
+        </p>
+
         <form
           noValidate
           onSubmit={(event) => {
             event.preventDefault();
-
-            if (step === 1) {
-              if (
-                locationTypes.some(
-                  (type) => type.value === form.draft.locationType
-                )
-              ) {
-                setStep(2);
-              }
-            } else {
-              void submit();
-            }
+            void submit();
           }}
         >
-          {!original && (
-            <div className="configuration-step">
-              <p>
-                Paso {step} de 2 ·{" "}
-                {step === 1
-                  ? "Elige el tipo de lugar"
-                  : "Datos de la ubicación"}
-              </p>
-
-              <progress
-                value={step}
-                max={2}
-                aria-label="Progreso de nueva ubicación"
-              />
-            </div>
-          )}
-
           <fieldset
-            disabled={form.busy || form.uncertain}
-            className="configuration-section"
+            disabled={disabled}
+            className="location-form-fields"
           >
             <legend className="sr-only">Datos de la ubicación</legend>
 
-            {step === 1 ? (
-              locationTypes.map((type, index) => {
-                const Icon = index === 0 ? Factory : Store;
+            <SettingsFields
+              fields={fields.slice(0, 2)}
+              values={form.draft}
+              errors={form.errors}
+              onChange={(name, value) =>
+                form.change({ [name]: value })
+              }
+            />
 
-                return (
-                  <button
-                    type="button"
-                    key={type.value}
-                    className="configuration-choice"
-                    aria-pressed={
-                      form.draft.locationType === type.value
-                    }
-                    onClick={() =>
-                      form.change({
-                        locationType: type.value,
-                      })
-                    }
-                  >
-                    <Icon size={24} />
+            <div className="configuration-fields location-capability-fields">
+              <SelectField
+                label="Tipo de ubicación"
+                name="locationType"
+                required
+                disabled={disabled}
+                value={form.draft.locationType}
+                options={locationTypes}
+                error={form.errors.locationType}
+                onValueChange={(value) =>
+                  form.change({ locationType: value })
+                }
+              />
 
-                    <span>
-                      <strong>{type.label}</strong>
+              <Toggle
+                label="Puede vender"
+                name="isSalesLocation"
+                checked={form.draft.isSalesLocation}
+                disabled={disabled}
+                error={form.errors.isSalesLocation}
+                onChange={(event) =>
+                  form.change({
+                    isSalesLocation: event.currentTarget.checked,
+                  })
+                }
+              />
+            </div>
 
-                      <small>
-                        {index === 0
-                          ? "Produce, almacena y despacha productos."
-                          : "Recibe inventario y registra ventas."}
-                      </small>
+            <div
+              className="configuration-badges"
+              aria-label="Capacidades derivadas del tipo"
+            >
+              <span>Inventario</span>
 
-                      <small>
-                        Inventario ·{" "}
-                        {index === 0 ? "Producción" : "Ventas"}
-                      </small>
-                    </span>
-                  </button>
-                );
-              })
-            ) : (
-              <>
-                {original && (
-                  <SelectField
-                    label="Tipo de ubicación"
-                    required
-                    value={form.draft.locationType}
-                    options={locationTypes}
-                    error={form.errors.locationType}
-                    onValueChange={(value) =>
-                      form.change({ locationType: value })
-                    }
-                  />
-                )}
+              {form.draft.locationType === "PRODUCTION_WAREHOUSE" && (
+                <span>Producción</span>
+              )}
+            </div>
 
-                {original &&
-                  original.locationType !==
-                    form.draft.locationType && (
-                    <p className="configuration-warning">
-                      Cambiar el tipo modificará las operaciones
-                      permitidas para esta ubicación.
-                    </p>
-                  )}
+            {original &&
+              original.locationType !== form.draft.locationType && (
+                <p className="configuration-warning">
+                  Cambiar el tipo modificará las capacidades de esta
+                  ubicación.
+                </p>
+              )}
 
-                <SettingsFields
-                  fields={fields}
-                  values={form.draft}
-                  errors={form.errors}
-                  onChange={(name, value) =>
-                    form.change({ [name]: value })
-                  }
-                />
-              </>
-            )}
+            <SettingsFields
+              fields={fields.slice(2)}
+              values={form.draft}
+              errors={form.errors}
+              onChange={(name, value) =>
+                form.change({ [name]: value })
+              }
+            />
           </fieldset>
+
+          {!canManage && (
+            <Alert>
+              No tienes permiso para modificar ubicaciones.
+            </Alert>
+          )}
 
           {form.message && <Alert>{form.message}</Alert>}
 
           <footer className="configuration-save configuration-location-form-actions">
-            {!original && step === 2 && (
-              <Button
-                variant="secondary"
-                disabled={form.busy || form.uncertain}
-                onClick={() => setStep(1)}
-              >
-                Volver
-              </Button>
-            )}
-
             <Button
-              variant="cancel"
+              variant="secondary"
               disabled={form.busy}
               onClick={close}
             >
@@ -411,17 +384,9 @@ function LocationForm({
               type="submit"
               loading={form.busy}
               loadingText="Guardando…"
-              disabled={
-                form.busy ||
-                form.uncertain ||
-                (step === 1 ? !form.draft.locationType : !form.dirty)
-              }
+              disabled={disabled || !form.dirty}
             >
-              {step === 1
-                ? "Continuar"
-                : original
-                  ? "Guardar cambios"
-                  : "Crear ubicación"}
+              Guardar ubicación
             </Button>
           </footer>
         </form>
@@ -448,7 +413,11 @@ function LocationDetail({
     isActive: location.isActive,
   });
 
+  const canManage = hasPermission(session, "locations.manage");
+
   async function confirm() {
+    if (!canManage) return;
+
     let saved: BusinessLocation | undefined;
 
     await form.save(
@@ -477,8 +446,8 @@ function LocationDetail({
       title={
         status
           ? location.isActive
-            ? "Desactivar ubicación"
-            : "Reactivar ubicación"
+            ? "Desactivar " + location.name
+            : "Activar " + location.name
           : location.name
       }
       busy={form.busy}
@@ -530,7 +499,7 @@ function LocationDetail({
           disabled={form.busy}
           onClick={onClose}
         >
-          Cerrar
+          {status ? "Cancelar" : "Cerrar"}{" "}
         </Button>
 
         {status && (
@@ -538,10 +507,10 @@ function LocationDetail({
             variant={location.isActive ? "danger" : "primary"}
             loading={form.busy}
             loadingText="Guardando…"
-            disabled={form.busy || form.uncertain}
+            disabled={form.busy || form.uncertain || !canManage}
             onClick={() => void confirm()}
           >
-            {location.isActive ? "Desactivar ubicación" : "Reactivar"}
+            Confirmar
           </Button>
         )}
       </footer>

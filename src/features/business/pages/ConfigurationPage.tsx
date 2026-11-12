@@ -114,6 +114,7 @@ export function ConfigurationPage() {
           options={sections.map((section) => ({
             value: section.id,
             label: section.label,
+            group: section.group,
           }))}
           onValueChange={select}
         />

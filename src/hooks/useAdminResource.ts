@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAppShell } from "../app/layout/shell-context";
 import type { AuthSession } from "../features/auth/types/auth.types";
+import { hasPermission } from "../features/auth/utils/permissions";
 
 export function useAdminResource<T>(
   load: (session: AuthSession, signal: AbortSignal) => Promise<T>,
-  name: string
+  name: string,
+  permission?: string
 ) {
   const { session } = useAppShell();
   const [attempt, setAttempt] = useState(0);
@@ -23,7 +25,9 @@ export function useAdminResource<T>(
     error?: string;
   } | null>(null);
 
-  const allowed = session.authorization.roles.includes("ADMIN");
+  const allowed = permission
+    ? hasPermission(session, permission)
+    : session.authorization.roles.includes("ADMIN");
 
   useEffect(() => {
     if (!allowed) return;

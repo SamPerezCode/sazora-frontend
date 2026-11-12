@@ -68,7 +68,7 @@ export async function getFiscalProfile(
     const response = await request(
       "/organization-profile",
       profileResponse,
-      options(session, signal)
+      locationOptions(session, signal, "locations.read")
     );
 
     return verify(response.data.profile, session);
@@ -211,7 +211,7 @@ export async function saveLocation(
     id ? "/locations/" + encodeURIComponent(id) : "/locations",
     locationResponse,
     {
-      ...options(session, signal),
+      ...locationOptions(session, signal, "locations.manage"),
       method: id ? "PATCH" : "POST",
       body,
     }
@@ -240,7 +240,7 @@ export async function setLocationStatus(
     "/locations/" + encodeURIComponent(id) + "/status",
     locationResponse,
     {
-      ...options(session, signal),
+      ...locationOptions(session, signal, "locations.manage"),
       method: "PATCH",
       body: { isActive },
     }
@@ -257,4 +257,39 @@ export async function setLocationStatus(
   }
 
   return location;
+}
+
+function locationOptions(
+  session: AuthSession,
+  signal: AbortSignal,
+  permission: "locations.read" | "locations.manage"
+) {
+  if (!hasPermission(session, permission)) {
+    throw new ApiError(
+      403,
+      "FORBIDDEN",
+      permission === "locations.read"
+        ? "No tienes permiso para consultar ubicaciones."
+        : "No tienes permiso para modificar ubicaciones."
+    );
+  }
+
+  return {
+    accessToken: session.accessToken,
+    signal,
+  };
+}
+
+export async function getConfigurationLocations(
+  session: AuthSession,
+  signal: AbortSignal
+) {
+  const response = await request("/locations", locationsResponse, {
+    ...locationOptions(session, signal, "locations.read"),
+    cache: "no-store",
+  });
+
+  return response.data.locations.map((location) =>
+    verify(location, session)
+  );
 }

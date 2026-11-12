@@ -1,35 +1,49 @@
 import { useState } from "react";
 import {
-  Eye,
   Factory,
-  MapPin,
   Pencil,
   Plus,
   Power,
+  Search,
   Store,
 } from "lucide-react";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { Button } from "../../../components/ui/Button";
-import { ActionMenu } from "../../../components/ui/ActionMenu";
 import { Alert } from "../../../components/feedback/Alert";
 import { SelectField } from "../../../components/forms/SelectField";
+import { TextField } from "../../../components/forms/TextField";
+import { hasPermission } from "../../auth/utils/permissions";
 import { useAdminResource } from "../../../hooks/useAdminResource";
 import { useInventoryRealtime } from "../../../hooks/useInventoryRealtime";
-import { getLocations } from "../services/organization.service";
+import { useTimedMessage } from "../../../hooks/useTimedMessage";
+import { getConfigurationLocations } from "../services/organization.service";
 import { locationTypes } from "../schemas/organization.schema";
 import type { BusinessLocation } from "../schemas/organization.schema";
 import { ConfigurationState } from "./ConfigurationState";
-import { useTimedMessage } from "../../../hooks/useTimedMessage";
 import {
   LocationCapabilities,
   LocationDialog,
 } from "./LocationDialog";
 
+function normalize(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 export function LocationsPanel() {
   const { session } = useAppShell();
-  const resource = useAdminResource(getLocations, "locations");
+  const canManage = hasPermission(session, "locations.manage");
 
-  const [type, setType] = useState("ALL");
+  const resource = useAdminResource(
+    getConfigurationLocations,
+    "configuration-locations",
+    "locations.read"
+  );
+
+  const [search, setSearch] = useState("");
+  const [capability, setCapability] = useState("ALL");
   const [activity, setActivity] = useState("ALL");
   const [notice, setNotice] = useTimedMessage();
   const [savedId, setSavedId] = useState("");
@@ -46,23 +60,31 @@ export function LocationsPanel() {
     return true;
   });
 
+  const query = normalize(search.trim());
   const items = resource.data;
 
-  const visible = (items ?? [])
-    .filter(
-      (item) =>
-        (type === "ALL" || item.locationType === type) &&
-        (activity === "ALL" ||
-          item.isActive === (activity === "ACTIVE"))
-    )
-    .sort(
-      (a, b) => Number(b.id === savedId) - Number(a.id === savedId)
-    );
+  const visible = (items ?? []).filter(
+    (item) =>
+      (!query ||
+        normalize(item.name).includes(query) ||
+        normalize(item.code).includes(query)) &&
+      (capability === "ALL" ||
+        (capability === "INVENTORY" && item.isInventoryLocation) ||
+        (capability === "PRODUCTION" && item.isProductionLocation) ||
+        (capability === "SALES" && item.isSalesLocation)) &&
+      (activity === "ALL" ||
+        item.isActive === (activity === "ACTIVE"))
+  );
+
+  function clearFilters() {
+    setSearch("");
+    setCapability("ALL");
+    setActivity("ALL");
+  }
 
   function saved(location: BusinessLocation) {
     setAction(null);
-    setType("ALL");
-    setActivity("ALL");
+    clearFilters();
     setSavedId(location.id);
     setNotice(
       "Ubicación " + location.name + " guardada correctamente."
@@ -70,80 +92,41 @@ export function LocationsPanel() {
     resource.refresh();
   }
 
-  const create = (
-    <Button onClick={() => setAction({ kind: "create" })}>
-      <Plus size={16} />
+  const create = canManage ? (
+    <Button size="sm" onClick={() => setAction({ kind: "create" })}>
+      <Plus size={16} aria-hidden="true" />
       Nueva ubicación
     </Button>
-  );
+  ) : null;
 
   return (
-    <section className="configuration-section">
-      <header className="configuration-heading">
-        <div>
-          <h2>Sedes y planta</h2>
-          <p>
-            Administra los lugares físicos propios donde opera la
-            organización.
-          </p>
-        </div>
-
+    <section className="configuration-section locations-panel">
+      <header className="configuration-heading locations-heading">
+        <h2>Sedes y planta</h2>
         {create}
       </header>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        {[
-          {
-            label: "Plantas / bodegas",
-            Icon: Factory,
-            count: items?.filter(
-              (item) => item.locationType === "PRODUCTION_WAREHOUSE"
-            ).length,
-          },
-          {
-            label: "Puntos de venta",
-            Icon: Store,
-            count: items?.filter(
-              (item) => item.locationType === "POINT_OF_SALE"
-            ).length,
-          },
-          {
-            label: "Ubicaciones activas",
-            Icon: MapPin,
-            count: items?.filter((item) => item.isActive).length,
-          },
-        ].map((metric) => (
-          <div
-            key={metric.label}
-            className="configuration-card flex items-center gap-3 p-4 md:block"
-          >
-            <metric.Icon
-              aria-hidden="true"
-              size={22}
-              className="shrink-0 text-accent"
-            />
+      <div className="locations-filters">
+        <div className="locations-search">
+          <TextField
+            label="Buscar por nombre o código"
+            type="search"
+            icon={Search}
+            placeholder="Buscar por nombre o código"
+            value={search}
+            onChange={(event) => setSearch(event.currentTarget.value)}
+          />
+        </div>
 
-            <div className="min-w-0 md:mt-2">
-              <strong className="block text-xl font-bold leading-none">
-                {metric.count ?? "—"}
-              </strong>
-
-              <p className="mt-1 text-xs leading-snug">
-                {metric.label}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="configuration-filters">
         <SelectField
-          label="Tipo de ubicación"
-          value={type}
-          onValueChange={setType}
+          label="Capacidad"
+          value={capability}
+          onValueChange={setCapability}
           options={[
-            { value: "ALL", label: "Todas las ubicaciones" },
-            ...locationTypes,
+            { value: "ALL", label: "Todas las capacidades" },
+            { value: "INVENTORY", label: "Inventario" },
+            { value: "PRODUCTION", label: "Producción" },
+            { value: "SALES", label: "Puede vender" },
           ]}
         />
 
@@ -152,9 +135,9 @@ export function LocationsPanel() {
           value={activity}
           onValueChange={setActivity}
           options={[
-            { value: "ALL", label: "Activas e inactivas" },
-            { value: "ACTIVE", label: "Solo activas" },
-            { value: "INACTIVE", label: "Solo inactivas" },
+            { value: "ALL", label: "Todos" },
+            { value: "ACTIVE", label: "Activas" },
+            { value: "INACTIVE", label: "Inactivas" },
           ]}
         />
       </div>
@@ -173,123 +156,119 @@ export function LocationsPanel() {
         <div className="configuration-card configuration-state">
           <h3>No hay ubicaciones con estos filtros</h3>
 
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setType("ALL");
-              setActivity("ALL");
-            }}
-          >
+          <Button variant="secondary" onClick={clearFilters}>
             Limpiar filtros
           </Button>
         </div>
       ) : (
-        <div className="configuration-table-wrap">
-          <table className="configuration-table">
-            <thead>
-              <tr>
-                {[
-                  "Código",
-                  "Nombre",
-                  "Tipo",
-                  "Dirección",
-                  "Capacidades",
-                  "Estado",
-                  "Acciones",
-                ].map((label) => (
-                  <th key={label}>{label}</th>
-                ))}
-              </tr>
-            </thead>
+        <ul className="locations-list" aria-label="Ubicaciones">
+          {visible.map((location) => {
+            const Icon =
+              location.locationType === "POINT_OF_SALE"
+                ? Store
+                : Factory;
 
-            <tbody>
-              {visible.map((location) => (
-                <tr
-                  key={location.id}
-                  className="configuration-location-row"
-                  data-inactive={!location.isActive}
-                  data-highlight={location.id === savedId}
-                >
-                  <td data-label="Código">{location.code}</td>
+            return (
+              <li
+                key={location.id}
+                className="locations-row"
+                data-inactive={!location.isActive}
+                data-highlight={location.id === savedId}
+              >
+                <Icon
+                  className="locations-icon"
+                  size={22}
+                  aria-hidden="true"
+                />
 
-                  <td data-label="Nombre">
-                    <strong>{location.name}</strong>
-                  </td>
-
-                  <td data-label="Tipo">
+                <div className="locations-information">
+                  <p className="locations-code">
+                    {location.code} ·{" "}
                     {
                       locationTypes.find(
-                        (item) => item.value === location.locationType
+                        (type) => type.value === location.locationType
                       )?.label
                     }
-                  </td>
+                  </p>
 
-                  <td data-label="Dirección">
-                    {[location.address, location.municipalityName]
+                  <button
+                    type="button"
+                    className="locations-name"
+                    aria-label={"Ver detalle de " + location.name}
+                    onClick={() =>
+                      setAction({
+                        kind: "detail",
+                        id: location.id,
+                      })
+                    }
+                  >
+                    {location.name}
+                  </button>
+
+                  <p className="locations-address">
+                    {[
+                      location.address || "Sin dirección",
+                      location.municipalityName,
+                    ]
                       .filter(Boolean)
-                      .join(", ") || "—"}
-                  </td>
+                      .join(" · ")}
+                  </p>
 
-                  <td data-label="Capacidades">
-                    <LocationCapabilities location={location} />
-                  </td>
-
-                  <td data-label="Estado">
-                    <span className="configuration-status">
+                  <div className="locations-badges">
+                    <span
+                      className="locations-status"
+                      data-active={location.isActive}
+                    >
                       {location.isActive ? "Activa" : "Inactiva"}
                     </span>
-                  </td>
 
-                  <td
-                    data-label="Acciones"
-                    className="configuration-location-actions"
-                  >
-                    <ActionMenu
-                      appearance="compact"
-                      label={"Acciones de " + location.name}
-                      actions={[
-                        {
-                          id: "detail",
-                          label: "Ver detalle",
-                          icon: <Eye size={16} />,
-                          onSelect: () =>
-                            setAction({
-                              kind: "detail",
-                              id: location.id,
-                            }),
-                        },
-                        {
-                          id: "edit",
-                          label: "Editar ubicación",
-                          icon: <Pencil size={16} />,
-                          onSelect: () =>
-                            setAction({
-                              kind: "edit",
-                              id: location.id,
-                            }),
-                        },
-                        {
-                          id: "status",
-                          label: location.isActive
-                            ? "Desactivar ubicación"
-                            : "Reactivar",
-                          icon: <Power size={16} />,
-                          danger: location.isActive,
-                          separatorBefore: true,
-                          onSelect: () =>
-                            setAction({
-                              kind: "status",
-                              id: location.id,
-                            }),
-                        },
-                      ]}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    <LocationCapabilities location={location} />
+                  </div>
+                </div>
+
+                {canManage && (
+                  <div className="locations-actions">
+                    <button
+                      type="button"
+                      aria-label={"Editar " + location.name}
+                      title="Editar ubicación"
+                      onClick={() =>
+                        setAction({
+                          kind: "edit",
+                          id: location.id,
+                        })
+                      }
+                    >
+                      <Pencil size={17} aria-hidden="true" />
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-label={
+                        (location.isActive
+                          ? "Desactivar "
+                          : "Activar ") + location.name
+                      }
+                      title={
+                        location.isActive
+                          ? "Desactivar ubicación"
+                          : "Activar ubicación"
+                      }
+                      onClick={() =>
+                        setAction({
+                          kind: "status",
+                          id: location.id,
+                        })
+                      }
+                    >
+                      <Power size={17} aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       )}
 
       {action && (
