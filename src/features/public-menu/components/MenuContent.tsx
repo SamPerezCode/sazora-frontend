@@ -1,164 +1,41 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
-import {
-  Check,
-  Clock,
-  MapPin,
-  Pencil,
-  Phone,
-  Plus,
-  Search,
-  ShoppingBag,
-} from "lucide-react";
-import { SelectField } from "../../components/forms/SelectField";
-import { TextField } from "../../components/forms/TextField";
-import { ApiError } from "../../lib/http/client";
-import {
-  cents,
-  getPublicMenu,
-  money,
-  sendPublicOrder,
-  slugSchema,
-  themeFor,
-} from "./public-menu.api";
-import type {
-  CartLine,
-  CartRow,
-  CheckoutDraft,
-  PublicMenu,
-  PublicProduct,
-} from "./public-menu.api";
-import {
-  CartDialog,
-  CheckoutDialog,
-  MenuImage,
-  ProductDialog,
-} from "./PublicMenuDialogs";
-import "./public-menu.css";
+import { SelectField } from "../../../components/forms/SelectField";
+import { TextField } from "../../../components/forms/TextField";
+import { ApiError } from "../../../lib/http/client";
+import { cents } from "../../../lib/money";
+import { money } from "../../../lib/money";
+import type { CartLine } from "../schemas/public-menu.schema";
+import type { CartRow } from "../schemas/public-menu.schema";
+import type { CheckoutDraft } from "../schemas/public-menu.schema";
+import type { PublicMenu } from "../schemas/public-menu.schema";
+import type { PublicProduct } from "../schemas/public-menu.schema";
+import { sendPublicOrder } from "../services/public-menu.service";
+import { themeFor } from "../utils/public-menu-theme";
+import { getInstagramHandle } from "../utils/public-menu.utils";
+import { normalize } from "../utils/public-menu.utils";
+import { CartDialog } from "./CartDialog";
+import { CheckoutDialog } from "./CheckoutDialog";
+import { MenuImage } from "./MenuImage";
+import { ProductDialog } from "./ProductDialog";
+import { Check } from "lucide-react";
+import { Clock } from "lucide-react";
+import { MapPin } from "lucide-react";
+import { Pencil } from "lucide-react";
+import { Phone } from "lucide-react";
+import { Plus } from "lucide-react";
+import { Search } from "lucide-react";
+import { ShoppingBag } from "lucide-react";
+import { useNavigate } from "react-router";
+import { useEffect } from "react";
+import { useRef } from "react";
+import { useState } from "react";
 
-type Dialog =
+export type Dialog =
   | { kind: "cart" }
   | { kind: "checkout" }
   | { kind: "product"; product: PublicProduct }
   | null;
 
-function getInstagramHandle(
-  instagram: string | null | undefined
-): string | null {
-  const value = instagram?.trim();
-
-  if (!value) return null;
-
-  let handle: string;
-  if (/^https?:\/\//i.test(value)) {
-    try {
-      const url = new URL(value);
-
-      if (
-        !["instagram.com", "www.instagram.com"].includes(
-          url.hostname.toLowerCase()
-        )
-      ) {
-        return null;
-      }
-
-      handle = url.pathname.split("/").filter(Boolean)[0] ?? "";
-    } catch {
-      return null;
-    }
-  } else {
-    handle = value.replace(/^@/, "");
-  }
-
-  return /^[a-z0-9._]{1,30}$/i.test(handle) ? handle : null;
-}
-
-function normalize(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("es")
-    .trim();
-}
-
-export function PublicMenuPage() {
-  const { businessSlug = "" } = useParams();
-
-  if (!slugSchema.safeParse(businessSlug).success) {
-    return (
-      <main className="pm-root pm-loading">
-        El enlace no es válido.
-      </main>
-    );
-  }
-
-  return <MenuLoader key={businessSlug} slug={businessSlug} />;
-}
-
-function MenuLoader({ slug }: { slug: string }) {
-  const [attempt, setAttempt] = useState(0);
-  const [snapshot, setSnapshot] = useState<{
-    attempt: number;
-    data: PublicMenu | null;
-    error: string;
-  }>({ attempt: -1, data: null, error: "" });
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    void getPublicMenu(slug, controller.signal)
-      .then((data) => {
-        if (!controller.signal.aborted) {
-          setSnapshot({ attempt, data, error: "" });
-        }
-      })
-      .catch((cause: unknown) => {
-        if (!controller.signal.aborted) {
-          setSnapshot((previous) => ({
-            attempt,
-            data: previous.data,
-            error:
-              cause instanceof Error
-                ? cause.message
-                : "No pudimos cargar el menú.",
-          }));
-        }
-      });
-
-    return () => controller.abort();
-  }, [slug, attempt]);
-
-  const pending = snapshot.attempt !== attempt;
-  const refresh = () => setAttempt((value) => value + 1);
-
-  if (!snapshot.data) {
-    return (
-      <main className="pm-root pm-loading" style={themeFor()}>
-        {pending ? (
-          <p role="status">Cargando menú…</p>
-        ) : (
-          <div className="pm-stack">
-            <p role="alert">{snapshot.error}</p>
-            <button className="pm-primary" onClick={refresh}>
-              Reintentar
-            </button>
-          </div>
-        )}
-      </main>
-    );
-  }
-
-  return (
-    <MenuContent
-      menu={snapshot.data}
-      refreshing={pending}
-      loadError={snapshot.error}
-      onRefresh={refresh}
-    />
-  );
-}
-
-function MenuContent({
+export function MenuContent({
   menu,
   refreshing,
   loadError,

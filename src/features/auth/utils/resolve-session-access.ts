@@ -47,17 +47,17 @@ const modules: readonly ModuleDefinition[] = [
   },
   {
     id: "public-orders",
-    label: "Pedidos públicos",
+    label: "Solicitudes del menú público",
     path: "/pedidos-publicos",
     permission: "public_orders.read",
-    available: false,
+    available: true,
   },
   {
     id: "deliveries",
     label: "Domicilios",
     path: "/domicilios",
     permission: "deliveries.read",
-    available: false,
+    available: true,
   },
   {
     id: "statistics",

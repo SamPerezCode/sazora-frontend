@@ -8,6 +8,8 @@ import {
   PackageOpen,
   Settings,
   Tags,
+  Bike,
+  ClipboardList,
 } from "lucide-react";
 
 import type { LucideIcon } from "lucide-react";
@@ -68,6 +70,26 @@ const navigation: readonly NavigationItem[] = [
     group: "main",
     status: "ready",
     to: "/ventas",
+  },
+  {
+    id: "public-orders",
+    label: "Solicitudes del menú público",
+    description: "Ventas · Revisión comercial",
+    icon: ClipboardList,
+    roles: null,
+    group: "main",
+    status: "ready",
+    to: "/pedidos-publicos",
+  },
+  {
+    id: "deliveries",
+    label: "Domicilios",
+    description: "Ventas · Pedidos aceptados",
+    icon: Bike,
+    roles: null,
+    group: "main",
+    status: "ready",
+    to: "/domicilios",
   },
   {
     id: "kitchen",

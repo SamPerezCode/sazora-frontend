@@ -1,143 +1,26 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  Link,
-  useLocation,
-  useNavigate,
-  useParams,
-} from "react-router";
-import { Check, Copy, MessageCircle, RefreshCw } from "lucide-react";
-import { z } from "zod";
-import {
-  getPublicMenu,
-  getPublicTracking,
-  money,
-  slugSchema,
-  themeFor,
-  buildWhatsAppOrderMessage,
-  buildWhatsAppUrl,
-  publicWhatsAppStateSchema,
-} from "./public-menu.api";
-import type {
-  PublicBusiness,
-  PublicTracking,
-} from "./public-menu.api";
-import { MenuImage } from "./PublicMenuDialogs";
-import "./public-menu.css";
+import { money } from "../../../lib/money";
+import { buildWhatsAppUrl } from "../../../lib/whatsapp";
+import type { PublicBusiness } from "../schemas/public-menu.schema";
+import type { PublicTracking } from "../schemas/public-menu.schema";
+import { publicWhatsAppStateSchema } from "../schemas/public-menu.schema";
+import { getPublicMenu } from "../services/public-menu.service";
+import { getPublicTracking } from "../services/public-menu.service";
+import { themeFor } from "../utils/public-menu-theme";
+import { statusOf } from "../utils/public-order-status";
+import { buildWhatsAppOrderMessage } from "../utils/public-order-whatsapp";
+import { MenuImage } from "./MenuImage";
+import { Check } from "lucide-react";
+import { Copy } from "lucide-react";
+import { MessageCircle } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+import { Link } from "react-router";
+import { useLocation } from "react-router";
+import { useNavigate } from "react-router";
+import { useEffect } from "react";
+import { useRef } from "react";
+import { useState } from "react";
 
-function statusOf(tracking: PublicTracking) {
-  const delivery = tracking.serviceType === "DELIVERY";
-  const labels = [
-    "Solicitud recibida",
-    "Solicitud aceptada",
-    "En preparación",
-    "Listo",
-    ...(delivery ? ["En camino"] : []),
-    "Entregado",
-  ];
-
-  if (tracking.requestStatus === "REJECTED") {
-    return {
-      labels,
-      index: 0,
-      text: "Solicitud rechazada",
-      stopped: true,
-    };
-  }
-
-  if (
-    tracking.requestStatus === "CANCELLED" ||
-    tracking.orderStatus === "CANCELLED" ||
-    tracking.fulfillmentStatus === "CANCELLED"
-  ) {
-    return {
-      labels,
-      index: 0,
-      text: "Pedido cancelado",
-      stopped: true,
-    };
-  }
-
-  let index = 0;
-  let text = "Pendiente de confirmación";
-
-  if (tracking.requestStatus === "CONTACTED") {
-    text = "Contacto del negocio";
-  }
-
-  if (tracking.requestStatus === "ACCEPTED") {
-    index = 1;
-    text = "Solicitud aceptada";
-  }
-
-  if (tracking.orderStatus === "CONFIRMED") {
-    index = 1;
-    text = "Pedido confirmado";
-  }
-
-  if (tracking.preparationStatus === "IN_PREPARATION") {
-    index = 2;
-    text = "En preparación";
-  }
-
-  if (
-    tracking.preparationStatus === "READY" ||
-    tracking.preparationStatus === "DELIVERED"
-  ) {
-    index = 3;
-    text = "Listo";
-  }
-
-  if (
-    delivery &&
-    (tracking.fulfillmentStatus === "PICKED_UP" ||
-      tracking.fulfillmentStatus === "OUT_FOR_DELIVERY")
-  ) {
-    index = 4;
-    text =
-      tracking.fulfillmentStatus === "PICKED_UP"
-        ? "Recogido por el domiciliario"
-        : "En camino";
-  }
-
-  if (
-    tracking.fulfillmentStatus === "DELIVERED" ||
-    tracking.orderStatus === "DELIVERED"
-  ) {
-    index = labels.length - 1;
-    text = "Entregado";
-  }
-
-  if (tracking.orderStatus === "CLOSED") {
-    text = "Pedido cerrado";
-  }
-
-  return { labels, index, text, stopped: false };
-}
-
-export function PublicOrderTrackingPage() {
-  const { businessSlug = "", publicCode = "" } = useParams();
-
-  if (
-    !slugSchema.safeParse(businessSlug).success ||
-    !z.string().uuid().safeParse(publicCode).success
-  ) {
-    return (
-      <main className="pm-root pm-loading">
-        El enlace de seguimiento no es válido.
-      </main>
-    );
-  }
-
-  return (
-    <TrackingContent
-      key={businessSlug + ":" + publicCode}
-      slug={businessSlug}
-      code={publicCode}
-    />
-  );
-}
-
-function TrackingContent({
+export function TrackingContent({
   slug,
   code,
 }: {
