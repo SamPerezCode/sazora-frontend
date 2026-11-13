@@ -1,3 +1,5 @@
+import { useAppShell } from "../../../app/layout/shell-context";
+import { hasPermission } from "../../auth/utils/permissions";
 import { useId, useState } from "react";
 import { PackageOpen, Plus, Search } from "lucide-react";
 import { TextField } from "../../../components/forms/TextField";
@@ -116,6 +118,8 @@ export function ProductList({
   onCreate,
   onAction,
 }: ProductListProps) {
+  const { session } = useAppShell();
+  const canManage = hasPermission(session, "catalog.manage");
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [requestedPage, setRequestedPage] = useState(1);
@@ -187,7 +191,7 @@ export function ProductList({
 
         <Button
           className="products-toolbar-create"
-          disabled={disabled}
+          disabled={disabled || !canManage}
           onClick={onCreate}
         >
           <Plus size={16} aria-hidden="true" />

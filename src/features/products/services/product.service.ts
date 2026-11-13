@@ -24,12 +24,15 @@ const savedSchema = z.object({
 
 export async function getProductCatalog(
   accessToken: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  includeAreas = true
 ) {
   const [products, categories, areas] = await Promise.all([
     getAllProducts(accessToken, signal),
     getCategories(accessToken, signal),
-    getPreparationAreas(accessToken, signal),
+    includeAreas
+      ? getPreparationAreas(accessToken, signal)
+      : Promise.resolve([]),
   ]);
 
   return { products, categories, areas };
@@ -173,8 +176,8 @@ export async function saveProduct(
       const form = new FormData();
 
       for (const [key, value] of Object.entries(input)) {
-        if (value !== null) {
-          form.append(key, value);
+        if (value !== null && value !== undefined) {
+          form.append(key, String(value));
         }
       }
 

@@ -20,6 +20,8 @@ export const productDetailSchema = z.object({
   businessId: productIdSchema,
   categoryId: productIdSchema,
   preparationAreaId: productIdSchema,
+  taxClassId: productIdSchema.nullable(),
+  priceIncludesTax: z.boolean(),
   fulfillmentMode: fulfillmentModeSchema,
   sku: z.string().nullable(),
   name: z.string(),

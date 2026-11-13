@@ -1,3 +1,6 @@
+import { ProductTaxFields } from "./ProductTaxFields";
+import { useAppShell } from "../../../app/layout/shell-context";
+import { hasPermission } from "../../auth/utils/permissions";
 import { Boxes, Pencil } from "lucide-react";
 import { Avatar } from "../../../components/ui/Avatar";
 import { Button } from "../../../components/ui/Button";
@@ -40,6 +43,11 @@ export function ProductDetail({
   onAction,
 }: ProductDetailProps) {
   const product = { ...summary, ...detail };
+  const { session } = useAppShell();
+  const canManage = hasPermission(session, "catalog.manage");
+  const canInventory =
+    hasPermission(session, "inventory.items.read") &&
+    hasPermission(session, "inventory.links.manage");
 
   return (
     <div>
@@ -115,6 +123,14 @@ export function ProductDetail({
           </p>
         </section>
 
+        <div className="product-detail-section">
+          <ProductTaxFields
+            readOnly
+            value={detail.taxClassId ?? ""}
+            priceIncludesTax={detail.priceIncludesTax}
+          />
+        </div>
+
         {detail.components && (
           <section className="product-detail-section">
             <h4>Componentes del combo</h4>
@@ -140,7 +156,9 @@ export function ProductDetail({
           <button
             type="button"
             className="product-modal-link"
-            disabled={busy}
+            disabled={
+              busy || (product.isCombo ? !canManage : !canInventory)
+            }
             onClick={() =>
               onAction(
                 product.isCombo ? "edit" : "inventory",
@@ -171,7 +189,7 @@ export function ProductDetail({
 
         <Button
           size="sm"
-          disabled={busy}
+          disabled={busy || !canManage}
           onClick={() => onAction("edit", product)}
         >
           <Pencil size={16} aria-hidden="true" />

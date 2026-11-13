@@ -1,3 +1,5 @@
+import { useAppShell } from "../../../app/layout/shell-context";
+import { hasPermission } from "../../auth/utils/permissions";
 import { Alert } from "../../../components/feedback/Alert";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { Button } from "../../../components/ui/Button";
@@ -37,6 +39,10 @@ export function ProductEditor({
   onCancel,
   onAction,
 }: ProductEditorProps) {
+  const { session } = useAppShell();
+  const canInventory =
+    hasPermission(session, "inventory.items.read") &&
+    hasPermission(session, "inventory.links.manage");
   const detail = useProductDetail(
     product.id,
     product.isCombo,
@@ -81,7 +87,11 @@ export function ProductEditor({
       busy={busy}
       onSave={onSave}
       onCancel={onCancel}
-      onInventory={() => onAction("inventory", product)}
+      onInventory={
+        canInventory
+          ? () => onAction("inventory", product)
+          : undefined
+      }
     />
   ) : (
     <ProductDetail

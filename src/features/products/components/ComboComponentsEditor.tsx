@@ -164,6 +164,7 @@ export function ComboComponentsEditor({
 
             <TextField
               label="Cantidad"
+              placeholder="Ej. 1"
               type="number"
               min="1"
               max="10000"

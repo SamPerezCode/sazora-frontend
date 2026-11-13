@@ -27,10 +27,15 @@ export const productEditSchema = z.object({
       z
         .string()
         .regex(
-          /^\d+(?:\.\d{1,2})?$/,
-          "Usa un importe con máximo dos decimales."
+          /^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/,
+          "Usa un importe de hasta diez enteros y dos decimales, sin ceros iniciales."
         )
     ),
+  taxClassId: z
+    .union([productIdSchema, z.literal(""), z.null()])
+    .transform((value) => value || null)
+    .optional(),
+  priceIncludesTax: z.boolean().optional(),
   categoryId: productIdSchema,
   preparationAreaId: productIdSchema,
   fulfillmentMode: fulfillmentModeSchema,

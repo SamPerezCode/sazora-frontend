@@ -1,13 +1,11 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { ImagePlus, Trash2, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ImagePlus, Trash2 } from "lucide-react";
 import { Alert } from "../../../components/feedback/Alert";
-import { Avatar } from "../../../components/ui/Avatar";
 import { Button } from "../../../components/ui/Button";
-import { resolveFileUrl } from "../../../lib/files";
 import { ApiError } from "../../../lib/http/client";
 import type { Product } from "../schemas/product.schema";
 import type { ProductMutation } from "../schemas/product-action.schema";
-import { validateProductImage } from "../services/product.service";
+import { ProductImageField } from "./ProductImageField";
 
 interface ProductImageFormProps {
   product: Product;
@@ -22,16 +20,12 @@ export function ProductImageForm({
   onSave,
   onCancel,
 }: ProductImageFormProps) {
-  const id = useId();
-
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [operation, setOperation] = useState<
     "image" | "remove-image" | null
   >(null);
 
-  const objectUrl = useRef<string | null>(null);
   const alive = useRef(false);
   const saving = useRef(false);
 
@@ -42,11 +36,6 @@ export function ProductImageForm({
 
     return () => {
       alive.current = false;
-
-      if (objectUrl.current) {
-        URL.revokeObjectURL(objectUrl.current);
-        objectUrl.current = null;
-      }
     };
   }, []);
 
@@ -97,85 +86,19 @@ export function ProductImageForm({
       }}
     >
       <div className="product-modal-section">
-        <div className="product-image-preview product-detail-image">
-          <Avatar
-            name={product.name}
-            src={preview ?? resolveFileUrl(product.imageUrl)}
-            size="xl"
-          />
-        </div>
-
-        <div className="product-image-upload">
-          <input
-            id={id}
-            type="file"
-            data-dialog-initial-focus
-            accept="image/jpeg,image/png,image/webp"
-            disabled={locked}
-            aria-label={`Seleccionar imagen para ${product.name}`}
-            aria-invalid={!!error}
-            aria-describedby={[
-              `${id}-filename`,
-              `${id}-help`,
-              error ? `${id}-error` : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            onChange={(event) => {
-              const selected = event.currentTarget.files?.[0];
-
-              if (!selected) return;
-
-              const message = validateProductImage(selected);
-
-              if (objectUrl.current) {
-                URL.revokeObjectURL(objectUrl.current);
-                objectUrl.current = null;
-              }
-
-              setFile(null);
-              setPreview(null);
-              setError(message ?? "");
-
-              if (message) {
-                event.currentTarget.value = "";
-                return;
-              }
-
-              const nextPreview = URL.createObjectURL(selected);
-
-              objectUrl.current = nextPreview;
-              setPreview(nextPreview);
-              setFile(selected);
-            }}
-          />
-
-          <div className="product-image-upload-content">
-            <Upload size={20} aria-hidden="true" />
-
-            <div>
-              <strong>
-                {file ? "Cambiar archivo" : "Seleccionar archivo"}
-              </strong>
-
-              <p
-                id={`${id}-filename`}
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                {file?.name ?? "Ningún archivo seleccionado"}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <p id={`${id}-help`} className="product-modal-help">
-          JPEG, PNG o WebP · Máximo 5 MB.
-        </p>
+        <ProductImageField
+          file={file}
+          name={product.name}
+          currentImageUrl={product.imageUrl}
+          disabled={locked}
+          onChange={(next) => {
+            setFile(next);
+            setError("");
+          }}
+        />
 
         {error && (
-          <div id={`${id}-error`} className="product-form-feedback">
+          <div className="product-form-feedback">
             <Alert variant="error">{error}</Alert>
           </div>
         )}

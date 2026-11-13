@@ -1,12 +1,14 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Upload } from "lucide-react";
-import { Avatar } from "../../../components/ui/Avatar";
+import { PackageOpen, Upload } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
+import { resolveFileUrl } from "../../../lib/files";
 import { validateProductImage } from "../services/product.service";
 
 interface ProductImageFieldProps {
   file: File | null;
   name: string;
   disabled: boolean;
+  currentImageUrl?: string | null;
   onChange: (file: File | null) => void;
 }
 
@@ -14,83 +16,134 @@ export function ProductImageField({
   file,
   name,
   disabled,
+  currentImageUrl,
   onChange,
 }: ProductImageFieldProps) {
   const id = useId();
-  const [preview, setPreview] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const input = useRef<HTMLInputElement>(null);
   const objectUrl = useRef<string | null>(null);
+  const [selection, setSelection] = useState<{
+    file: File;
+    url: string;
+  } | null>(null);
+  const [error, setError] = useState("");
+  const [failedSource, setFailedSource] = useState<string | null>(
+    null
+  );
 
   useEffect(
     () => () => {
-      if (objectUrl.current) {
-        URL.revokeObjectURL(objectUrl.current);
-      }
+      if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
     },
     []
   );
 
+  function clearSelection() {
+    if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+    objectUrl.current = null;
+    setSelection(null);
+    onChange(null);
+    if (input.current) input.current.value = "";
+  }
+
+  const src =
+    file && selection?.file === file
+      ? selection.url
+      : resolveFileUrl(currentImageUrl ?? null);
+
   return (
-    <div className="space-y-2">
-      {file && <Avatar name={name} src={preview} size="xl" />}
+    <div className="product-image-field">
+      <label htmlFor={id}>Imagen del producto (opcional)</label>
 
-      <label
-        htmlFor={id}
-        className="block text-sm font-medium text-heading"
-      >
-        Imagen opcional
-      </label>
+      <div className="product-image-frame">
+        {src && src !== failedSource ? (
+          <img
+            src={src}
+            alt={
+              "Vista previa de " +
+              (name.trim() || "la imagen del producto")
+            }
+            onError={() => {
+              setFailedSource(src);
+              if (file) {
+                clearSelection();
+                setError(
+                  "No pudimos visualizar la imagen. Selecciona otro archivo."
+                );
+              }
+            }}
+          />
+        ) : (
+          <PackageOpen size={40} aria-hidden="true" />
+        )}
+      </div>
 
-      <div className="relative rounded-xl border border-input-border bg-secondary/30 p-4 focus-within:ring-2 focus-within:ring-accent">
+      <div className="product-image-upload">
         <input
+          ref={input}
           id={id}
           type="file"
           accept="image/jpeg,image/png,image/webp"
           disabled={disabled}
-          aria-describedby={`${id}-help`}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          aria-invalid={!!error}
+          aria-describedby={
+            id + "-help" + (error ? " " + id + "-error" : "")
+          }
           onChange={(event) => {
             const next = event.currentTarget.files?.[0];
-
             if (!next) return;
-
             const message = validateProductImage(next);
-
-            if (objectUrl.current) {
-              URL.revokeObjectURL(objectUrl.current);
-            }
-
-            objectUrl.current = message
-              ? null
-              : URL.createObjectURL(next);
-
-            setPreview(objectUrl.current);
+            clearSelection();
             setError(message ?? "");
-            onChange(message ? null : next);
+            if (message) return;
 
-            if (message) {
-              event.currentTarget.value = "";
-            }
+            const url = URL.createObjectURL(next);
+            objectUrl.current = url;
+            setSelection({ file: next, url });
+            setFailedSource(null);
+            onChange(next);
           }}
         />
 
-        <div className="flex items-center gap-3 text-sm text-heading">
-          <Upload size={20} className="shrink-0 text-accent" />
-
-          <span className="min-w-0 break-words">
-            {file?.name ?? "Seleccionar archivo"}
-          </span>
+        <div className="product-image-upload-content">
+          <Upload size={20} aria-hidden="true" />
+          <div>
+            <strong>
+              {file ? "Cambiar archivo" : "Seleccionar archivo"}
+            </strong>
+            <p role="status">
+              {file?.name ?? "Ningún archivo seleccionado"}
+            </p>
+          </div>
         </div>
       </div>
 
-      <p id={`${id}-help`} className="text-xs text-muted">
-        JPEG, PNG o WebP. Máximo 5 MB.
+      <p id={id + "-help"} className="product-modal-help">
+        JPEG, PNG o WebP · Máximo 5 MB.
       </p>
 
       {error && (
-        <p role="alert" className="text-sm text-danger">
+        <p
+          id={id + "-error"}
+          role="alert"
+          className="text-sm text-danger"
+        >
           {error}
         </p>
+      )}
+
+      {file && (
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={disabled}
+          onClick={() => {
+            clearSelection();
+            setError("");
+          }}
+        >
+          Quitar selección
+        </Button>
       )}
     </div>
   );

@@ -1,3 +1,5 @@
+import { useAppShell } from "../../../app/layout/shell-context";
+import { hasPermission } from "../../auth/utils/permissions";
 import {
   Boxes,
   Eye,
@@ -22,6 +24,12 @@ export function ProductActions({
   disabled,
   onAction,
 }: ProductActionsProps) {
+  const { session } = useAppShell();
+  const canManage = hasPermission(session, "catalog.manage");
+  const canInventory =
+    hasPermission(session, "inventory.items.read") &&
+    hasPermission(session, "inventory.links.manage");
+
   const actions = [
     {
       id: "detail",
@@ -31,12 +39,14 @@ export function ProductActions({
     },
     {
       id: "edit",
+      disabled: !canManage,
       label: "Editar",
       icon: <Pencil size={16} />,
       onSelect: () => onAction("edit", product),
     },
     {
       id: "image",
+      disabled: !canManage,
       label: "Cambiar imagen",
       icon: <ImagePlus size={16} />,
       onSelect: () => onAction("image", product),
@@ -45,6 +55,7 @@ export function ProductActions({
       ? [
           {
             id: "remove-image",
+            disabled: !canManage,
             label: "Retirar imagen",
             icon: <Trash2 size={16} />,
             danger: true,
@@ -54,6 +65,7 @@ export function ProductActions({
       : []),
     {
       id: "inventory",
+      disabled: product.isCombo ? !canManage : !canInventory,
       label: product.isCombo
         ? "Editar composición"
         : product.hasInventory
@@ -65,6 +77,7 @@ export function ProductActions({
     },
     {
       id: "status",
+      disabled: !canManage,
       label: product.isActive ? "Desactivar" : "Activar",
       icon: product.isActive ? (
         <ToggleRight size={18} />

@@ -1,3 +1,4 @@
+import { hasPermission } from "../../auth/utils/permissions";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { Alert } from "../../../components/feedback/Alert";
@@ -31,13 +32,18 @@ type Editor =
 export function ProductsPage() {
   const { session } = useAppShell();
 
-  if (!session.authorization.roles.includes("ADMIN")) {
+  if (!hasPermission(session, "catalog.read")) {
     return <Alert>No tienes acceso a Productos.</Alert>;
   }
 
   return (
     <ProductsContent
-      key={`${session.business.id}:${session.membership.id}:${session.accessToken}`}
+      key={JSON.stringify([
+        session.business.id,
+        session.membership.id,
+        session.accessToken,
+        session.authorization.permissions,
+      ])}
       session={session}
     />
   );
@@ -58,7 +64,9 @@ function ProductsContent({ session }: { session: AuthSession }) {
 
   const editor: Editor | null =
     localEditor ??
-    (linkedCombo ? { kind: "edit", id: linkedCombo.id } : null);
+    (linkedCombo && hasPermission(session, "catalog.manage")
+      ? { kind: "edit", id: linkedCombo.id }
+      : null);
 
   function setEditor(next: Editor | null) {
     setLocalEditor(next);
@@ -73,7 +81,13 @@ function ProductsContent({ session }: { session: AuthSession }) {
   }
 
   useInventoryRealtime(session, () => {
-    if (resource.busy || resource.pending) return false;
+    if (
+      resource.busy ||
+      resource.pending ||
+      resource.uncertain ||
+      editor
+    )
+      return false;
 
     resource.retry();
 
@@ -129,7 +143,15 @@ function ProductsContent({ session }: { session: AuthSession }) {
   }
 
   function onAction(kind: ProductActionKind, product: Product) {
-    if (resource.busy) return;
+    if (resource.busy || resource.uncertain) return;
+
+    const allowed =
+      kind === "detail" ||
+      (kind === "inventory" && !product.isCombo
+        ? hasPermission(session, "inventory.items.read") &&
+          hasPermission(session, "inventory.links.manage")
+        : hasPermission(session, "catalog.manage"));
+    if (!allowed) return;
 
     setNotice(null);
 
@@ -221,7 +243,7 @@ function ProductsContent({ session }: { session: AuthSession }) {
         <ProductList
           products={resource.data.products}
           categories={resource.data.categories}
-          disabled={resource.busy || !!editor}
+          disabled={resource.busy || !!editor || resource.uncertain}
           onAction={onAction}
           onCreate={() => {
             setNotice(null);

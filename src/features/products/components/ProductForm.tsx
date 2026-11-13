@@ -1,3 +1,4 @@
+import { ProductTaxFields } from "./ProductTaxFields";
 import { useRef, useState } from "react";
 import { Boxes, Save } from "lucide-react";
 import { InventoryTrackingBadge } from "./ProductBadges";
@@ -58,7 +59,9 @@ export function ProductForm({
     currentPrice: original?.currentPrice ?? "",
     categoryId: original?.categoryId ?? "",
     preparationAreaId: original?.preparationAreaId ?? "",
-    fulfillmentMode: original?.fulfillmentMode ?? "",
+    fulfillmentMode: original?.fulfillmentMode ?? "PREPARE_TO_ORDER",
+    taxClassId: original?.taxClassId ?? "",
+    priceIncludesTax: original?.priceIncludesTax ?? true,
   });
 
   const [components, setComponents] = useState<ComboComponent[]>(
@@ -207,7 +210,8 @@ export function ProductForm({
 
           <TextField
             label="Nombre del producto"
-            placeholder="Ej. Combo desayuno"
+            placeholder="Ej. Croissant de mantequilla"
+            data-dialog-initial-focus
             required
             maxLength={150}
             value={draft.name}
@@ -219,7 +223,7 @@ export function ProductForm({
           <div className="product-form-grid">
             <TextField
               label="Código SKU (opcional)"
-              placeholder="Ej. DESAYUNO-01"
+              placeholder="Ej. PAN-001"
               maxLength={50}
               value={draft.sku}
               disabled={busy}
@@ -229,7 +233,7 @@ export function ProductForm({
 
             <TextField
               label="Precio de venta"
-              placeholder="Ej. 15000.00"
+              placeholder="Ej. 4500.00"
               inputMode="decimal"
               required
               value={draft.currentPrice}
@@ -243,7 +247,7 @@ export function ProductForm({
 
           <TextAreaField
             label="Descripción (opcional)"
-            placeholder="Describe el producto o la oferta"
+            placeholder="Ingredientes y características del producto"
             rows={3}
             value={draft.description}
             maxLength={500}
@@ -255,12 +259,33 @@ export function ProductForm({
           />
         </section>
 
+        <ProductTaxFields
+          value={draft.taxClassId}
+          priceIncludesTax={draft.priceIncludesTax}
+          disabled={busy}
+          error={errors.taxClassId}
+          priceError={errors.priceIncludesTax}
+          onTaxChange={(value) => change("taxClassId", value)}
+          onIncludesTaxChange={(value) => {
+            setDraft((previous) => ({
+              ...previous,
+              priceIncludesTax: value,
+            }));
+            setErrors((previous) => ({
+              ...previous,
+              priceIncludesTax: "",
+            }));
+            setMessage("");
+          }}
+        />
+
         <section className="product-form-section">
           <h3>Clasificación y atención</h3>
 
           <div className="product-form-grid">
             <SelectField
               label="Categoría"
+              placeholder="Seleccionar categoría"
               value={draft.categoryId}
               required
               disabled={busy}
@@ -283,6 +308,7 @@ export function ProductForm({
 
             <SelectField
               label="Área de preparación"
+              placeholder="Seleccionar área"
               value={draft.preparationAreaId}
               required
               disabled={busy}
@@ -336,11 +362,11 @@ export function ProductForm({
               options={[
                 {
                   value: "PREPARE_TO_ORDER",
-                  label: "Preparar después de recibir el pedido",
+                  label: "Preparado al momento",
                 },
                 {
                   value: "READY_TO_SERVE",
-                  label: "Ya está listo para entregar",
+                  label: "Listo para entregar",
                 },
               ]}
             />

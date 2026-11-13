@@ -1,3 +1,5 @@
+import { z } from "zod";
+import { hasPermission } from "../../auth/utils/permissions";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../../lib/http/client";
 import type { AuthSession } from "../../auth/types/auth.types";
@@ -37,15 +39,27 @@ export function useProducts(session: AuthSession) {
   const [attempt, setAttempt] = useState(0);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uncertain, setUncertain] = useState(false);
+  const uncertainWrite = useRef(false);
 
   const write = useRef<AbortController | null>(null);
   const read = useRef<AbortController | null>(null);
 
   const { accessToken } = session;
   const businessId = session.business.id;
-  const allowed = session.authorization.roles.includes("ADMIN");
+  const allowed = hasPermission(session, "catalog.read");
+  const canManage = hasPermission(session, "catalog.manage");
+  const includeAreas = hasPermission(
+    session,
+    "kitchen.settings.read"
+  );
 
-  const scope = `${businessId}:${session.membership.id}:${accessToken}`;
+  const scope = JSON.stringify([
+    businessId,
+    session.membership.id,
+    accessToken,
+    session.authorization.permissions,
+  ]);
 
   useEffect(() => {
     if (!allowed) return;
@@ -53,11 +67,17 @@ export function useProducts(session: AuthSession) {
     const controller = new AbortController();
     read.current = controller;
 
-    void getProductCatalog(accessToken, controller.signal)
+    void getProductCatalog(
+      accessToken,
+      controller.signal,
+      includeAreas
+    )
       .then((data) => {
         const checked = verify(data, businessId);
 
         if (!controller.signal.aborted) {
+          uncertainWrite.current = false;
+          setUncertain(false);
           setSnapshot({
             scope,
             attempt,
@@ -71,7 +91,13 @@ export function useProducts(session: AuthSession) {
           setSnapshot((previous) => ({
             scope,
             attempt,
-            data: previous?.scope === scope ? previous.data : null,
+            data:
+              cause instanceof ApiError &&
+              (cause.status === 401 || cause.status === 403)
+                ? null
+                : previous?.scope === scope
+                  ? previous.data
+                  : null,
             error:
               cause instanceof Error
                 ? cause.message
@@ -81,7 +107,14 @@ export function useProducts(session: AuthSession) {
       });
 
     return () => controller.abort();
-  }, [accessToken, businessId, allowed, scope, attempt]);
+  }, [
+    accessToken,
+    businessId,
+    allowed,
+    scope,
+    attempt,
+    includeAreas,
+  ]);
 
   useEffect(
     () => () => {
@@ -96,8 +129,16 @@ export function useProducts(session: AuthSession) {
   async function mutate(
     action: ProductMutation
   ): Promise<string | null> {
-    if (!allowed) {
+    if (!allowed || !canManage) {
       throw new ApiError(403, "FORBIDDEN", "No tienes acceso.");
+    }
+
+    if (uncertainWrite.current) {
+      throw new ApiError(
+        409,
+        "WRITE_UNCERTAIN",
+        "Cierra el formulario y reintenta la consulta antes de guardar otra vez."
+      );
     }
 
     if (write.current || !current?.data) {
@@ -115,7 +156,26 @@ export function useProducts(session: AuthSession) {
     setBusy(true);
 
     try {
-      await saveProduct(action, accessToken, controller.signal);
+      try {
+        await saveProduct(action, accessToken, controller.signal);
+      } catch (cause) {
+        if (
+          !controller.signal.aborted &&
+          !(cause instanceof z.ZodError) &&
+          (!(cause instanceof ApiError) ||
+            cause.status === 0 ||
+            cause.status >= 500)
+        ) {
+          uncertainWrite.current = true;
+          setUncertain(true);
+          throw new ApiError(
+            409,
+            "WRITE_UNCERTAIN",
+            "No pudimos confirmar el guardado. Cierra el formulario y reintenta la consulta antes de guardar otra vez."
+          );
+        }
+        throw cause;
+      }
 
       controller.signal.throwIfAborted();
 
@@ -127,9 +187,11 @@ export function useProducts(session: AuthSession) {
             );
 
       const [catalog, detail] = await Promise.allSettled([
-        getProductCatalog(accessToken, controller.signal).then(
-          (data) => verify(data, businessId)
-        ),
+        getProductCatalog(
+          accessToken,
+          controller.signal,
+          includeAreas
+        ).then((data) => verify(data, businessId)),
         existing
           ? getProductDetail(
               existing.id,
@@ -218,9 +280,12 @@ export function useProducts(session: AuthSession) {
     loading: allowed && current === null,
     pending: allowed && current?.attempt !== attempt,
     error: allowed
-      ? (current?.error ?? null)
+      ? uncertain
+        ? "No pudimos confirmar el último guardado. Reintenta la consulta antes de continuar."
+        : (current?.error ?? null)
       : "No tienes acceso a los productos.",
     busy,
+    uncertain,
     mutate,
     retry: () => {
       if (!write.current) {
