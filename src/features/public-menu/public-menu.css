@@ -62,14 +62,21 @@
 
 .pm-header,
 .pm-footer {
-  background: var(--pm-brand);
-  color: var(--pm-on-brand);
-  border-color: var(--pm-accent);
+  background-color: var(--pm-brand);
+  background-image:
+    linear-gradient(rgb(0 0 0 / 35%), rgb(0 0 0 / 35%)),
+    linear-gradient(
+      120deg,
+      var(--pm-brand) 0%,
+      var(--pm-brand) 35%,
+      var(--pm-accent) 100%
+    );
+  color: #ffffff;
 }
 
 .pm-header {
   padding: 2.5rem 0 4.5rem;
-  border-top: 5px solid var(--pm-accent);
+  border-top: 0;
 }
 
 .pm-brand {
@@ -442,7 +449,7 @@
 
 .pm-footer {
   padding: 2.5rem 0;
-  border-top: 5px solid var(--pm-accent);
+  border-top: 0;
 }
 
 .pm-footer-grid {

@@ -222,7 +222,7 @@ function BusinessSettingsEditor({
   const publicMenuUrl = settings.slug
     ? new URL(
         `/menu/${encodeURIComponent(settings.slug)}`,
-        "https://lemokaicoffe.com.co"
+        "http://localhost:5173"
       ).href
     : "";
 
