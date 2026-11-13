@@ -16,7 +16,7 @@ export const employeeLocationSummarySchema = z.object({
   ),
 });
 
-export const assignableRoleSchema = roleSchema.exclude(["ADMIN"]);
+export const assignableRoleSchema = roleSchema;
 export const assignableRoles = assignableRoleSchema.options;
 
 export const employeeSchema = z.object({
@@ -74,7 +74,7 @@ export const employeeRolesSchema = z
     z
       .array(assignableRoleSchema)
       .min(1, "Selecciona al menos un rol.")
-      .max(5, "Puedes asignar hasta cinco roles.")
+      .max(assignableRoles.length, "Puedes asignar hasta ocho roles.")
   );
 
 export const employeeCreateSchema = employeeIdentitySchema
@@ -138,7 +138,7 @@ export function employeePermissions(
 
   return {
     edit: !admin,
-    roles: !admin && !self,
+    roles: !self,
     status: !self,
   };
 }

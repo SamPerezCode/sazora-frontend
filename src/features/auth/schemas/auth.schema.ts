@@ -4,10 +4,11 @@ export const roleSchema = z.enum([
   "ADMIN",
   "WAITER",
   "KITCHEN",
-  "PRODUCTION",
-  "INVENTORY_MANAGER",
   "PUBLIC_ORDER_MANAGER",
   "DELIVERY_DRIVER",
+  "PRODUCTION",
+  "CASHIER",
+  "INVENTORY_MANAGER",
 ]);
 
 export const loginSchema = z.object({

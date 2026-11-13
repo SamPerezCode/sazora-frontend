@@ -159,7 +159,9 @@ export function useEmployees(session: AuthSession) {
           ...employee,
           locationAccess:
             employee.locationAccess ??
-            previousEmployee?.locationAccess,
+            (action.kind === "roles"
+              ? undefined
+              : previousEmployee?.locationAccess),
         };
 
         return {

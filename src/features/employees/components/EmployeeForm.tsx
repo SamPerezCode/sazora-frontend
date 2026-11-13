@@ -47,12 +47,9 @@ export function EmployeeForm({
     passwordConfirmation: "",
   });
 
-  const [roles, setRoles] = useState<AssignableRole[]>(
-    () =>
-      employee?.roles.filter(
-        (role): role is AssignableRole => role !== "ADMIN"
-      ) ?? []
-  );
+  const [roles, setRoles] = useState<AssignableRole[]>(() => [
+    ...(employee?.roles ?? []),
+  ]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");

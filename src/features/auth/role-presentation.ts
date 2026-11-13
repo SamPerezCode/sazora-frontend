@@ -18,11 +18,11 @@ interface RolePresentation {
   icon: LucideIcon;
 }
 
-// Solo presentación. Los permisos siguen usando los códigos de rol.
 export const ROLE_PRESENTATION: Record<RoleCode, RolePresentation> = {
   ADMIN: {
     label: "Administrador",
-    description: "Administración del negocio.",
+    description:
+      "Administración del negocio y acceso global a ubicaciones.",
     icon: ShieldCheck,
   },
   WAITER: {
@@ -35,20 +35,8 @@ export const ROLE_PRESENTATION: Record<RoleCode, RolePresentation> = {
     description: "Preparación de productos de comandas y pedidos.",
     icon: ChefHat,
   },
-  PRODUCTION: {
-    label: "Producción",
-    description:
-      "Procesos de planta, producción y productos terminados.",
-    icon: Factory,
-  },
-  INVENTORY_MANAGER: {
-    label: "Inventario",
-    description:
-      "Gestiona existencias, compras, movimientos, transferencias y costos.",
-    icon: Boxes,
-  },
   PUBLIC_ORDER_MANAGER: {
-    label: "Gestor de pedidos",
+    label: "Gestor de pedidos públicos",
     description: "Gestión de pedidos del menú público.",
     icon: ClipboardList,
   },
@@ -56,6 +44,23 @@ export const ROLE_PRESENTATION: Record<RoleCode, RolePresentation> = {
     label: "Domiciliario",
     description: "Entrega de pedidos a domicilio.",
     icon: Truck,
+  },
+  PRODUCTION: {
+    label: "Producción",
+    description:
+      "Procesos de planta, producción y productos terminados.",
+    icon: Factory,
+  },
+  CASHIER: {
+    label: "Caja",
+    description: "Pedidos, cobros, aperturas y cierres de caja.",
+    icon: Wallet,
+  },
+  INVENTORY_MANAGER: {
+    label: "Gestor de inventario",
+    description:
+      "Gestiona existencias, compras, movimientos y transferencias.",
+    icon: Boxes,
   },
 };
 
@@ -66,19 +71,9 @@ export const ROLE_LABELS: Record<string, string> = Object.fromEntries(
   ])
 );
 
-ROLE_LABELS.CASHIER = "Caja";
-
 export function getRolePresentation(code: string): RolePresentation {
   if (Object.prototype.hasOwnProperty.call(ROLE_PRESENTATION, code)) {
     return ROLE_PRESENTATION[code as RoleCode];
-  }
-
-  if (code === "CASHIER") {
-    return {
-      label: "Caja",
-      description: "Pedidos, cobros, aperturas y cierres de caja.",
-      icon: Wallet,
-    };
   }
 
   const readable = code

@@ -149,6 +149,10 @@ function EmployeesContent({ session }: { session: AuthSession }) {
       await resource.mutate(action);
 
       clearModal();
+
+      if (action.kind === "roles") {
+        resource.retry();
+      }
       setNotice({
         error: false,
         message:
@@ -368,6 +372,11 @@ function EmployeesContent({ session }: { session: AuthSession }) {
                   }
                 >
                   <EmployeeLocationsForm
+                    key={
+                      creation.input.roles.includes("ADMIN")
+                        ? "global"
+                        : "locations"
+                    }
                     session={session}
                     creation={creation}
                     onCreate={create}

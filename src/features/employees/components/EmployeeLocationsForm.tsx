@@ -84,7 +84,10 @@ function errorMessage(error: unknown): string {
         );
 
       default:
-        return employeeErrorMessage(error, "No pudimos guardar las ubicaciones.");
+        return employeeErrorMessage(
+          error,
+          "No pudimos guardar las ubicaciones."
+        );
     }
   }
 
@@ -111,7 +114,11 @@ export function EmployeeLocationsForm({
   onDirtyChange,
 }: Props) {
   const groupId = useId();
-  const knownGlobal = employee?.roles.includes("ADMIN") ?? false;
+  const knownGlobal = (
+    employee?.roles ??
+    creation?.input.roles ??
+    []
+  ).includes("ADMIN");
   const membershipId = employee?.membershipId;
 
   const [locations, setLocations] = useState<BusinessLocation[]>([]);
@@ -143,7 +150,8 @@ export function EmployeeLocationsForm({
   const [missing, setMissing] = useState(false);
   const [partial, setPartial] = useState(false);
   const [creationUncertain, setCreationUncertain] = useState(false);
-  const [confirmWithoutPlant, setConfirmWithoutPlant] = useState(false);
+  const [confirmWithoutPlant, setConfirmWithoutPlant] =
+    useState(false);
 
   const initialized = useRef(false);
   const pending = useRef(false);
@@ -275,7 +283,10 @@ export function EmployeeLocationsForm({
   }, [session, membershipId, knownGlobal, attempt]);
 
   useEffect(() => {
-    if (missing) onUnavailable("El empleado ya no existe. Actualizamos el listado.");
+    if (missing)
+      onUnavailable(
+        "El empleado ya no existe. Actualizamos el listado."
+      );
   }, [missing, onUnavailable]);
 
   useEffect(() => {
@@ -312,7 +323,7 @@ export function EmployeeLocationsForm({
   const locked =
     busy ||
     loading ||
-    globalAccess ||
+    (globalAccess && !creation) ||
     forbidden ||
     creationUncertain ||
     needsRefresh ||
@@ -343,12 +354,20 @@ export function EmployeeLocationsForm({
   const roles = employee?.roles ?? creation?.input.roles ?? [];
   const isProduction = roles.includes("PRODUCTION");
   const orderedLocations = sortEmployeeLocations(locations, roles);
-  const hasPlant = hasSelectedProductionPlant(locations, selection.ids);
+  const hasPlant = hasSelectedProductionPlant(
+    locations,
+    selection.ids
+  );
 
   async function submit(allowWithoutPlant = false) {
     if (pending.current || locked || (!creation && !dirty)) return;
 
-    if (isProduction && !hasPlant && !allowWithoutPlant) {
+    if (
+      !globalAccess &&
+      isProduction &&
+      !hasPlant &&
+      !allowWithoutPlant
+    ) {
       setConfirmWithoutPlant(true);
       return;
     }
@@ -362,11 +381,13 @@ export function EmployeeLocationsForm({
     setFieldErrors([]);
 
     try {
-      const assignments = normalizeEmployeeAssignments(
-        selection.ids,
-        selection.defaultId,
-        locations
-      );
+      const assignments = globalAccess
+        ? []
+        : normalizeEmployeeAssignments(
+            selection.ids,
+            selection.defaultId,
+            locations
+          );
 
       let target = employee ?? createdEmployee.current;
 
@@ -384,11 +405,8 @@ export function EmployeeLocationsForm({
       controller.signal.throwIfAborted();
 
       if (target.roles.includes("ADMIN")) {
-        throw new ApiError(
-          409,
-          "ADMIN_LOCATION_ASSIGNMENT_NOT_ALLOWED",
-          "Los administradores tienen acceso global."
-        );
+        onSaved();
+        return;
       }
 
       // Al crear sin ubicaciones no necesitamos enviar un PUT vacío.
@@ -440,8 +458,9 @@ export function EmployeeLocationsForm({
         setFieldErrors(
           error.code === "EMPLOYEE_ROLE_NOT_AVAILABLE"
             ? ["Roles: El rol seleccionado no está disponible."]
-            : error.errors.map((issue) =>
-                `${issue.field.startsWith("roles") ? "Roles" : issue.field}: ${issue.message}`
+            : error.errors.map(
+                (issue) =>
+                  `${issue.field.startsWith("roles") ? "Roles" : issue.field}: ${issue.message}`
               )
         );
       }
@@ -495,8 +514,9 @@ export function EmployeeLocationsForm({
 
         {isProduction && !globalAccess && (
           <p className="rounded-xl border border-outline bg-secondary/30 p-3 text-sm text-heading">
-            Este empleado tendrá funciones de producción. Se recomienda asignarle
-            una planta de producción como ubicación predeterminada.
+            Este empleado tendrá funciones de producción. Se
+            recomienda asignarle una planta de producción como
+            ubicación predeterminada.
           </p>
         )}
 
@@ -627,8 +647,11 @@ export function EmployeeLocationsForm({
                       key={location.id}
                       location={location}
                       recommendation={
-                        isProduction && isActiveProductionPlant(location)
-                          ? creation ? "Recomendada" : "Recomendada para Producción"
+                        isProduction &&
+                        isActiveProductionPlant(location)
+                          ? creation
+                            ? "Recomendada"
+                            : "Recomendada para Producción"
                           : undefined
                       }
                       groupId={groupId}
@@ -730,7 +753,7 @@ export function EmployeeLocationsForm({
               <span>Reintentar asignación</span>
             </Button>
           </>
-        ) : globalAccess || forbidden ? (
+        ) : (globalAccess && !creation) || forbidden ? (
           <Button
             className="col-span-2"
             variant="secondary"
@@ -798,10 +821,18 @@ export function EmployeeLocationsForm({
                 disabled={busy}
                 onClick={() => setConfirmWithoutPlant(false)}
               >
-                {creation && !partial ? "Volver y asignar planta" : "Volver y seleccionar planta"}
+                {creation && !partial
+                  ? "Volver y asignar planta"
+                  : "Volver y seleccionar planta"}
               </Button>
-              <Button size="sm" disabled={busy} onClick={() => void submit(true)}>
-                {creation && !partial ? "Crear de todas formas" : "Guardar de todas formas"}
+              <Button
+                size="sm"
+                disabled={busy}
+                onClick={() => void submit(true)}
+              >
+                {creation && !partial
+                  ? "Crear de todas formas"
+                  : "Guardar de todas formas"}
               </Button>
             </div>
           </div>
