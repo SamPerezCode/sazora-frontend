@@ -9,6 +9,8 @@ import {
   Save,
   Users,
   UtensilsCrossed,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { Alert } from "../../../components/feedback/Alert";
@@ -24,6 +26,7 @@ import { resolveFileUrl } from "../../../lib/files";
 import { PreparationAreasPanel } from "../../preparation-areas/components/PreparationAreasPanel";
 import { RestaurantTablesPanel } from "../../restaurant-tables/components/RestaurantTablesPanel";
 import { EmployeesPanel } from "../../employees/components/EmployeesPanel";
+import { useTimedMessage } from "../../../hooks/useTimedMessage";
 import {
   DiscardChangesDialog,
   UnsavedChangesGuard,
@@ -213,6 +216,28 @@ function BusinessSettingsEditor({
 
   const selectedTab = tabs.find((tab) => tab.id === active)!;
   const Icon = selectedTab.icon;
+
+  const [menuLinkMessage, setMenuLinkMessage] = useTimedMessage();
+
+  const publicMenuUrl = settings.slug
+    ? new URL(
+        `/menu/${encodeURIComponent(settings.slug)}`,
+        "https://lemokaicoffe.com.co"
+      ).href
+    : "";
+
+  async function copyPublicMenuLink(): Promise<void> {
+    if (!publicMenuUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(publicMenuUrl);
+      setMenuLinkMessage("Enlace copiado.");
+    } catch {
+      setMenuLinkMessage(
+        "No se pudo copiar automáticamente. Selecciona el enlace y cópialo manualmente."
+      );
+    }
+  }
 
   function activateTab(
     next: SettingsSection | "areas" | "tables" | "employees"
@@ -624,6 +649,112 @@ function BusinessSettingsEditor({
 
                       {active === "menu" && (
                         <>
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <p
+                                id={`${id}-public-menu-link-label`}
+                                className="text-[0.6875rem] font-semibold uppercase tracking-widest text-muted"
+                              >
+                                Enlace de tu menú público
+                              </p>
+
+                              {publicMenuUrl ? (
+                                <a
+                                  id={`${id}-public-menu-link`}
+                                  href={publicMenuUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  aria-describedby={`${id}-public-menu-link-help`}
+                                  className="flex min-h-11 items-center gap-3 rounded-2xl border border-input-border bg-surface/50 px-4 py-3 text-sm text-heading transition-colors hover:border-accent hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 dark:bg-secondary/60"
+                                >
+                                  <span className="min-w-0 flex-1 break-all underline underline-offset-4">
+                                    {publicMenuUrl}
+                                  </span>
+
+                                  <ExternalLink
+                                    aria-hidden="true"
+                                    size={16}
+                                    strokeWidth={1.75}
+                                    className="shrink-0"
+                                  />
+
+                                  <span className="sr-only">
+                                    Abre en una pestaña nueva
+                                  </span>
+                                </a>
+                              ) : (
+                                <p className="text-sm text-muted">
+                                  El negocio todavía no tiene un
+                                  enlace.
+                                </p>
+                              )}
+                            </div>
+
+                            <p
+                              id={`${id}-public-menu-link-help`}
+                              className="text-xs leading-relaxed text-muted"
+                            >
+                              {settings.publicMenuEnabled
+                                ? "Comparte este enlace con tus clientes. El menú muestra la configuración guardada."
+                                : "Activa «Habilitar menú público» y guarda los cambios para que tus clientes puedan acceder."}
+                            </p>
+
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                disabled={
+                                  !publicMenuUrl || resource.busy
+                                }
+                                onClick={() => {
+                                  void copyPublicMenuLink();
+                                }}
+                              >
+                                <Copy
+                                  aria-hidden="true"
+                                  size={16}
+                                  strokeWidth={1.75}
+                                />
+                                Copiar enlace
+                              </Button>
+
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                disabled={
+                                  !publicMenuUrl ||
+                                  !settings.publicMenuEnabled ||
+                                  resource.busy
+                                }
+                                onClick={() => {
+                                  window.open(
+                                    publicMenuUrl,
+                                    "_blank",
+                                    "noopener,noreferrer"
+                                  );
+                                }}
+                              >
+                                <ExternalLink
+                                  aria-hidden="true"
+                                  size={16}
+                                  strokeWidth={1.75}
+                                />
+                                Abrir menú
+                              </Button>
+                            </div>
+
+                            <p
+                              role="status"
+                              aria-live="polite"
+                              aria-atomic="true"
+                              className="text-xs leading-relaxed text-muted"
+                            >
+                              {menuLinkMessage}
+                            </p>
+                          </div>
+
                           <TextAreaField
                             name="publicMenuDescription"
                             label="Descripción del menú público"

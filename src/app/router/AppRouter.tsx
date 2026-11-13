@@ -11,6 +11,8 @@ import { ConfigurationPage } from "../../features/business/pages/ConfigurationPa
 import { ReportsPage } from "../../features/reports/ReportsPage";
 import { AppShell } from "../layout/AppShell";
 import { RoleSelectionPage } from "../../features/auth/pages/RoleSelectionPage";
+import { PublicMenuPage } from "../../features/public-menu/PublicMenuPage";
+import { PublicOrderTrackingPage } from "../../features/public-menu/PublicOrderTrackingPage";
 import {
   GuestOnly,
   RequireAuth,
@@ -22,6 +24,16 @@ import {
 export function AppRouter() {
   return (
     <Routes>
+      <Route
+        path="/menu/:businessSlug"
+        element={<PublicMenuPage />}
+      />
+
+      <Route
+        path="/menu/:businessSlug/pedido/:publicCode"
+        element={<PublicOrderTrackingPage />}
+      />
+
       <Route element={<SessionBoundary />}>
         <Route element={<GuestOnly />}>
           <Route path="/login" element={<LoginPage />} />

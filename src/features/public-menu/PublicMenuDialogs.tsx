@@ -1,0 +1,668 @@
+import { useState } from "react";
+import {
+  Bike,
+  ImageIcon,
+  Minus,
+  Pencil,
+  Plus,
+  Store,
+  Trash2,
+} from "lucide-react";
+import { BottomSheet } from "../../components/layout/BottomSheet";
+import { TextField } from "../../components/forms/TextField";
+import { TextAreaField } from "../../components/forms/TextAreaField";
+import { resolveFileUrl } from "../../lib/files";
+import { cents, checkoutSchema, money } from "./public-menu.api";
+import type {
+  CartLine,
+  CartRow,
+  CheckoutDraft,
+  PublicLocation,
+  PublicProduct,
+} from "./public-menu.api";
+
+export function MenuImage({
+  src,
+  alt,
+  className = "",
+}: {
+  src: string | null;
+  alt: string;
+  className?: string;
+}) {
+  const url = resolveFileUrl(src);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  return (
+    <span className={"pm-image " + className}>
+      {url && failed !== url ? (
+        <img
+          src={url}
+          alt={alt}
+          loading="lazy"
+          onError={() => setFailed(url)}
+        />
+      ) : (
+        <ImageIcon size={28} aria-label="Sin imagen" />
+      )}
+    </span>
+  );
+}
+
+function Quantity({
+  value,
+  disabled = false,
+  onChange,
+}: {
+  value: number;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="pm-quantity" aria-label="Cantidad">
+      <button
+        type="button"
+        aria-label="Disminuir cantidad"
+        disabled={disabled || value <= 1}
+        onClick={() => onChange(value - 1)}
+      >
+        <Minus size={16} aria-hidden="true" />
+      </button>
+
+      <output aria-live="polite">{value}</output>
+
+      <button
+        type="button"
+        aria-label="Aumentar cantidad"
+        disabled={disabled || value >= 100}
+        onClick={() => onChange(value + 1)}
+      >
+        <Plus size={16} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+export function ProductDialog({
+  product,
+  line,
+  available,
+  currency,
+  onClose,
+  onSave,
+}: {
+  product: PublicProduct;
+  line?: CartLine;
+  available: boolean;
+  currency: string;
+  onClose: () => void;
+  onSave: (quantity: number, notes: string) => void;
+}) {
+  const [quantity, setQuantity] = useState(line?.quantity ?? 1);
+  const [notes, setNotes] = useState(line?.notes ?? "");
+
+  return (
+    <BottomSheet
+      id="pm-product-dialog"
+      open
+      variant="modal"
+      title={product.name}
+      className="pm-dialog pm-dialog--product"
+      onClose={onClose}
+    >
+      <form
+        className="pm-dialog-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+
+          if (available) {
+            onSave(quantity, notes.trim());
+          }
+        }}
+      >
+        <div className="pm-dialog-content pm-stack">
+          <MenuImage
+            src={product.imageUrl}
+            alt={product.name}
+            className="pm-product-cover"
+          />
+
+          <div>
+            <p className="pm-price">
+              {money(product.currentPrice, currency)}
+              <small> c/u</small>
+            </p>
+
+            {product.description && (
+              <p className="pm-muted">{product.description}</p>
+            )}
+          </div>
+
+          <div className="pm-between">
+            <span>Cantidad</span>
+            <Quantity
+              value={quantity}
+              onChange={setQuantity}
+              disabled={!available}
+            />
+          </div>
+
+          <div>
+            <TextAreaField
+              label="Notas para el producto (opcional)"
+              placeholder="Ej. Sin azúcar"
+              value={notes}
+              maxLength={500}
+              rows={3}
+              onChange={(event) => setNotes(event.target.value)}
+            />
+            <p className="pm-counter">{notes.length}/500</p>
+          </div>
+
+          {!available && (
+            <p role="alert" className="pm-notice">
+              Este producto no está disponible para pedir en el punto
+              seleccionado.
+            </p>
+          )}
+        </div>
+
+        <div className="pm-dialog-footer">
+          <button
+            type="submit"
+            className="pm-primary pm-between"
+            disabled={!available}
+          >
+            <span>
+              {line ? "Actualizar producto" : "Agregar al pedido"}
+            </span>
+            <span>
+              {money(
+                cents(product.currentPrice) * BigInt(quantity),
+                currency
+              )}
+            </span>
+          </button>
+        </div>
+      </form>
+    </BottomSheet>
+  );
+}
+
+export function CartDialog({
+  rows,
+  location,
+  currency,
+  refreshing,
+  onClose,
+  onQuantity,
+  onRemove,
+  onEdit,
+  onContinue,
+  onRefresh,
+}: {
+  rows: CartRow[];
+  location?: PublicLocation;
+  currency: string;
+  refreshing: boolean;
+  onClose: () => void;
+  onQuantity: (id: string, quantity: number) => void;
+  onRemove: (id: string) => void;
+  onEdit: (product: PublicProduct) => void;
+  onContinue: () => void;
+  onRefresh: () => void;
+}) {
+  const total = rows.reduce(
+    (sum, row) =>
+      sum + cents(row.product.currentPrice) * BigInt(row.quantity),
+    0n
+  );
+
+  const valid =
+    !!location &&
+    rows.length > 0 &&
+    rows.every((row) => row.available);
+
+  return (
+    <BottomSheet
+      id="pm-cart-dialog"
+      open
+      variant="modal"
+      title="Tu pedido"
+      className="pm-dialog pm-dialog--cart"
+      onClose={onClose}
+    >
+      <p className="pm-dialog-caption">
+        Punto de venta:{" "}
+        <strong>{location?.name ?? "Sin seleccionar"}</strong>
+      </p>
+
+      <div className="pm-dialog-content pm-stack">
+        {rows.length === 0 && (
+          <p className="pm-notice">
+            Tu pedido está vacío. Agrega productos desde el menú.
+          </p>
+        )}
+
+        {rows.map((row) => (
+          <article className="pm-cart-item" key={row.product.id}>
+            <div className="pm-between pm-align-start">
+              <div>
+                <h3>{row.product.name}</h3>
+                <small className="pm-muted">
+                  {money(row.product.currentPrice, currency)} c/u
+                </small>
+              </div>
+
+              <strong>
+                {money(
+                  cents(row.product.currentPrice) *
+                    BigInt(row.quantity),
+                  currency
+                )}
+              </strong>
+            </div>
+
+            {row.notes && (
+              <p className="pm-item-notes">{row.notes}</p>
+            )}
+
+            {!row.available && (
+              <p className="pm-error">
+                No disponible en este punto. Retíralo o cambia de
+                punto de venta.
+              </p>
+            )}
+
+            <div className="pm-between">
+              <Quantity
+                value={row.quantity}
+                disabled={!row.available}
+                onChange={(quantity) =>
+                  onQuantity(row.product.id, quantity)
+                }
+              />
+
+              <div className="pm-inline">
+                <button
+                  type="button"
+                  className="pm-icon-button"
+                  aria-label={"Editar " + row.product.name}
+                  disabled={!row.available}
+                  onClick={() => onEdit(row.product)}
+                >
+                  <Pencil size={18} aria-hidden="true" />
+                </button>
+
+                <button
+                  type="button"
+                  className="pm-icon-button pm-danger"
+                  aria-label={"Retirar " + row.product.name}
+                  onClick={() => onRemove(row.product.id)}
+                >
+                  <Trash2 size={18} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          </article>
+        ))}
+
+        {rows.some((row) => !row.available) && (
+          <button
+            type="button"
+            className="pm-secondary"
+            disabled={refreshing}
+            onClick={onRefresh}
+          >
+            {refreshing
+              ? "Consultando…"
+              : "Actualizar disponibilidad"}
+          </button>
+        )}
+      </div>
+
+      <div className="pm-dialog-footer pm-stack">
+        <div>
+          <p className="pm-between">
+            <strong>Subtotal estimado</strong>
+            <strong>{money(total, currency)}</strong>
+          </p>
+          <small className="pm-muted">
+            El negocio confirma los precios al revisar tu solicitud.
+          </small>
+        </div>
+
+        <button
+          type="button"
+          className="pm-primary"
+          disabled={!valid || refreshing}
+          onClick={onContinue}
+        >
+          Continuar
+        </button>
+      </div>
+    </BottomSheet>
+  );
+}
+
+export function CheckoutDialog({
+  draft,
+  rows,
+  location,
+  currency,
+  busy,
+  uncertain,
+  error,
+  onDraft,
+  onClose,
+  onChangeLocation,
+  onSubmit,
+}: {
+  draft: CheckoutDraft;
+  rows: CartRow[];
+  location: PublicLocation;
+  currency: string;
+  busy: boolean;
+  uncertain: boolean;
+  error: string;
+  onDraft: (draft: CheckoutDraft) => void;
+  onClose: () => void;
+  onChangeLocation: () => void;
+  onSubmit: (draft: CheckoutDraft) => void;
+}) {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const locked = busy || uncertain;
+
+  const total = rows.reduce(
+    (sum, row) =>
+      sum + cents(row.product.currentPrice) * BigInt(row.quantity),
+    0n
+  );
+
+  function change<K extends keyof CheckoutDraft>(
+    key: K,
+    value: CheckoutDraft[K]
+  ) {
+    onDraft({ ...draft, [key]: value });
+    setErrors((previous) => ({ ...previous, [key]: "" }));
+  }
+
+  function continueOrSend() {
+    if (locked) return;
+
+    const result = checkoutSchema.safeParse(draft);
+
+    if (!result.success) {
+      setErrors(
+        Object.fromEntries(
+          result.error.issues.map((issue) => [
+            String(issue.path[0]),
+            issue.message,
+          ])
+        )
+      );
+      setStep(1);
+      return;
+    }
+
+    setErrors({});
+
+    if (step === 1) {
+      setStep(2);
+    } else {
+      onSubmit(result.data);
+    }
+  }
+
+  return (
+    <BottomSheet
+      id="pm-checkout-dialog"
+      open
+      variant="modal"
+      title={
+        step === 1 ? "Completa tu solicitud" : "Revisa tu solicitud"
+      }
+      className="pm-dialog pm-dialog--checkout"
+      busy={busy}
+      onClose={onClose}
+      onBack={step === 2 ? () => setStep(1) : undefined}
+    >
+      <p className="pm-dialog-caption">Paso {step} de 2</p>
+
+      <div
+        className="pm-progress"
+        role="progressbar"
+        aria-label="Pasos de la solicitud"
+        aria-valuemin={0}
+        aria-valuemax={2}
+        aria-valuenow={step}
+      >
+        <span style={{ width: step === 1 ? "50%" : "100%" }} />
+      </div>
+
+      <form
+        className="pm-dialog-form"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          continueOrSend();
+        }}
+      >
+        <div className="pm-dialog-content pm-stack">
+          <p className="pm-notice">
+            Esta es una solicitud de pedido. El negocio debe revisarla
+            y confirmarla.
+          </p>
+
+          {step === 1 ? (
+            <fieldset
+              disabled={locked}
+              className="pm-stack pm-fieldset"
+            >
+              <div>
+                <p className="pm-field-label">Tipo de servicio</p>
+
+                <div className="pm-service-options">
+                  <button
+                    type="button"
+                    aria-pressed={draft.serviceType === "TAKEAWAY"}
+                    onClick={() => change("serviceType", "TAKEAWAY")}
+                  >
+                    <Store size={20} aria-hidden="true" />
+                    Recoger en el punto de venta
+                  </button>
+
+                  <button
+                    type="button"
+                    aria-pressed={draft.serviceType === "DELIVERY"}
+                    onClick={() => change("serviceType", "DELIVERY")}
+                  >
+                    <Bike size={20} aria-hidden="true" />
+                    Domicilio
+                  </button>
+                </div>
+              </div>
+
+              <div className="pm-notice pm-between">
+                <div>
+                  <strong>{location.name}</strong>
+                  {location.address && <p>{location.address}</p>}
+                  {location.phone && <p>{location.phone}</p>}
+                </div>
+
+                <button
+                  type="button"
+                  className="pm-text-button"
+                  onClick={onChangeLocation}
+                >
+                  Cambiar punto de venta
+                </button>
+              </div>
+
+              <TextField
+                label="Nombre"
+                placeholder="Ej. Laura Gómez"
+                autoComplete="name"
+                required
+                maxLength={150}
+                value={draft.customerName}
+                error={errors.customerName}
+                onChange={(event) =>
+                  change("customerName", event.target.value)
+                }
+              />
+
+              <TextField
+                label="Teléfono"
+                placeholder="Ej. +57 300 123 4567"
+                type="tel"
+                autoComplete="tel"
+                required
+                maxLength={30}
+                value={draft.customerPhone}
+                error={errors.customerPhone}
+                onChange={(event) =>
+                  change("customerPhone", event.target.value)
+                }
+              />
+
+              <TextField
+                label="Correo (opcional)"
+                placeholder="Ej. laura@correo.com"
+                type="email"
+                autoComplete="email"
+                maxLength={254}
+                value={draft.customerEmail}
+                error={errors.customerEmail}
+                onChange={(event) =>
+                  change("customerEmail", event.target.value)
+                }
+              />
+
+              {draft.serviceType === "DELIVERY" && (
+                <TextAreaField
+                  label="Dirección del domicilio"
+                  placeholder="Calle, número, edificio y apartamento"
+                  autoComplete="street-address"
+                  required
+                  maxLength={300}
+                  value={draft.deliveryAddress}
+                  error={errors.deliveryAddress}
+                  onChange={(event) =>
+                    change("deliveryAddress", event.target.value)
+                  }
+                />
+              )}
+
+              <TextAreaField
+                label="Notas generales (opcional)"
+                placeholder="Ej. Llamar al llegar"
+                maxLength={500}
+                value={draft.notes}
+                error={errors.notes}
+                onChange={(event) =>
+                  change("notes", event.target.value)
+                }
+              />
+            </fieldset>
+          ) : (
+            <div className="pm-stack">
+              <dl className="pm-review">
+                <div>
+                  <dt>Punto de venta</dt>
+                  <dd>{location.name}</dd>
+                </div>
+
+                <div>
+                  <dt>Tipo de servicio</dt>
+                  <dd>
+                    {draft.serviceType === "DELIVERY"
+                      ? "Domicilio"
+                      : "Recoger en el punto de venta"}
+                  </dd>
+                </div>
+
+                <div>
+                  <dt>Cliente</dt>
+                  <dd>
+                    {draft.customerName} · {draft.customerPhone}
+                    {draft.customerEmail &&
+                      " · " + draft.customerEmail}
+                  </dd>
+                </div>
+
+                {draft.serviceType === "DELIVERY" && (
+                  <div>
+                    <dt>Dirección</dt>
+                    <dd>{draft.deliveryAddress}</dd>
+                  </div>
+                )}
+              </dl>
+
+              <div>
+                <p className="pm-field-label">Productos</p>
+
+                <ul className="pm-summary-list">
+                  {rows.map((row) => (
+                    <li key={row.product.id}>
+                      <div>
+                        {row.quantity} × {row.product.name}
+                        {row.notes && (
+                          <small className="pm-muted">
+                            {row.notes}
+                          </small>
+                        )}
+                      </div>
+
+                      <strong>
+                        {money(
+                          cents(row.product.currentPrice) *
+                            BigInt(row.quantity),
+                          currency
+                        )}
+                      </strong>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {draft.notes && (
+                <div>
+                  <p className="pm-field-label">Notas generales</p>
+                  <p className="pm-item-notes">{draft.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {error && (
+            <p className="pm-error pm-notice" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <div className="pm-dialog-footer pm-stack">
+          <p className="pm-between">
+            <strong>Subtotal estimado</strong>
+            <strong>{money(total, currency)}</strong>
+          </p>
+
+          <button
+            type="submit"
+            className="pm-primary"
+            disabled={locked || rows.some((row) => !row.available)}
+          >
+            {busy
+              ? "Enviando solicitud…"
+              : step === 1
+                ? "Revisar solicitud"
+                : "Enviar solicitud"}
+          </button>
+        </div>
+      </form>
+    </BottomSheet>
+  );
+}

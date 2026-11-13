@@ -1,4 +1,5 @@
 import { useId, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import * as Select from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
@@ -23,6 +24,8 @@ interface SelectFieldProps {
   describedBy?: string;
   hideLabel?: boolean;
   className?: string;
+  contentClassName?: string;
+  contentStyle?: CSSProperties;
 }
 
 export function SelectField({
@@ -39,6 +42,8 @@ export function SelectField({
   describedBy,
   hideLabel = false,
   className = "",
+  contentClassName = "",
+  contentStyle,
 }: SelectFieldProps) {
   const generatedId = useId();
   const triggerId = id ?? generatedId;
@@ -143,7 +148,8 @@ export function SelectField({
             position="popper"
             sideOffset={6}
             collisionPadding={12}
-            className="select-field-content"
+            className={`select-field-content ${contentClassName}`}
+            style={contentStyle}
             onEscapeKeyDown={(event: KeyboardEvent) => {
               event.stopPropagation();
             }}
