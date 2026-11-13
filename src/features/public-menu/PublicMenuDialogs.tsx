@@ -542,18 +542,40 @@ export function CheckoutDialog({
               />
 
               {draft.serviceType === "DELIVERY" && (
-                <TextAreaField
-                  label="Dirección del domicilio"
-                  placeholder="Calle, número, edificio y apartamento"
-                  autoComplete="street-address"
-                  required
-                  maxLength={300}
-                  value={draft.deliveryAddress}
-                  error={errors.deliveryAddress}
-                  onChange={(event) =>
-                    change("deliveryAddress", event.target.value)
-                  }
-                />
+                <>
+                  <TextAreaField
+                    label="Dirección del domicilio"
+                    placeholder="Calle, número, edificio y apartamento"
+                    autoComplete="street-address"
+                    required
+                    maxLength={300}
+                    value={draft.deliveryAddress}
+                    error={errors.deliveryAddress}
+                    onChange={(event) =>
+                      change("deliveryAddress", event.target.value)
+                    }
+                  />
+
+                  <TextAreaField
+                    label="Indicaciones de entrega (opcional)"
+                    placeholder="Ej. Portería, torre o indicaciones para llegar"
+                    maxLength={300}
+                    value={draft.deliveryInstructions ?? ""}
+                    error={errors.deliveryInstructions}
+                    onChange={(event) =>
+                      change(
+                        "deliveryInstructions",
+                        event.target.value
+                      )
+                    }
+                  />
+
+                  <p className="pm-notice">
+                    La cobertura, el valor del domicilio y el pago se
+                    confirmarán por WhatsApp. La entrega depende de la
+                    aceptación del negocio.
+                  </p>
+                </>
               )}
 
               <TextAreaField
@@ -599,6 +621,14 @@ export function CheckoutDialog({
                     <dd>{draft.deliveryAddress}</dd>
                   </div>
                 )}
+
+                {draft.serviceType === "DELIVERY" &&
+                  draft.deliveryInstructions?.trim() && (
+                    <div>
+                      <dt>Indicaciones de entrega</dt>
+                      <dd>{draft.deliveryInstructions}</dd>
+                    </div>
+                  )}
               </dl>
 
               <div>

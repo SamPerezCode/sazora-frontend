@@ -9,6 +9,7 @@ import {
 } from "../schemas/business-settings.schema";
 import type {
   BusinessDraft,
+  BusinessPatch,
   BusinessSettings,
   BusinessSettingsResource,
   SettingsSection,
@@ -177,9 +178,20 @@ export function useSettingsEditor(
     }));
 
     try {
+      const patch: BusinessPatch =
+        section === "information"
+          ? (Object.fromEntries(
+              Object.entries(result.data).filter(([key]) => {
+                const field = key as keyof BusinessDraft;
+
+                return draft[field] !== baseline[field];
+              })
+            ) as BusinessPatch)
+          : result.data;
+
       const saved = await resource.mutate({
         kind: "settings",
-        patch: result.data,
+        patch,
       });
 
       if (!alive.current) return;

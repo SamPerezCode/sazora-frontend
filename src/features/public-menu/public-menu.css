@@ -149,10 +149,29 @@
 }
 
 .pm-contact > span,
+.pm-contact > a,
 .pm-location-contact p {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.pm-contact > a {
+  min-width: 0;
+  max-width: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.pm-contact > a > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pm-contact > a:hover,
+.pm-contact > a:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 
 .pm-contact svg,
@@ -1038,4 +1057,28 @@
     flex-wrap: wrap;
     justify-content: center;
   }
+}
+
+.pm-whatsapp-summary {
+  min-width: 0;
+}
+
+.pm-whatsapp-summary summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.pm-whatsapp-summary textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--pm-border);
+  border-radius: 1rem;
+  background: var(--pm-canvas);
+  color: var(--pm-ink);
+  font: inherit;
+  font-size: 0.875rem;
+  resize: vertical;
 }

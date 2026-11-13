@@ -77,6 +77,21 @@ const menuResponseSchema = z.object({
   data: z.object({ menu: menuSchema }),
 });
 
+export function publicOrderNotes(
+  serviceType: "TAKEAWAY" | "DELIVERY",
+  notes: string,
+  deliveryInstructions?: string
+): string {
+  return [
+    notes.trim(),
+    serviceType === "DELIVERY" && deliveryInstructions?.trim()
+      ? `Indicaciones de entrega: ${deliveryInstructions.trim()}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 export const checkoutSchema = z
   .object({
     serviceType: serviceSchema,
@@ -105,9 +120,29 @@ export const checkoutSchema = z
       .string()
       .trim()
       .max(300, "Máximo 300 caracteres."),
+    deliveryInstructions: z
+      .string()
+      .trim()
+      .max(300, "Máximo 300 caracteres.")
+      .optional(),
     notes: z.string().trim().max(500, "Máximo 500 caracteres."),
   })
   .superRefine((value, context) => {
+    if (
+      publicOrderNotes(
+        value.serviceType,
+        value.notes,
+        value.deliveryInstructions
+      ).length > 500
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["notes"],
+        message:
+          "Las notas y las indicaciones de entrega juntas admiten máximo 500 caracteres.",
+      });
+    }
+
     if (value.serviceType === "DELIVERY" && !value.deliveryAddress) {
       context.addIssue({
         code: "custom",
@@ -267,7 +302,12 @@ export async function sendPublicOrder(
           customer.serviceType === "DELIVERY"
             ? customer.deliveryAddress
             : null,
-        notes: customer.notes || null,
+        notes:
+          publicOrderNotes(
+            customer.serviceType,
+            customer.notes,
+            customer.deliveryInstructions
+          ) || null,
         items,
       },
     }
@@ -387,4 +427,120 @@ export function themeFor(
     "--sazora-popover": "#ffffff",
     "--sazora-secondary": "#f4f7fb",
   } as CSSProperties;
+}
+
+export const publicWhatsAppStateSchema = z.object({
+  business: businessSchema,
+  customer: checkoutSchema,
+  publicCode: z.string().uuid(),
+  openWhatsApp: z.boolean(),
+});
+
+export function normalizeWhatsAppPhone(
+  phone: string | null | undefined
+): string | null {
+  const value = phone?.trim();
+
+  if (!value || !/^\+?[\d\s().-]+$/.test(value)) {
+    return null;
+  }
+
+  const international =
+    value.startsWith("+") || value.startsWith("00");
+
+  let digits = value.replace(/\D/g, "");
+
+  if (value.startsWith("00")) {
+    digits = digits.slice(2);
+  }
+
+  // Los números nacionales admitidos aquí corresponden a Colombia.
+  if (!international && digits.length === 10) {
+    if (!/^(?:3\d{9}|60[1-8]\d{7})$/.test(digits)) {
+      return null;
+    }
+
+    digits = "57" + digits;
+  }
+
+  return /^[1-9]\d{9,14}$/.test(digits) ? digits : null;
+}
+
+export function buildWhatsAppUrl(
+  phone: string | null | undefined,
+  message: string
+): string | null {
+  const number = normalizeWhatsAppPhone(phone);
+
+  return number
+    ? `https://wa.me/${number}?text=${encodeURIComponent(message)}`
+    : null;
+}
+
+export function buildWhatsAppOrderMessage(
+  tracking: PublicTracking,
+  customer?: CheckoutDraft
+): string {
+  const delivery = tracking.serviceType === "DELIVERY";
+
+  const sections = [
+    "Hola, envié una solicitud de pedido desde el menú público.",
+    "",
+    `Negocio: ${tracking.businessName}`,
+    `Solicitud: ${tracking.publicCode}`,
+    `Tipo: ${delivery ? "A domicilio" : "Para recoger"}`,
+    `Punto de venta: ${tracking.locationName}`,
+  ];
+
+  if (customer) {
+    sections.push(
+      "",
+      `Cliente: ${customer.customerName.trim()}`,
+      `Teléfono: ${customer.customerPhone.trim()}`
+    );
+
+    if (customer.customerEmail.trim()) {
+      sections.push(`Correo: ${customer.customerEmail.trim()}`);
+    }
+
+    if (delivery && customer.deliveryAddress.trim()) {
+      sections.push(`Dirección: ${customer.deliveryAddress.trim()}`);
+    }
+
+    if (delivery && customer.deliveryInstructions?.trim()) {
+      sections.push(
+        `Indicaciones de entrega: ${customer.deliveryInstructions.trim()}`
+      );
+    }
+  }
+
+  sections.push("", "Productos:");
+
+  for (const item of tracking.items) {
+    sections.push(
+      `- ${item.quantity} × ${item.productName} — ${money(item.lineTotal, "COP")}`,
+      `  Precio unitario: ${money(item.unitPrice, "COP")}`
+    );
+
+    if (item.notes?.trim()) {
+      sections.push(`  Nota del producto: ${item.notes.trim()}`);
+    }
+  }
+
+  sections.push(
+    "",
+    `Subtotal de productos: ${money(tracking.subtotal, "COP")}`
+  );
+
+  if (customer?.notes.trim()) {
+    sections.push("", `Notas generales: ${customer.notes.trim()}`);
+  }
+
+  sections.push(
+    "",
+    "La disponibilidad, el domicilio y el pago están pendientes de confirmación.",
+    "Quedo atento a la confirmación y las instrucciones de pago."
+  );
+
+  return sections.join("\n");
 }

@@ -1,6 +1,11 @@
-import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
-import { Check, Copy, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router";
+import { Check, Copy, MessageCircle, RefreshCw } from "lucide-react";
 import { z } from "zod";
 import {
   getPublicMenu,
@@ -8,6 +13,9 @@ import {
   money,
   slugSchema,
   themeFor,
+  buildWhatsAppOrderMessage,
+  buildWhatsAppUrl,
+  publicWhatsAppStateSchema,
 } from "./public-menu.api";
 import type {
   PublicBusiness,
@@ -50,7 +58,7 @@ function statusOf(tracking: PublicTracking) {
   }
 
   let index = 0;
-  let text = "Solicitud recibida";
+  let text = "Pendiente de confirmación";
 
   if (tracking.requestStatus === "CONTACTED") {
     text = "Contacto del negocio";
@@ -136,7 +144,24 @@ function TrackingContent({
   slug: string;
   code: string;
 }) {
-  const [business, setBusiness] = useState<PublicBusiness>();
+  const route = useLocation();
+  const navigate = useNavigate();
+
+  const parsed = publicWhatsAppStateSchema.safeParse(route.state);
+
+  const checkout =
+    parsed.success &&
+    parsed.data.publicCode === code &&
+    parsed.data.business.slug === slug
+      ? parsed.data
+      : undefined;
+
+  const automaticOpen = useRef(false);
+  const summaryDetails = useRef<HTMLDetailsElement>(null);
+
+  const [business, setBusiness] = useState<
+    PublicBusiness | undefined
+  >(() => checkout?.business);
   const [tracking, setTracking] = useState<PublicTracking>();
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -214,6 +239,50 @@ function TrackingContent({
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  const whatsappMessage = tracking
+    ? buildWhatsAppOrderMessage(tracking, checkout?.customer)
+    : "";
+
+  const whatsappUrl = whatsappMessage
+    ? buildWhatsAppUrl(business?.phone, whatsappMessage)
+    : null;
+
+  useEffect(() => {
+    if (
+      !checkout?.openWhatsApp ||
+      !tracking ||
+      automaticOpen.current
+    ) {
+      return;
+    }
+
+    automaticOpen.current = true;
+
+    // Evita repetir la apertura al recargar o consultar el estado.
+    void navigate(route.pathname + route.search, {
+      replace: true,
+      state: {
+        ...checkout,
+        openWhatsApp: false,
+      },
+    });
+
+    if (!whatsappUrl) return;
+
+    try {
+      window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    } catch {
+      // El botón manual permanece disponible si falla la apertura.
+    }
+  }, [
+    checkout,
+    tracking,
+    whatsappUrl,
+    navigate,
+    route.pathname,
+    route.search,
+  ]);
+
   const status = tracking ? statusOf(tracking) : undefined;
   const name =
     business?.name ?? tracking?.businessName ?? "Tu solicitud";
@@ -240,7 +309,7 @@ function TrackingContent({
           )}
           <div>
             <p>{name}</p>
-            <h1>Tu solicitud</h1>
+            <h1>Solicitud enviada</h1>
           </div>
         </div>
       </header>
@@ -306,6 +375,96 @@ function TrackingContent({
                   <dd>{formatDate(tracking.createdAt)}</dd>
                 </div>
               </dl>
+            </section>
+
+            <section className="pm-panel pm-stack">
+              <h2>Enviar por WhatsApp</h2>
+
+              <p className="pm-muted">
+                Recibimos tu solicitud. Envíala también por WhatsApp
+                para que el negocio pueda confirmar disponibilidad,
+                domicilio y forma de pago.
+              </p>
+
+              {whatsappUrl ? (
+                <a
+                  className="pm-primary pm-inline"
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Enviar solicitud por WhatsApp"
+                >
+                  <MessageCircle size={18} aria-hidden="true" />
+                  Enviar pedido por WhatsApp
+                </a>
+              ) : (
+                <p className="pm-notice" role="status">
+                  {business
+                    ? "El negocio no tiene un número de WhatsApp configurado."
+                    : "No pudimos obtener el teléfono del negocio. Puedes copiar el resumen y consultar el estado."}
+                </p>
+              )}
+
+              <button
+                type="button"
+                className="pm-secondary pm-inline"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(
+                      whatsappMessage
+                    );
+
+                    setToast("Resumen copiado");
+                  } catch {
+                    if (summaryDetails.current) {
+                      summaryDetails.current.open = true;
+                    }
+
+                    setToast(
+                      "Selecciona el resumen para copiarlo manualmente."
+                    );
+                  }
+                }}
+              >
+                <Copy size={16} aria-hidden="true" />
+                Copiar resumen
+              </button>
+
+              <details
+                ref={summaryDetails}
+                className="pm-whatsapp-summary"
+              >
+                <summary>Ver resumen del pedido</summary>
+
+                <textarea
+                  aria-label="Resumen del pedido para WhatsApp"
+                  readOnly
+                  value={whatsappMessage}
+                  rows={12}
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+              </details>
+
+              {!checkout && (
+                <p className="pm-muted">
+                  Este enlace de seguimiento no incluye tus datos de
+                  contacto en el resumen. Puedes añadirlos en
+                  WhatsApp.
+                </p>
+              )}
+
+              {tracking.requestStatus === "NEW" ||
+              tracking.requestStatus === "CONTACTED" ? (
+                <p className="pm-muted">
+                  Tu pedido todavía no está confirmado. El negocio lo
+                  aceptará después de verificar los datos y el pago.
+                </p>
+              ) : null}
+
+              <p className="pm-muted">
+                Si WhatsApp no se abrió automáticamente, usa el botón.
+                Revisa el mensaje y pulsa Enviar dentro de WhatsApp.
+              </p>
             </section>
 
             <section className="pm-panel pm-stack">

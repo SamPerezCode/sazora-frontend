@@ -42,6 +42,37 @@ type Dialog =
   | { kind: "product"; product: PublicProduct }
   | null;
 
+function getInstagramHandle(
+  instagram: string | null | undefined
+): string | null {
+  const value = instagram?.trim();
+
+  if (!value) return null;
+
+  let handle: string;
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const url = new URL(value);
+
+      if (
+        !["instagram.com", "www.instagram.com"].includes(
+          url.hostname.toLowerCase()
+        )
+      ) {
+        return null;
+      }
+
+      handle = url.pathname.split("/").filter(Boolean)[0] ?? "";
+    } catch {
+      return null;
+    }
+  } else {
+    handle = value.replace(/^@/, "");
+  }
+
+  return /^[a-z0-9._]{1,30}$/i.test(handle) ? handle : null;
+}
+
 function normalize(value: string) {
   return value
     .normalize("NFD")
@@ -142,6 +173,12 @@ function MenuContent({
   const business = menu.business;
   const theme = themeFor(business);
 
+  const instagramHandle = getInstagramHandle(business.instagram);
+
+  const instagramUrl = instagramHandle
+    ? `https://www.instagram.com/${encodeURIComponent(instagramHandle)}`
+    : null;
+
   const [locationId, setLocationId] = useState(
     menu.locations.length === 1 ? menu.locations[0].id : ""
   );
@@ -162,6 +199,7 @@ function MenuContent({
     customerPhone: "",
     customerEmail: "",
     deliveryAddress: "",
+    deliveryInstructions: "",
     notes: "",
   });
 
@@ -328,11 +366,20 @@ function MenuContent({
       if (!alive.current) return;
 
       setCart([]);
+
       navigate(
         "/menu/" +
           encodeURIComponent(business.slug) +
           "/pedido/" +
-          encodeURIComponent(result.publicCode)
+          encodeURIComponent(result.publicCode),
+        {
+          state: {
+            business,
+            customer,
+            publicCode: result.publicCode,
+            openWhatsApp: true,
+          },
+        }
       );
     } catch (cause) {
       if (!alive.current || controller.signal.aborted) return;
@@ -430,8 +477,13 @@ function MenuContent({
                 {business.openingHoursText}
               </span>
             )}
-            {business.instagram && (
-              <span>
+            {instagramHandle && instagramUrl && (
+              <a
+                href={instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Abrir Instagram de @${instagramHandle}`}
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width={16}
@@ -455,9 +507,9 @@ function MenuContent({
                     fill="currentColor"
                     stroke="none"
                   />
-                </svg>{" "}
-                {business.instagram}
-              </span>
+                </svg>
+                <span>@{instagramHandle}</span>
+              </a>
             )}
           </div>
         </div>

@@ -125,7 +125,7 @@ const informationFields = [
   {
     key: "instagram",
     label: "Instagram",
-    placeholder: "Ej. @mokai",
+    placeholder: "Ej. @instagram",
     max: 100,
   },
 ] as const;
