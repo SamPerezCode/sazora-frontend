@@ -16,6 +16,7 @@ import { Feedback } from "./PublicOrderShared";
 import { Pager } from "./PublicOrderShared";
 import { Service } from "./PublicOrderShared";
 import { RequestDialog } from "./PublicRequestDialog";
+import { usePublicRequestsRealtime } from "../../hooks/usePublicRequestsRealtime";
 import { Bike } from "lucide-react";
 import { Inbox } from "lucide-react";
 import { RotateCcw } from "lucide-react";
@@ -37,6 +38,7 @@ export function RequestList() {
 
   const resource = useRemote(loader);
 
+  usePublicRequestsRealtime(session, resource.reload);
   const [filter, setFilter] = useState({
     q: "",
     location: "ALL",

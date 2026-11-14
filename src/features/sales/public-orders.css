@@ -417,3 +417,131 @@
     flex: 1 1 auto;
   }
 }
+
+.por-page,
+.por-dialog {
+  --form-control-height: 38px;
+  --field-font-size: 13px;
+  --field-label-size: 12px;
+  --field-gap: 2px;
+  --button-font-size: 13px;
+
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+:is(.por-page, .por-dialog) label:not(.por-check),
+:is(.por-page, .por-dialog) .select-field-label,
+:is(.por-page, .por-dialog) .date-field-label {
+  color: var(--sazora-heading);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+:is(.por-page, .por-dialog) .select-field-label {
+  margin-bottom: 2px;
+}
+
+:is(.por-page, .por-dialog) .date-field {
+  gap: 2px;
+}
+
+:is(.por-page, .por-dialog)
+  input:not([type="checkbox"]):not([type="radio"]),
+:is(.por-page, .por-dialog) .select-field-trigger,
+:is(.por-page, .por-dialog) .date-field-trigger {
+  height: var(--form-control-height);
+  min-height: var(--form-control-height);
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+:is(.por-page, .por-dialog) textarea {
+  min-height: 76px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+:is(.por-page, .por-dialog) .ui-button[data-size="md"],
+.por-link {
+  min-height: 36px;
+  padding: 8px 13px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+.por-stats strong {
+  font-size: 24px;
+  line-height: 32px;
+}
+
+.por-filters {
+  gap: 12px;
+  align-items: start;
+}
+
+.por-tabs button {
+  font-size: 13px;
+  padding: 12px;
+}
+
+.por-card {
+  border-radius: 12px;
+}
+
+.por-cards {
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(100%, 320px), 1fr)
+  );
+}
+
+.por-search {
+  gap: 8px;
+}
+
+.por-search > :first-child {
+  --field-gap: 0px;
+}
+
+/* Conserva la etiqueta accesible sin ocupar una fila visual. */
+.por-search > :first-child > :first-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.bottom-sheet.bottom-sheet-modal.por-dialog {
+  width: min(680px, calc(100vw - 24px));
+  padding: 24px;
+}
+
+@media (max-width: 640px) {
+  .por-page,
+  .por-dialog {
+    --form-control-height: 44px;
+  }
+
+  :is(.por-page, .por-dialog)
+    input:not([type="checkbox"]):not([type="radio"]),
+  :is(.por-page, .por-dialog) textarea {
+    font-size: 16px;
+  }
+
+  .bottom-sheet.bottom-sheet-modal.por-dialog {
+    padding: 18px;
+  }
+
+  .por-tabs button {
+    padding-inline: 5px;
+    font-size: 12px;
+  }
+}

@@ -10,6 +10,8 @@ import type { RequestAction } from "../../schemas/public-orders.schema";
 import { changeRequest } from "../../services/public-orders.service";
 import { readRequest } from "../../services/public-orders.service";
 import { pending } from "../../utils/public-orders.utils";
+import { DeliveryCostNotice } from "./DeliveryCostNotice";
+import { PublicRequestNotes } from "./PublicRequestNotes";
 import { Address } from "./PublicOrderShared";
 import { Badge } from "./PublicOrderShared";
 import { External } from "./PublicOrderShared";
@@ -100,7 +102,7 @@ export function RequestDialog({
       className="por-dialog"
       title={
         panel === "accept"
-          ? "Aceptar solicitud"
+          ? "Aceptar solicitud y crear pedido"
           : panel === "reject"
             ? "Rechazar solicitud"
             : "Solicitud " + (row?.publicCode ?? "")
@@ -158,23 +160,26 @@ export function RequestDialog({
                 </div>
               </dl>
 
-              {row.deliveryAddress && (
-                <Address value={row.deliveryAddress} />
-              )}
+              {row.serviceType === "DELIVERY" &&
+                row.deliveryAddress && (
+                  <Address value={row.deliveryAddress} />
+                )}
 
               <Items items={row.items} />
 
-              {row.notes && (
-                <div>
-                  <strong>Notas generales</strong>
-                  <p className="por-notes">{row.notes}</p>
-                </div>
-              )}
+              <PublicRequestNotes
+                notes={row.notes}
+                delivery={row.serviceType === "DELIVERY"}
+              />
 
               <div className="por-toolbar">
                 <strong>Subtotal de productos</strong>
                 <strong>{price(row.subtotal)}</strong>
               </div>
+
+              {row.serviceType === "DELIVERY" && (
+                <DeliveryCostNotice />
+              )}
 
               {row.rejectionReason && (
                 <p className="por-error">{row.rejectionReason}</p>
@@ -231,11 +236,13 @@ export function RequestDialog({
           ) : (
             <>
               <p>
-                Se creará un pedido para{" "}
+                Confirma que contactaste al cliente y verificaste la
+                disponibilidad de los productos
                 {row.serviceType === "DELIVERY"
-                  ? "domicilio"
-                  : "recoger"}{" "}
-                en {row.locationName}.
+                  ? ", la dirección de entrega"
+                  : ""}{" "}
+                y las condiciones de pago. Al aceptar se creará el
+                pedido y podrá enviarse a preparación.
               </p>
 
               <p>
@@ -244,8 +251,8 @@ export function RequestDialog({
               </p>
 
               <p className="por-muted">
-                La coordinación del pago y del costo del domicilio se
-                realiza por WhatsApp.
+                Aceptar la solicitud no registra un pago. El pago
+                definitivo se registra posteriormente en ventas.
               </p>
 
               <label className="por-check">
@@ -257,8 +264,8 @@ export function RequestDialog({
                     setChecked(event.target.checked)
                   }
                 />
-                Confirmé disponibilidad y acordé con el cliente el
-                pago y la entrega.
+                He contactado al cliente y verificado los datos de la
+                solicitud.
               </label>
             </>
           ))}

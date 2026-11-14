@@ -1146,3 +1146,59 @@
     padding-inline: 1.5rem;
   }
 }
+
+@media (min-width: 768px) {
+  .shell-workspace:is(
+      [data-module="public-orders"],
+      [data-module="deliveries"],
+      [data-module="cash"],
+      [data-module="sale-history"]
+    )
+    > .shell-header {
+    min-height: 82px;
+    padding: 14px 30px;
+    gap: 12px;
+    border: 1px solid var(--sazora-outline);
+    border-radius: 16px;
+  }
+
+  .shell-workspace:is(
+      [data-module="public-orders"],
+      [data-module="deliveries"],
+      [data-module="cash"],
+      [data-module="sale-history"]
+    )
+    .shell-header-copy
+    h1 {
+    margin: 0;
+    font-size: 24px;
+    line-height: 30px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    white-space: normal;
+  }
+
+  .shell-workspace:is(
+      [data-module="public-orders"],
+      [data-module="deliveries"],
+      [data-module="cash"],
+      [data-module="sale-history"]
+    )
+    .shell-header-copy
+    p {
+    margin-top: 3px;
+    font-size: 13px;
+    line-height: 18px;
+  }
+
+  .app-shell
+    .shell-workspace:is(
+      [data-module="public-orders"],
+      [data-module="deliveries"],
+      [data-module="cash"],
+      [data-module="sale-history"]
+    )
+    > .shell-content {
+    padding: 24px 30px 40px;
+  }
+}

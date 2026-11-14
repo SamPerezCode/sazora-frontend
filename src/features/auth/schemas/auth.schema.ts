@@ -66,6 +66,7 @@ export const sessionLocationAccessSchema = z.object({
       name: z.string(),
       locationType: z.enum(["POINT_OF_SALE", "PRODUCTION_WAREHOUSE"]),
       isDefault: z.boolean(),
+      isSalesLocation: z.boolean().optional(),
       isActive: z.boolean().optional(),
     })
   ),

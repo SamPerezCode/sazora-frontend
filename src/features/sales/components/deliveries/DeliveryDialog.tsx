@@ -12,6 +12,7 @@ import { assignDelivery } from "../../services/deliveries.service";
 import { readDelivery } from "../../services/deliveries.service";
 import { labels } from "../../utils/public-orders.utils";
 import { Address } from "../public-orders/PublicOrderShared";
+import { DeliveryCostNotice } from "../public-orders/DeliveryCostNotice";
 import { Badge } from "../public-orders/PublicOrderShared";
 import { External } from "../public-orders/PublicOrderShared";
 import { Feedback } from "../public-orders/PublicOrderShared";
@@ -177,7 +178,7 @@ export function DeliveryDialog({
 
               <p>{row.customerPhone}</p>
               <Address value={row.deliveryAddress} />
-
+              <DeliveryCostNotice />
               <p>
                 Repartidor:{" "}
                 {row.assignedDriverName ??

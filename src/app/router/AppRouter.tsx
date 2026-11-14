@@ -13,6 +13,8 @@ import { ReportsPage } from "../../features/reports/ReportsPage";
 import { DeliveriesPage } from "../../features/sales/pages/DeliveriesPage";
 import { PublicOrdersPage } from "../../features/sales/pages/PublicOrdersPage";
 import { SalesPage } from "../../features/sales/pages/SalesPage";
+import { CashPage } from "../../features/cash/pages/CashPage";
+import { FinancialSalesPage } from "../../features/sales/pages/FinancialSalesPage";
 import { AppShell } from "../layout/AppShell";
 import { GuestOnly } from "./AuthGuards";
 import { RequireAccess } from "./AuthGuards";
@@ -52,6 +54,11 @@ export function AppRouter() {
               <Route path="/panel" element={<DashboardPage />} />
               <Route path="/estadisticas" element={<ReportsPage />} />
               <Route path="/ventas" element={<SalesPage />} />
+              <Route path="/cajas" element={<CashPage />} />
+              <Route
+                path="/historial-ventas"
+                element={<FinancialSalesPage />}
+              />{" "}
               <Route
                 path="/pedidos-publicos"
                 element={<PublicOrdersPage />}

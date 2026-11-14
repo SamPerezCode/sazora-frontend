@@ -103,6 +103,7 @@ export function AppShell() {
       </div>
 
       <div
+        data-module={current?.id}
         className={
           "shell-workspace " +
           (isInventory
@@ -130,7 +131,15 @@ export function AppShell() {
                   ? "Existencias y costos por ubicación"
                   : isPanel && dashboard.data
                     ? `${businessDate(dashboard.data.period.today)} · ${business.name}`
-                    : business.name
+                    : current &&
+                        [
+                          "cash",
+                          "sale-history",
+                          "public-orders",
+                          "deliveries",
+                        ].includes(current.id)
+                      ? current.description
+                      : business.name
           }
           session={session}
           business={business}

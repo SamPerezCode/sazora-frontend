@@ -25,6 +25,20 @@ const modules: readonly ModuleDefinition[] = [
     available: true,
   },
   {
+    id: "cash",
+    label: "Cajas y turnos",
+    path: "/cajas",
+    permission: "cash.sessions.read",
+    available: true,
+  },
+  {
+    id: "sale-history",
+    label: "Historial de ventas",
+    path: "/historial-ventas",
+    permission: "orders.read",
+    available: true,
+  },
+  {
     id: "kitchen",
     label: "Cocina",
     path: "/cocina",

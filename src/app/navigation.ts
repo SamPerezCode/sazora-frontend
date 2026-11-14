@@ -1,4 +1,6 @@
 import {
+  Banknote,
+  ReceiptText,
   BookOpen,
   Boxes,
   ChartNoAxesColumnIncreasing,
@@ -70,6 +72,26 @@ const navigation: readonly NavigationItem[] = [
     group: "main",
     status: "ready",
     to: "/ventas",
+  },
+  {
+    id: "cash",
+    label: "Cajas y turnos",
+    description: "Operación de efectivo por ubicación.",
+    icon: Banknote,
+    roles: null,
+    group: "main",
+    status: "ready",
+    to: "/cajas",
+  },
+  {
+    id: "sale-history",
+    label: "Historial de ventas",
+    description: "Ventas definitivas, anulaciones y devoluciones",
+    icon: ReceiptText,
+    roles: null,
+    group: "main",
+    status: "ready",
+    to: "/historial-ventas",
   },
   {
     id: "public-orders",

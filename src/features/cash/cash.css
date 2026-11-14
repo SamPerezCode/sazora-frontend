@@ -1,0 +1,528 @@
+.cash-page,
+.cash-stack {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  color: var(--sazora-heading);
+}
+
+.cash-page p,
+.cash-dialog p {
+  margin: 0;
+}
+
+.cash-page h2 {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.cash-page h3,
+.cash-dialog h3 {
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+
+.cash-line,
+.cash-actions,
+.cash-tabs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cash-line {
+  justify-content: space-between;
+}
+
+.cash-actions {
+  justify-content: flex-end;
+}
+
+.cash-tabs {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--sazora-outline);
+}
+
+.cash-filters {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 14px;
+  align-items: end;
+}
+
+.cash-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+}
+
+.cash-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.cash-table {
+  width: 100%;
+  min-width: 800px;
+  text-align: left;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.cash-table th,
+.cash-table td {
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--sazora-outline);
+}
+
+.cash-table th {
+  color: var(--sazora-muted);
+  font-size: 12px;
+}
+
+.cash-table small,
+.cash-movement small {
+  display: block;
+  margin-top: 4px;
+}
+
+.cash-totals {
+  display: grid;
+  gap: 10px;
+}
+
+.cash-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.cash-totals dd {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-totals dt,
+.cash-metadata dt,
+.cash-muted,
+.cash-table small {
+  color: var(--sazora-muted);
+}
+
+.cash-metadata {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.cash-metadata dd {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cash-movement {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--sazora-outline);
+}
+
+.cash-movement p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cash-movement > strong {
+  flex-shrink: 0;
+}
+
+.cash-badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: color-mix(
+    in srgb,
+    var(--sazora-heading) 8%,
+    transparent
+  );
+  font-size: 12px;
+}
+
+.cash-positive {
+  color: var(--sazora-success, #10b981);
+}
+
+.cash-negative {
+  color: var(--sazora-danger, #ef4444);
+}
+
+.cash-note {
+  padding: 16px;
+  border: 1px solid var(--sazora-outline);
+  border-radius: 12px;
+  background: color-mix(
+    in srgb,
+    var(--sazora-heading) 4%,
+    transparent
+  );
+}
+
+.cash-note > * + * {
+  margin-top: 10px;
+}
+
+.bottom-sheet.bottom-sheet-modal.cash-dialog {
+  width: min(680px, calc(100vw - 24px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: 24px;
+  color: var(--sazora-heading);
+}
+
+.cash-dialog fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.cash-dialog > form {
+  margin-top: 20px;
+}
+
+.cash-dialog .cash-actions {
+  padding-top: 16px;
+  border-top: 1px solid var(--sazora-outline);
+}
+
+@media (max-width: 720px) {
+  .cash-columns,
+  .cash-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .cash-movement {
+    flex-wrap: wrap;
+  }
+
+  .cash-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Medidas y tipografía de Cajas y turnos. */
+.cash-page,
+.cash-dialog {
+  --form-control-height: 38px;
+  --field-font-size: 13px;
+  --field-label-size: 12px;
+  --field-gap: 0px;
+  --button-font-size: 13px;
+
+  --button-primary-background: var(--shell-action-bg, #1c2a4d);
+  --button-primary-foreground: var(--shell-action-text, #fff);
+  --button-primary-hover: color-mix(
+    in srgb,
+    var(--button-primary-background) 92%,
+    black
+  );
+
+  font-size: 13px;
+  line-height: 18px;
+}
+
+:is(.cash-page, .cash-dialog) label,
+:is(.cash-page, .cash-dialog) .select-field-label {
+  display: block;
+  margin: 0;
+  color: var(--sazora-heading);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 14px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+:is(.cash-page, .cash-dialog)
+  input:not([type="checkbox"]):not([type="radio"]):not(
+    [type="hidden"]
+  ),
+:is(.cash-page, .cash-dialog) .select-field-trigger {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--form-control-height);
+  min-height: var(--form-control-height);
+  border-radius: 9px;
+  background: var(--sazora-surface);
+  color: var(--sazora-heading);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+:is(.cash-page, .cash-dialog) input::placeholder {
+  color: var(--sazora-muted);
+  opacity: 1;
+}
+
+.cash-dialog .select-field-trigger[data-placeholder] {
+  color: var(--sazora-heading);
+}
+
+:is(.cash-page, .cash-dialog) .ui-button:not([data-size="icon"]) {
+  min-height: 34px;
+  padding: 7px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* Barra de pestañas y acciones. */
+.cash-stack.cash-board {
+  gap: 18px;
+}
+
+.cash-board-toolbar {
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--sazora-outline);
+}
+
+.cash-board .cash-tabs {
+  gap: 8px;
+  padding: 0;
+  border: 0;
+}
+
+.cash-board .cash-tabs .ui-button[aria-pressed="false"] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 400;
+}
+
+.cash-board .cash-actions {
+  gap: 8px;
+}
+
+/* Buscador amplio y filtros compactos. */
+.cash-board .cash-filters {
+  grid-template-columns: minmax(0, 1fr) 225px 169px;
+  align-items: end;
+  gap: 12px;
+}
+
+.cash-search {
+  position: relative;
+  min-width: 0;
+}
+
+.cash-search > svg {
+  position: absolute;
+  top: 19px;
+  left: 12px;
+  transform: translateY(-50%);
+  color: var(--sazora-muted);
+  pointer-events: none;
+}
+
+.cash-page .cash-search input {
+  padding: 8px 12px 8px 34px;
+  border: 1px solid var(--sazora-input-border);
+  background: var(--sazora-background);
+  box-shadow: 0 1px 2px rgb(20 32 51 / 12%);
+}
+
+/* Tabla. */
+.cash-board .cash-table {
+  border-top: 1px solid var(--sazora-outline);
+  font-size: 13px;
+}
+
+.cash-board .cash-table th {
+  padding: 12px 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cash-board .cash-table td {
+  padding: 16px 10px;
+  vertical-align: middle;
+}
+
+.cash-board .cash-table strong {
+  font-weight: 500;
+}
+
+.cash-board .cash-table small {
+  margin-top: 0;
+  font-size: 11px;
+}
+
+.cash-board .cash-table .ui-button {
+  min-height: 30px;
+  padding: 4px 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.cash-board .cash-table .ui-button:enabled:hover {
+  color: var(--sazora-accent);
+  background: transparent;
+}
+
+.cash-board .cash-badge {
+  padding: 3px 8px;
+  border-radius: 9px;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.cash-board .cash-badge[data-status="ACTIVE"] {
+  color: var(--sazora-success, #008653);
+  background: color-mix(in srgb, #10b981 12%, transparent);
+}
+
+/* Modales Nueva caja y Abrir turno. */
+.bottom-sheet.bottom-sheet-modal.cash-action-dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 22px 24px;
+  border-radius: 12px;
+  background: var(--sazora-background);
+}
+
+.cash-action-dialog::backdrop {
+  background: rgb(15 23 42 / 62%);
+}
+
+.cash-action-dialog .bottom-sheet-heading {
+  min-height: 22px;
+  margin: 0;
+  gap: 12px;
+}
+
+.cash-action-dialog .bottom-sheet-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.cash-action-dialog .bottom-sheet-close {
+  width: 24px;
+  height: 24px;
+  color: var(--sazora-muted);
+}
+
+.cash-dialog p.cash-dialog-subtitle {
+  margin-top: 4px;
+  color: var(--sazora-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.cash-action-dialog > form.cash-stack {
+  margin-top: 20px;
+  gap: 18px;
+}
+
+.cash-action-dialog fieldset.cash-stack {
+  gap: 16px;
+}
+
+.cash-notes-field > div {
+  display: grid;
+  gap: 0;
+}
+
+.cash-notes-field > div > * {
+  margin-block: 0;
+}
+
+.cash-action-dialog textarea {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: 76px;
+  min-height: 76px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--sazora-surface);
+  font-size: 13px;
+  line-height: 18px;
+  resize: vertical;
+}
+
+.cash-action-dialog .cash-actions {
+  justify-content: flex-end;
+  padding-top: 14px;
+}
+
+/* Foco naranja de los controles. */
+.cash-page .cash-search input:focus-visible,
+.cash-action-dialog input:focus-visible,
+.cash-action-dialog textarea:focus-visible,
+.cash-action-dialog .select-field-trigger:focus-visible,
+.cash-action-dialog .select-field-trigger[data-state="open"] {
+  border-color: var(--sazora-accent);
+  outline: 2px solid var(--sazora-accent);
+  outline-offset: -1px;
+  box-shadow: none;
+}
+
+/* Encabezado y márgenes del módulo. */
+@media (min-width: 768px) {
+  .app-shell .shell-workspace[data-module="cash"] > .shell-header {
+    min-height: 78px;
+    padding: 12px 24px;
+  }
+
+  .app-shell
+    .shell-workspace[data-module="cash"]
+    > main.shell-content {
+    padding: 22px 24px 40px;
+  }
+}
+
+/* Adaptación a pantallas pequeñas. */
+@media (max-width: 900px) {
+  .cash-board .cash-filters {
+    grid-template-columns: minmax(0, 1fr) 200px;
+  }
+
+  .cash-board .cash-search {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .cash-page,
+  .cash-dialog {
+    --form-control-height: 44px;
+  }
+
+  .cash-board .cash-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .cash-search > svg {
+    top: 22px;
+  }
+
+  .cash-page .cash-search input,
+  .cash-action-dialog input,
+  .cash-action-dialog textarea {
+    font-size: 16px;
+  }
+
+  .bottom-sheet.bottom-sheet-modal.cash-action-dialog {
+    padding: 20px;
+  }
+}
