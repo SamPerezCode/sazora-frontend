@@ -1,10 +1,6 @@
-import { useId, useState } from "react";
-import { Check, ReceiptText } from "lucide-react";
-
-import { BottomSheet } from "../../../components/layout/BottomSheet";
+import { CircleDollarSign } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Alert } from "../../../components/feedback/Alert";
-
 import { OrderStatusBadge } from "./OrderStatusBadge";
 import type { Order } from "../schemas/sales.schema";
 import { cents, money } from "../schemas/sales.schema";
@@ -16,12 +12,15 @@ interface Props {
   order: Order;
   table?: SalesTable;
   resource?: SalesResource;
+  onCheckout?: () => void;
 }
 
-export function OrderSummaryView({ order, table, resource }: Props) {
-  const id = useId();
-  const [confirming, setConfirming] = useState(false);
-
+export function OrderSummaryView({
+  order,
+  table,
+  resource,
+  onCheckout,
+}: Props) {
   const active = order.items.filter(
     (item) => item.status === "ACTIVE"
   );
@@ -35,30 +34,23 @@ export function OrderSummaryView({ order, table, resource }: Props) {
   const blocked =
     !!resource &&
     (resource.busy ||
+      resource.loading ||
       resource.uncertain ||
       !!resource.error ||
       resource.accessLost);
 
   const service =
     order.serviceType === "TABLE"
-      ? `${table?.name ?? "Mesa"}${
-          table?.code ? ` · ${table.code}` : ""
-        }`
-      : "Pedido para recoger";
-
-  const closingText =
-    order.serviceType === "TAKEAWAY"
-      ? "El pedido se cerrará y saldrá del listado de pedidos activos. Su historial se conservará."
-      : table?.continuityOnly || table?.isActive === false
-        ? "La cuenta se cerrará. La mesa seguirá fuera del listado de mesas disponibles para nuevas órdenes. Su historial se conservará."
-        : "La cuenta se cerrará y la mesa quedará libre. Su historial se conservará.";
+      ? `${table?.name ?? "Mesa"}${table?.code ? ` · ${table.code}` : ""}`
+      : order.serviceType === "DELIVERY"
+        ? "Domicilio"
+        : "Pedido para recoger";
 
   return (
     <>
       {resource?.error && (
         <div className="mp-dialog-content">
           <Alert>{resource.error}</Alert>
-
           <Button
             variant="secondary"
             disabled={resource.busy}
@@ -69,13 +61,13 @@ export function OrderSummaryView({ order, table, resource }: Props) {
         </div>
       )}
 
-      {resource?.notice && !confirming && (
+      {resource?.notice && (
         <p className="mp-notice" role="status">
           {resource.notice}
         </p>
       )}
 
-      {resource?.uncertain && !confirming && (
+      {resource?.uncertain && (
         <div className="mp-dialog-content" role="alert">
           <p>
             Hay una operación pendiente de verificar. Revisa la cuenta
@@ -121,12 +113,10 @@ export function OrderSummaryView({ order, table, resource }: Props) {
               <dt>Orden</dt>
               <dd>#{order.id}</dd>
             </div>
-
             <div>
               <dt>Servicio</dt>
               <dd>{service}</dd>
             </div>
-
             <div>
               <dt>Punto de venta</dt>
               <dd>
@@ -157,7 +147,6 @@ export function OrderSummaryView({ order, table, resource }: Props) {
                       {item.productName}
                       {item.notes && <small>{item.notes}</small>}
                     </th>
-
                     <td>{item.quantity}</td>
                     <td>{money(cents(item.unitPrice))}</td>
                     <td>{money(cents(item.lineTotal))}</td>
@@ -224,12 +213,15 @@ export function OrderSummaryView({ order, table, resource }: Props) {
 
           <div className="mp-badges">
             <OrderStatusBadge status={order.status} />
-            <span className="mp-neutral">
-              Sin información de pago
-            </span>
+            {order.status === "DELIVERED" && (
+              <span className="mp-neutral">Pendiente de cobro</span>
+            )}
           </div>
 
-          <p>El cierre de la cuenta no registra un pago.</p>
+          {onCheckout && order.status === "DELIVERED" && (
+            <p>Registra los pagos con «Cobrar y cerrar cuenta».</p>
+          )}
+
           {resource && (
             <OrderPrintPanel
               orderId={order.id}
@@ -247,92 +239,19 @@ export function OrderSummaryView({ order, table, resource }: Props) {
             {active.reduce((sum, item) => sum + item.quantity, 0)}{" "}
             unidades
           </small>
-
           <strong>{money(cents(order.subtotal))}</strong>
         </div>
 
-        {resource && order.status === "DELIVERED" && (
+        {resource && order.status === "DELIVERED" && onCheckout && (
           <Button
             disabled={blocked || pending.length > 0}
-            onClick={() => setConfirming(true)}
+            onClick={onCheckout}
           >
-            <Check size={16} />
-            Cerrar cuenta
+            <CircleDollarSign size={16} />
+            Cobrar y cerrar cuenta
           </Button>
         )}
       </footer>
-
-      {confirming && resource && (
-        <BottomSheet
-          id={id}
-          open
-          variant="modal"
-          title={`¿Cerrar la cuenta #${order.id}?`}
-          className="mp-dialog"
-          busy={resource.busy}
-          onClose={() => setConfirming(false)}
-        >
-          <div className="mp-dialog-content">
-            <p>{closingText}</p>
-
-            <div className="mp-summary-meta">
-              <ReceiptText size={20} />
-              <strong>
-                {service} · {money(cents(order.subtotal))}
-              </strong>
-            </div>
-
-            <p>Esta acción no registra un pago.</p>
-
-            {resource.notice && (
-              <p role="status">{resource.notice}</p>
-            )}
-
-            {resource.uncertain && (
-              <div role="alert">
-                <p>
-                  El resultado debe verificarse antes de volver a
-                  cerrar.
-                </p>
-
-                <Button
-                  variant="secondary"
-                  disabled={resource.busy}
-                  onClick={() => void resource.reconcile()}
-                >
-                  Verificar operación
-                </Button>
-              </div>
-            )}
-
-            <div className="sales-form-actions">
-              <Button
-                variant="secondary"
-                disabled={resource.busy}
-                onClick={() => setConfirming(false)}
-              >
-                Volver
-              </Button>
-
-              <Button
-                loading={resource.busy}
-                loadingText="Cerrando…"
-                disabled={blocked || pending.length > 0}
-                onClick={async () => {
-                  const ok = await resource.action(
-                    `/orders/${order.id}/close`,
-                    "POST"
-                  );
-
-                  if (ok) setConfirming(false);
-                }}
-              >
-                Cerrar cuenta
-              </Button>
-            </div>
-          </div>
-        </BottomSheet>
-      )}
     </>
   );
 }

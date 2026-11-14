@@ -141,3 +141,56 @@ export async function getFinancialSale(
 
   return row;
 }
+
+export async function getFinancialSaleOverview(
+  session: AuthSession,
+  id: string,
+  signal: AbortSignal
+) {
+  const sale = await getFinancialSale(session, id, signal);
+
+  // El listado aporta los totales vigentes y el nombre de quien anuló.
+  const timestamp = new Date(sale.soldAt).toISOString();
+
+  let page = 1;
+  let totalPages: number;
+
+  do {
+    signal.throwIfAborted();
+
+    const result = await listFinancialSales(
+      session,
+      {
+        locationId: sale.locationId,
+        cashSessionId: sale.cashSessionId,
+        status: "",
+        from: timestamp,
+        to: timestamp,
+      },
+      page,
+      signal
+    );
+
+    const summary = result.sales.find((row) => row.id === id);
+
+    if (summary) {
+      if (
+        summary.status !== sale.status ||
+        summary.total !== sale.total
+      ) {
+        throw new Error(
+          "La venta cambió durante la consulta. Vuelve a consultar."
+        );
+      }
+
+      return { ...sale, summary };
+    }
+
+    totalPages = result.pagination.totalPages;
+    page++;
+  } while (page <= totalPages);
+
+  throw new Error(
+    "No fue posible consultar los totales vigentes de la venta."
+  );
+}

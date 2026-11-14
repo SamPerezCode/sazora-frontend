@@ -29,6 +29,7 @@ import { useSalesLocations } from "../hooks/useSalesLocations";
 
 import { OrderWorkspace } from "../components/OrderWorkspace";
 import { OrderSummaryView } from "../components/OrderSummaryView";
+import { CheckoutDialog } from "../components/CheckoutDialog";
 import { OrderStatusBadge } from "../components/OrderStatusBadge";
 import { SalesSummary } from "../components/SalesSummary";
 import { SalesHistory } from "../components/SalesHistory";
@@ -209,6 +210,12 @@ function SalesContent({
   const [chooseTable, setChooseTable] = useState(false);
   const [history, setHistory] = useState(false);
 
+  const [checkoutId, setCheckoutId] = useState<string | null>(null);
+
+  const canCheckout = hasEveryPermission(session, [
+    "orders.close",
+    "cash.sessions.read",
+  ]);
   const [leaving, setLeaving] = useState<
     { kind: "location"; id: string } | { kind: "close" } | null
   >(null);
@@ -270,6 +277,20 @@ function SalesContent({
       ? (table?.name ?? "Mesa")
       : "Pedido para recoger"
     : "Cargando cuenta…";
+
+  function startCheckout() {
+    if (
+      !active ||
+      active.status !== "DELIVERED" ||
+      !canCheckout ||
+      blocked ||
+      Object.keys(resource.drafts[active.id] ?? {}).length > 0
+    ) {
+      return;
+    }
+
+    setCheckoutId(active.id);
+  }
 
   function openTable(id: string) {
     const entry = board.find(
@@ -735,6 +756,7 @@ function SalesContent({
               order={active}
               table={table}
               resource={resource}
+              onCheckout={canCheckout ? startCheckout : undefined}
             />
           ) : workspaceOrder && data ? (
             <OrderWorkspace
@@ -747,6 +769,7 @@ function SalesContent({
               resource={resource}
               order={workspaceOrder}
               data={data}
+              onCheckout={canCheckout ? startCheckout : undefined}
             />
           ) : (
             <div className="mp-dialog-content">
@@ -766,6 +789,24 @@ function SalesContent({
             </div>
           )}
         </BottomSheet>
+      )}
+
+      {checkoutId && canCheckout && (
+        <CheckoutDialog
+          key={JSON.stringify([
+            checkoutId,
+            session.accessToken,
+            session.authorization.permissions,
+            session.authorization.locationAccess,
+          ])}
+          orderId={checkoutId}
+          locationId={location.id}
+          onRecorded={resource.retry}
+          onClose={() => {
+            setCheckoutId(null);
+            resource.retry();
+          }}
+        />
       )}
 
       {leaving && (

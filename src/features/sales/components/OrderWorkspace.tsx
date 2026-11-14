@@ -54,8 +54,10 @@ export function OrderWorkspace({
   resource,
   order,
   data,
+  onCheckout,
 }: {
   resource: SalesResource;
+  onCheckout?: () => void;
   order: Pick<
     Order,
     | "serviceType"
@@ -1119,19 +1121,14 @@ export function OrderWorkspace({
                   : "Enviar pedido"}
               </Button>
             )
-          ) : order.status === "DELIVERED" ? (
+          ) : order.status === "DELIVERED" && onCheckout ? (
             <Button
               size="sm"
               disabled={blocked || unsentAdditions.length > 0}
-              onClick={() =>
-                void resource.action(
-                  `/orders/${order.id}/close`,
-                  "POST"
-                )
-              }
+              onClick={onCheckout}
             >
               <Check size={16} />
-              Cerrar cuenta
+              Cobrar y cerrar cuenta
             </Button>
           ) : null}
         </div>
@@ -1146,9 +1143,7 @@ export function OrderWorkspace({
 
         {order.status === "DELIVERED" && (
           <p className="sales-price-note">
-            {order.serviceType === "TABLE"
-              ? "El cierre libera la mesa. No registra un pago."
-              : "El cierre finaliza la cuenta. No registra un pago."}
+            Registra el pago para cerrar la cuenta.
           </p>
         )}
       </footer>

@@ -54,6 +54,7 @@ const saleBase = z.object({
 });
 
 export const saleRowSchema = saleBase.extend({
+  voidedBy: employee.nullable(),
   customerName: z.string().nullable(),
   itemCount: z.number().int().nonnegative(),
   unitsSold: z.number().nonnegative(),
@@ -79,6 +80,7 @@ export const saleDetailSchema = saleBase.extend({
     z.object({
       id: saleId,
       paymentMethodName: z.string(),
+      affectsCash: z.boolean(),
       amount,
       tenderedAmount: amount,
       changeAmount: amount,
