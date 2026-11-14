@@ -1,0 +1,197 @@
+.bottom-sheet.bottom-sheet-modal.cash-close-dialog {
+  box-sizing: border-box;
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 22px 24px;
+  border: 1px solid var(--sazora-outline);
+  border-radius: 12px;
+  background: var(--sazora-background);
+}
+
+.cash-close-dialog::backdrop {
+  background: var(
+    --sazora-overlay,
+    color-mix(in srgb, var(--sazora-heading) 62%, transparent)
+  );
+}
+
+.cash-close-dialog .bottom-sheet-heading {
+  margin: 0;
+  min-height: 24px;
+}
+
+.cash-close-dialog .bottom-sheet-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+.cash-close-dialog .bottom-sheet-close {
+  width: 24px;
+  height: 24px;
+  color: var(--sazora-muted);
+}
+
+.cash-close-dialog > form.cash-stack {
+  margin-top: 22px;
+  gap: 16px;
+}
+
+.cash-close-dialog .cash-totals {
+  gap: 8px;
+  margin: 0;
+}
+
+.cash-close-dialog .cash-totals dd,
+.cash-count-panel .cash-totals dd {
+  margin: 0;
+}
+
+.cash-close-dialog .cash-actions {
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 16px;
+}
+
+.cash-other-payments {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.cash-other-payments > * + * {
+  margin-top: 0;
+}
+
+.cash-close-dialog .cash-other-payments h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cash-other-payments small {
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.cash-close-dialog input {
+  padding-inline: 12px;
+}
+
+.cash-close-dialog textarea,
+.cash-count-panel textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 76px;
+  min-height: 76px;
+  padding: 8px 12px;
+  border: 1px solid var(--sazora-input-border);
+  border-radius: 9px;
+  background: var(--sazora-surface);
+  color: var(--sazora-heading);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.cash-close-dialog input:focus-visible,
+.cash-close-dialog textarea:focus-visible,
+.cash-count-panel input:focus-visible,
+.cash-count-panel textarea:focus-visible {
+  outline: 2px solid var(--sazora-accent);
+  outline-offset: -1px;
+  box-shadow: none;
+}
+
+.cash-count-panel {
+  display: grid;
+  gap: 24px;
+  width: min(100%, 640px);
+  min-width: 0;
+}
+
+.cash-count-panel .cash-metadata {
+  gap: 16px 24px;
+}
+
+.cash-count-panel .cash-metadata dt {
+  font-size: 11px;
+}
+
+.cash-count-panel .cash-metadata dd {
+  margin: 4px 0 0;
+}
+
+.cash-count-notes {
+  grid-column: 1 / -1;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cash-count-badge {
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.cash-count-badge[data-kind="exact"],
+.cash-session-detail .cash-badge[data-status="OPEN"] {
+  color: var(--sazora-success);
+  background: color-mix(
+    in srgb,
+    var(--sazora-success) 12%,
+    transparent
+  );
+}
+
+.cash-count-badge[data-kind="short"] {
+  color: var(--sazora-danger);
+  background: color-mix(
+    in srgb,
+    var(--sazora-danger) 12%,
+    transparent
+  );
+}
+
+.cash-count-badge[data-kind="over"] {
+  color: var(--sazora-accent);
+  background: color-mix(
+    in srgb,
+    var(--sazora-accent) 12%,
+    transparent
+  );
+}
+
+.cash-session-detail .cash-tabs {
+  gap: 8px;
+}
+
+.cash-session-detail .cash-tabs .ui-button[aria-pressed="false"] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 400;
+}
+
+@media (max-width: 640px) {
+  .bottom-sheet.bottom-sheet-modal.cash-close-dialog {
+    padding: 20px;
+  }
+
+  .cash-close-dialog input,
+  .cash-close-dialog textarea,
+  .cash-count-panel input,
+  .cash-count-panel textarea {
+    font-size: 16px;
+  }
+
+  .cash-count-panel .cash-metadata {
+    grid-template-columns: 1fr;
+  }
+
+  .cash-close-dialog .cash-actions .ui-button {
+    flex: 1 1 auto;
+  }
+}

@@ -6,239 +6,271 @@ import { TextAreaField } from "../../../components/forms/TextAreaField";
 import { BottomSheet } from "../../../components/layout/BottomSheet";
 import { Button } from "../../../components/ui/Button";
 
-import { hasPermission } from "../../auth/utils/permissions";
 import { useCashResource } from "../hooks/useCashResource";
-import { useCashMutation } from "../hooks/useCashMutation";
-import { closeSessionInput } from "../schemas/cash.schema";
-import type { CashSession } from "../schemas/cash.schema";
-import {
-  readCashSession,
-  closeSession,
-} from "../services/cash.service";
-import { cashCents, cashMoney } from "../utils/cash-format";
-import { CashBalance } from "./CashPanels";
+import { useCashClose } from "../hooks/useCashClose";
 
-export function CashCloseDialog({
-  id,
-  close,
-  saved,
-}: {
+import {
+  cashAmountInput,
+  closeSessionInput,
+  type CashSession,
+  type Reconciliation,
+} from "../schemas/cash.schema";
+
+import {
+  canCloseCash,
+  readCloseReconciliation,
+} from "../services/cash-close.service";
+
+import {
+  countPreview,
+  centsDecimal,
+  type CashCountDraft,
+} from "../utils/cash-count";
+
+import { CashTotals } from "./CashPanels";
+
+import {
+  CashCloseTotals,
+  CashDifference,
+  CashOtherPayments,
+} from "./CashCountPanel";
+
+type Props = {
   id: string;
   close: () => void;
-  saved: (row: CashSession) => void;
-}) {
+  saved: (row: CashSession, submitted: boolean) => void;
+  initial?: CashCountDraft;
+};
+
+export function CashCloseDialog(props: Props) {
   const { session } = useAppShell();
 
   const loader = useCallback(
-    (signal: AbortSignal) => readCashSession(id, session, signal),
-    [id, session]
+    (signal: AbortSignal) =>
+      readCloseReconciliation(props.id, session, signal),
+    [props.id, session]
   );
 
   const resource = useCashResource(loader);
-  const mutation = useCashMutation();
 
-  const [counted, setCounted] = useState("");
-  const [notes, setNotes] = useState("");
-  const [review, setReview] = useState(false);
+  if (resource.data) {
+    return <CloseForm {...props} data={resource.data} />;
+  }
 
-  const data = resource.data?.reconciliation;
+  return (
+    <BottomSheet
+      id="cash-close-loading"
+      open
+      variant="modal"
+      className="cash-dialog cash-close-dialog"
+      title="Cerrar turno"
+      onClose={props.close}
+    >
+      <div className="cash-stack">
+        {resource.loading && (
+          <p role="status">Consultando conciliación…</p>
+        )}
 
-  const body = closeSessionInput.safeParse({
+        {resource.error && (
+          <>
+            <p role="alert" className="cash-negative">
+              {resource.error}
+            </p>
+
+            <Button onClick={resource.reload}>
+              Reintentar consulta
+            </Button>
+          </>
+        )}
+      </div>
+    </BottomSheet>
+  );
+}
+
+function CloseForm({
+  data,
+  close,
+  saved,
+  initial,
+}: Props & {
+  data: Reconciliation;
+}) {
+  const { session } = useAppShell();
+
+  const [counted, setCounted] = useState(initial?.counted ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+
+  const flow = useCashClose(session, data, saved, !!initial);
+  const row = flow.data.cashSession;
+
+  const input = closeSessionInput.safeParse({
     countedCashAmount: counted,
     closingNotes: notes,
   });
 
-  const allowed =
-    data?.cashSession.status === "OPEN" &&
-    hasPermission(session, "cash.sessions.close");
+  const preview = cashAmountInput.safeParse(counted).success
+    ? countPreview(
+        counted.trim(),
+        flow.data.movements.calculatedExpectedCashAmount
+      )
+    : null;
 
-  const disabled =
-    mutation.busy ||
-    mutation.uncertain ||
-    resource.loading ||
-    !allowed ||
-    !body.success;
+  const allowed = canCloseCash(row, session);
 
-  const difference =
-    data && body.success
-      ? cashCents(body.data.countedCashAmount) -
-        cashCents(data.movements.calculatedExpectedCashAmount)
-      : null;
+  const valid =
+    allowed &&
+    input.success &&
+    preview &&
+    !preview.error &&
+    !flow.busy &&
+    !flow.uncertain;
 
-  function submit() {
-    if (disabled) return;
-
-    if (!review) {
-      setReview(true);
-      resource.reload();
-      return;
-    }
-
-    void mutation.run(
-      (signal) =>
-        closeSession(
-          id,
-          {
-            countedCashAmount: counted,
-            closingNotes: notes,
-          },
-          session,
-          signal
-        ),
-      saved
-    );
-  }
+  const draft = { counted, notes };
 
   return (
     <BottomSheet
       id="cash-close"
       open
       variant="modal"
-      className="cash-dialog"
+      className="cash-dialog cash-close-dialog"
       title={
-        review ? "Revisar arqueo y cerrar turno" : "Cerrar turno"
+        flow.review ? "Confirmar cierre y arqueo" : "Cerrar turno"
       }
-      busy={mutation.busy}
+      busy={flow.busy}
       onClose={close}
     >
+      <p className="cash-dialog-subtitle">
+        {row.cashRegister.name} · {row.cashRegister.location.name}
+      </p>
+
       <form
         className="cash-stack"
         onSubmit={(event) => {
           event.preventDefault();
-          submit();
+
+          if (valid) {
+            void flow.run(flow.review ? "confirm" : "review", draft);
+          }
         }}
       >
-        {resource.loading && (
-          <p role="status">Consultando el saldo del turno…</p>
-        )}
-
-        {(resource.error || mutation.error) && (
-          <p role="alert" className="cash-negative">
-            {resource.error || mutation.error}
+        {!allowed && (
+          <p role="alert">
+            Este turno está cerrado o no tienes permiso para cerrarlo.
           </p>
         )}
 
-        {resource.error && (
-          <Button variant="secondary" onClick={resource.reload}>
-            Reintentar consulta
-          </Button>
+        <CashCloseTotals data={flow.data} />
+
+        {flow.review ? (
+          <CashTotals
+            currency={row.currencyCode}
+            rows={[
+              ["Efectivo contado", counted.trim()],
+              [
+                "Diferencia preliminar",
+                preview?.difference === null ||
+                preview?.difference === undefined
+                  ? null
+                  : centsDecimal(preview.difference),
+              ],
+            ]}
+          />
+        ) : (
+          <TextField
+            label="Efectivo contado"
+            inputMode="decimal"
+            required
+            data-dialog-initial-focus
+            value={counted}
+            disabled={flow.busy || flow.uncertain || !allowed}
+            error={
+              counted && !cashAmountInput.safeParse(counted).success
+                ? "Usa un importe no negativo con máximo dos decimales."
+                : undefined
+            }
+            onChange={(event) => setCounted(event.target.value)}
+          />
         )}
 
-        {data && (
-          <>
-            <p>
-              {data.cashSession.cashRegister.name} ·{" "}
-              {data.cashSession.currencyCode}
-            </p>
+        {preview && !preview.error && (
+          <div>
+            <CashDifference
+              value={preview.difference}
+              currency={row.currencyCode}
+            />
+          </div>
+        )}
 
-            {!allowed && (
-              <p>
-                Este turno está cerrado o no tienes permiso para
-                cerrarlo.
+        {preview?.error && (
+          <p role="alert" className="cash-negative">
+            {preview.error}
+          </p>
+        )}
+
+        <CashOtherPayments data={flow.data} />
+
+        {flow.review ? (
+          <>
+            {notes.trim() && (
+              <p className="cash-count-notes">
+                <span className="cash-muted">Observaciones: </span>
+                {notes.trim()}
               </p>
             )}
 
-            <CashBalance data={data} />
-
-            <TextField
-              label="Efectivo contado"
-              inputMode="decimal"
-              value={counted}
-              disabled={review || mutation.busy}
-              onChange={(event) => setCounted(event.target.value)}
-              required
-            />
-
-            <small>
-              Sin separadores de miles; usa punto para los decimales.
-            </small>
-
-            <section className="cash-note">
-              <h3>Otros medios registrados · solo lectura</h3>
-
-              {data.paymentMethods
-                .filter((payment) => payment.paymentType !== "CASH")
-                .map((payment) => (
-                  <div
-                    className="cash-line"
-                    key={payment.paymentMethodCode}
-                  >
-                    <span>{payment.paymentMethodName}</span>
-                    <strong>
-                      {cashMoney(
-                        payment.netAmount,
-                        data.cashSession.currencyCode
-                      )}
-                    </strong>
-                  </div>
-                ))}
-
-              <p>
-                Estos medios no se suman al efectivo esperado ni al
-                efectivo contado.
-              </p>
-            </section>
-
+            <p className="cash-muted">
+              El turno cerrado no podrá modificarse. El servidor
+              calculará el arqueo definitivo al confirmar.
+            </p>
+          </>
+        ) : (
+          <div className="cash-notes-field">
             <TextAreaField
               label="Observaciones"
               value={notes}
               maxLength={500}
-              disabled={review || mutation.busy}
+              disabled={flow.busy || flow.uncertain || !allowed}
               onChange={(event) => setNotes(event.target.value)}
             />
-
-            {review && (
-              <>
-                <div className="cash-line">
-                  <strong>Diferencia preliminar</strong>
-                  <strong>
-                    {difference === null
-                      ? "—"
-                      : cashMoney(
-                          difference,
-                          data.cashSession.currencyCode
-                        )}
-                  </strong>
-                </div>
-
-                <p>
-                  El cierre guardará el efectivo contado y las
-                  observaciones. El servidor calculará la diferencia
-                  definitiva con los movimientos registrados al
-                  cerrar.
-                </p>
-              </>
-            )}
-          </>
+          </div>
         )}
 
-        <div className="cash-actions">
+        {flow.error && (
+          <p role="alert" className="cash-negative">
+            {flow.error}
+          </p>
+        )}
+
+        {(flow.uncertain || row.status === "CLOSED") && (
           <Button
             variant="secondary"
-            disabled={mutation.busy}
-            onClick={close}
+            disabled={flow.busy}
+            onClick={() => void flow.run("verify", draft)}
           >
-            Cancelar
+            Consultar estado del turno
           </Button>
+        )}
 
-          {review && (
-            <Button
-              variant="secondary"
-              disabled={mutation.busy}
-              onClick={() => setReview(false)}
-            >
-              Corregir conteo
-            </Button>
-          )}
+        <footer className="cash-actions">
+          <Button
+            variant="secondary"
+            disabled={flow.busy}
+            onClick={
+              flow.review && !flow.uncertain ? flow.back : close
+            }
+          >
+            {flow.review && !flow.uncertain ? "Atrás" : "Cancelar"}
+          </Button>
 
           <Button
             type="submit"
-            loading={mutation.busy}
-            disabled={disabled}
+            loading={flow.busy}
+            loadingText="Procesando…"
+            disabled={!valid}
           >
-            {review ? "Confirmar cierre" : "Revisar arqueo"}
+            {flow.review ? "Confirmar cierre" : "Revisar arqueo"}
           </Button>
-        </div>
+        </footer>
       </form>
     </BottomSheet>
   );
