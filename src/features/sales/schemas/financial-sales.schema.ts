@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const saleId = z.string().regex(/^[1-9]\d*$/);
 
-const amount = z.string().regex(/^-?\d+(\.\d{1,2})?$/);
+const amount = z.string().regex(/^-?\d+(\.\d{1,6})?$/);
 const date = z.iso.datetime({ offset: true });
 
 const employee = z.object({

@@ -1,5 +1,13 @@
 import { useCallback, useState } from "react";
-import { Ban } from "lucide-react";
+import { Ban, RotateCcw } from "lucide-react";
+import { RefundDialog } from "./RefundDialog";
+import { SaleRefunds } from "./SaleRefunds";
+import { readSaleWithRefunds } from "../services/refund.service";
+import {
+  returnedQuantity,
+  returnedPayment,
+  refundMoney,
+} from "../utils/refund-calculation";
 import { VoidSaleDialog } from "./VoidSaleDialog";
 import { Link } from "react-router";
 
@@ -13,7 +21,6 @@ import { useCashResource } from "../../cash/hooks/useCashResource";
 import { cashDate, cashMoney } from "../../cash/utils/cash-format";
 
 import { saleLabels } from "../schemas/financial-sales.schema";
-import { getFinancialSaleOverview } from "../services/financial-sales.service";
 export function FinancialSaleDetail({
   id,
   back,
@@ -25,8 +32,7 @@ export function FinancialSaleDetail({
   const zone = settings.data?.timezone ?? "America/Bogota";
 
   const loader = useCallback(
-    (signal: AbortSignal) =>
-      getFinancialSaleOverview(session, id, signal),
+    (signal: AbortSignal) => readSaleWithRefunds(session, id, signal),
     [session, id]
   );
 
@@ -39,6 +45,15 @@ export function FinancialSaleDetail({
   } | null>(null);
 
   const [notice, setNotice] = useState("");
+  const [refundTarget, setRefundTarget] = useState<string | null>(
+    null
+  );
+
+  const canRefund = hasEveryPermission(session, [
+    "sales.refunds.create",
+    "sales.refunds.read",
+    "cash.sessions.read",
+  ]);
 
   const canVoid = hasEveryPermission(session, [
     "sales.void",
@@ -106,6 +121,21 @@ export function FinancialSaleDetail({
                   Anular venta
                 </Button>
               )}
+
+              {canRefund &&
+                ["COMPLETED", "PARTIALLY_REFUNDED"].includes(
+                  row.status
+                ) && (
+                  <Button
+                    onClick={() => {
+                      setNotice("");
+                      setRefundTarget(row.id);
+                    }}
+                  >
+                    <RotateCcw size={16} aria-hidden="true" />
+                    Registrar devolución
+                  </Button>
+                )}
             </div>
           </div>
 
@@ -190,6 +220,11 @@ export function FinancialSaleDetail({
                   <small>
                     {cashMoney(item.unitPrice, row.currencyCode)} /
                     unidad · {item.taxName ?? "Sin impuesto"}
+                    {" · "}
+                    {row.refunds === null
+                      ? "Devoluciones no disponibles"
+                      : returnedQuantity(row.refunds, item.id) +
+                        " devueltas"}
                   </small>
                 </div>
 
@@ -224,6 +259,16 @@ export function FinancialSaleDetail({
 
                   <small>
                     Referencia: {payment.reference ?? "—"}
+                  </small>
+
+                  <small>
+                    Devuelto por este pago:{" "}
+                    {row.refunds === null
+                      ? "No disponible"
+                      : refundMoney(
+                          returnedPayment(row.refunds, payment.id),
+                          row.currencyCode
+                        )}
                   </small>
                 </div>
 
@@ -269,7 +314,28 @@ export function FinancialSaleDetail({
               </dl>
             </section>
           )}
+
+          <SaleRefunds
+            saleId={row.id}
+            rows={row.refunds}
+            currency={row.currencyCode}
+          />
         </>
+      )}
+
+      {refundTarget && canRefund && (
+        <RefundDialog
+          saleId={refundTarget}
+          onClose={() => {
+            setRefundTarget(null);
+            resource.reload();
+          }}
+          onCreated={(refundId) => {
+            setRefundTarget(null);
+            setNotice("Devolución #" + refundId + " registrada.");
+            resource.reload();
+          }}
+        />
       )}
       {voidTarget && canVoid && (
         <VoidSaleDialog

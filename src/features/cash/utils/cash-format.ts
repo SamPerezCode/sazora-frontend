@@ -1,13 +1,22 @@
 import { money } from "../../../lib/money";
 
 export function cashCents(value: string): bigint {
-  const negative = value.startsWith("-");
-  const [whole, decimal = ""] = value.replace(/^-/, "").split(".");
+  const match = /^(-?)(\d+)(?:\.(\d{1,6}))?$/.exec(value);
 
-  const amount =
-    BigInt(whole) * 100n + BigInt(decimal.padEnd(2, "0"));
+  if (!match) throw new Error("Importe inválido.");
 
-  return negative ? -amount : amount;
+  const fraction = (match[3] ?? "").replace(/0+$/, "");
+
+  if (fraction.length > 2) {
+    throw new Error(
+      "El importe no puede representarse en centavos sin redondear."
+    );
+  }
+
+  const result =
+    BigInt(match[2]) * 100n + BigInt(fraction.padEnd(2, "0"));
+
+  return match[1] ? -result : result;
 }
 
 export function cashMoney(
@@ -16,11 +25,33 @@ export function cashMoney(
 ): string {
   if (value === null) return "—";
 
-  const amount = typeof value === "bigint" ? value : cashCents(value);
+  if (typeof value === "bigint") {
+    return (
+      (value < 0n ? "−" : "") +
+      money(value < 0n ? -value : value, currency)
+    );
+  }
+
+  const match = /^(-?)(\d+)(?:\.(\d{1,6}))?$/.exec(value);
+
+  if (!match) throw new Error("Importe inválido.");
+
+  const fraction = (match[3] ?? "").replace(/0+$/, "");
+
+  const symbol =
+    new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency,
+    })
+      .formatToParts(0)
+      .find((part) => part.type === "currency")?.value ?? currency;
 
   return (
-    (amount < 0n ? "−" : "") +
-    money(amount < 0n ? -amount : amount, currency)
+    (match[1] ? "−" : "") +
+    symbol +
+    " " +
+    new Intl.NumberFormat("es-CO").format(BigInt(match[2])) +
+    (fraction ? "," + fraction : "")
   );
 }
 
