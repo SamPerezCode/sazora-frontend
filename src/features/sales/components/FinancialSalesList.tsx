@@ -6,6 +6,7 @@ import { TextField } from "../../../components/forms/TextField";
 import { Button } from "../../../components/ui/Button";
 import { useCashResource } from "../../cash/hooks/useCashResource";
 import { cashDate, cashMoney } from "../../cash/utils/cash-format";
+import { Pagination } from "../../../components/ui/Pagination";
 
 import {
   saleLabels,
@@ -43,6 +44,7 @@ export function FinancialSalesList({
   const [query, setQuery] = useState({
     filters: initial,
     page: 1,
+    pageSize: 20,
   });
   const [error, setError] = useState("");
 
@@ -50,8 +52,30 @@ export function FinancialSalesList({
   const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const loader = useCallback(
-    (signal: AbortSignal) =>
-      listFinancialSales(session, query.filters, query.page, signal),
+    async (signal: AbortSignal) => {
+      const result = await listFinancialSales(
+        session,
+        query.filters,
+        query.page,
+        signal,
+        query.pageSize
+      );
+
+      const lastPage = Math.max(1, result.pagination.totalPages);
+
+      // Si disminuyó el total, consulta una página disponible.
+      if (result.pagination.page > lastPage) {
+        return listFinancialSales(
+          session,
+          query.filters,
+          lastPage,
+          signal,
+          query.pageSize
+        );
+      }
+
+      return result;
+    },
     [session, query]
   );
 
@@ -94,6 +118,7 @@ export function FinancialSalesList({
         to: to?.toISOString() ?? "",
       },
       page: 1,
+      pageSize: query.pageSize,
     });
   }
 
@@ -219,7 +244,7 @@ export function FinancialSalesList({
             aria-label="Historial de ventas"
             tabIndex={0}
           >
-            <table className="fh-table">
+            <table id="financial-sales-table" className="fh-table">
               <thead>
                 <tr>
                   {[
@@ -244,7 +269,6 @@ export function FinancialSalesList({
                   ))}
                 </tr>
               </thead>
-
               <tbody>
                 {resource.data.sales.map((row) => (
                   <tr key={row.id}>
@@ -288,55 +312,37 @@ export function FinancialSalesList({
                     </td>
                   </tr>
                 ))}
-
-                {!resource.data.sales.length && (
-                  <tr>
-                    <td colSpan={14}>
-                      No hay ventas con estos filtros.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
 
-          <nav
-            className="por-actions"
-            aria-label="Paginación de ventas"
-          >
-            <Button
-              variant="secondary"
-              disabled={query.page <= 1}
-              onClick={() =>
-                setQuery({
-                  ...query,
-                  page: query.page - 1,
-                })
-              }
-            >
-              Anterior
-            </Button>
+          {!resource.data.sales.length && (
+            <p className="fh-empty" role="status">
+              No hay ventas con estos filtros.
+            </p>
+          )}
 
-            <small>
-              Página {resource.data.pagination.page} ·{" "}
-              {resource.data.pagination.total} ventas
-            </small>
-
-            <Button
-              variant="secondary"
-              disabled={
-                query.page >= resource.data.pagination.totalPages
-              }
-              onClick={() =>
-                setQuery({
-                  ...query,
-                  page: query.page + 1,
-                })
-              }
-            >
-              Siguiente
-            </Button>
-          </nav>
+          <Pagination
+            page={resource.data.pagination.page}
+            pageSize={resource.data.pagination.pageSize}
+            totalItems={resource.data.pagination.total}
+            itemLabel="ventas"
+            disabled={resource.loading}
+            controlsId="financial-sales-table"
+            onPageChange={(page) =>
+              setQuery((previous) => ({
+                ...previous,
+                page,
+              }))
+            }
+            onPageSizeChange={(pageSize) =>
+              setQuery((previous) => ({
+                ...previous,
+                page: 1,
+                pageSize,
+              }))
+            }
+          />
         </>
       )}
     </section>

@@ -63,7 +63,8 @@ export async function listFinancialSales(
   session: AuthSession,
   filters: SalesFilters,
   page: number,
-  signal: AbortSignal
+  signal: AbortSignal,
+  pageSize = 20
 ) {
   const access = session.authorization.locationAccess;
 
@@ -75,7 +76,7 @@ export async function listFinancialSales(
 
   const query = new URLSearchParams({
     page: String(page),
-    pageSize: "20",
+    pageSize: String(z.number().int().positive().parse(pageSize)),
   });
 
   if (filters.locationId) {

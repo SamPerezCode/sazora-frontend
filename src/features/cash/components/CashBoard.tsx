@@ -14,6 +14,8 @@ import { cashDate, cashMoney } from "../utils/cash-format";
 import { CashSessionDetail } from "./CashSessionDetail";
 import { CashActionDialog } from "./CashActionDialog";
 
+import { Pagination } from "../../../components/ui/Pagination";
+
 export function CashBoard() {
   const { session, settings } = useAppShell();
 
@@ -32,6 +34,8 @@ export function CashBoard() {
   const [location, setLocation] = useState("ALL");
   const [registerStatus, setRegisterStatus] = useState("ALL");
   const [sessionStatus, setSessionStatus] = useState("ALL");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [dialog, setDialog] = useState<"register" | "open" | null>(
     null
   );
@@ -95,6 +99,16 @@ export function CashBoard() {
         (sessionStatus === "ALL" || row.status === sessionStatus)
     ) ?? [];
 
+  const totalItems =
+    tab === "registers" ? registers.length : sessions.length;
+
+  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
+  const currentPage = Math.max(1, Math.min(page, pageCount));
+  const start = (currentPage - 1) * pageSize;
+
+  const visibleRegisters = registers.slice(start, start + pageSize);
+  const visibleSessions = sessions.slice(start, start + pageSize);
+
   return (
     <section className="cash-page">
       <div hidden={!!selected}>
@@ -113,7 +127,10 @@ export function CashBoard() {
                   key={value}
                   variant={tab === value ? "primary" : "secondary"}
                   aria-pressed={tab === value}
-                  onClick={() => setTab(value)}
+                  onClick={() => {
+                    setTab(value);
+                    setPage(1);
+                  }}
                 >
                   {label}
                 </Button>
@@ -159,14 +176,20 @@ export function CashBoard() {
                 aria-label="Buscar por nombre o código"
                 placeholder="Buscar por nombre o código"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(1);
+                }}
               />
             </div>
 
             <SelectField
               label="Ubicación"
               value={location}
-              onValueChange={setLocation}
+              onValueChange={(value) => {
+                setLocation(value);
+                setPage(1);
+              }}
               options={[
                 {
                   value: "ALL",
@@ -187,11 +210,15 @@ export function CashBoard() {
               value={
                 tab === "registers" ? registerStatus : sessionStatus
               }
-              onValueChange={
-                tab === "registers"
-                  ? setRegisterStatus
-                  : setSessionStatus
-              }
+              onValueChange={(value) => {
+                if (tab === "registers") {
+                  setRegisterStatus(value);
+                } else {
+                  setSessionStatus(value);
+                }
+
+                setPage(1);
+              }}
               options={
                 tab === "registers"
                   ? [
@@ -219,144 +246,169 @@ export function CashBoard() {
           )}
 
           {data && (
-            <div className="cash-table-wrap">
-              <table className="cash-table">
-                <thead>
-                  <tr>
-                    {(tab === "registers"
-                      ? [
-                          "Caja / código",
-                          "Ubicación",
-                          "Estado",
-                          "Turno",
-                          "Responsable",
-                          "Apertura",
-                          "Acción",
-                        ]
-                      : [
-                          "Turno / caja",
-                          "Ubicación",
-                          "Estado",
-                          "Efectivo inicial",
-                          "Esperado al cierre",
-                          "Diferencia",
-                          "Acción",
-                        ]
-                    ).map((label) => (
-                      <th key={label} scope="col">
-                        <span
-                          className={
-                            label === "Acción" ? "sr-only" : undefined
-                          }
-                        >
-                          {label}
-                        </span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
+            <>
+              <div className="cash-table-wrap">
+                <table id="cash-board-table" className="cash-table">
+                  <thead>
+                    <tr>
+                      {(tab === "registers"
+                        ? [
+                            "Caja / código",
+                            "Ubicación",
+                            "Estado",
+                            "Turno",
+                            "Responsable",
+                            "Apertura",
+                            "Acción",
+                          ]
+                        : [
+                            "Turno / caja",
+                            "Ubicación",
+                            "Estado",
+                            "Efectivo inicial",
+                            "Esperado al cierre",
+                            "Diferencia",
+                            "Acción",
+                          ]
+                      ).map((label) => (
+                        <th key={label} scope="col">
+                          <span
+                            className={
+                              label === "Acción"
+                                ? "sr-only"
+                                : undefined
+                            }
+                          >
+                            {label}
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
 
-                <tbody>
-                  {tab === "registers"
-                    ? registers.map((row) => {
-                        const open = data.sessions.find(
-                          (candidate) =>
-                            candidate.cashRegisterId === row.id &&
-                            candidate.status === "OPEN"
-                        );
+                  <tbody>
+                    {tab === "registers"
+                      ? visibleRegisters.map((row) => {
+                          const open = data.sessions.find(
+                            (candidate) =>
+                              candidate.cashRegisterId === row.id &&
+                              candidate.status === "OPEN"
+                          );
 
-                        return (
+                          return (
+                            <tr key={row.id}>
+                              <td>
+                                <strong>{row.name}</strong>
+                                <small>{row.code}</small>
+                              </td>
+                              <td>{row.location.name}</td>
+                              <td>
+                                <span
+                                  className="cash-badge"
+                                  data-status={
+                                    row.isActive
+                                      ? "ACTIVE"
+                                      : "INACTIVE"
+                                  }
+                                >
+                                  {row.isActive
+                                    ? "Activa"
+                                    : "Inactiva"}
+                                </span>{" "}
+                              </td>
+                              <td>
+                                {open
+                                  ? "#" + open.id + " · Abierto"
+                                  : "Sin turno abierto"}
+                              </td>
+                              <td>
+                                {open?.openedBy.fullName ?? "—"}
+                              </td>
+                              <td>
+                                {cashDate(
+                                  open?.openedAt ?? null,
+                                  timeZone
+                                )}
+                              </td>
+                              <td>
+                                {open && (
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => select(open.id)}
+                                  >
+                                    Consultar turno
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      : visibleSessions.map((row) => (
                           <tr key={row.id}>
                             <td>
-                              <strong>{row.name}</strong>
-                              <small>{row.code}</small>
+                              <strong>#{row.id}</strong>
+                              <small>{row.cashRegister.name}</small>
                             </td>
-                            <td>{row.location.name}</td>
+                            <td>{row.cashRegister.location.name}</td>
                             <td>
-                              <span
-                                className="cash-badge"
-                                data-status={
-                                  row.isActive ? "ACTIVE" : "INACTIVE"
-                                }
+                              {row.status === "OPEN"
+                                ? "Abierto"
+                                : "Cerrado"}
+                            </td>
+                            <td>
+                              {cashMoney(
+                                row.openingCashAmount,
+                                row.currencyCode
+                              )}
+                            </td>
+                            <td>
+                              {cashMoney(
+                                row.expectedCashAmount,
+                                row.currencyCode
+                              )}
+                            </td>
+                            <td>
+                              {cashMoney(
+                                row.differenceAmount,
+                                row.currencyCode
+                              )}
+                            </td>
+                            <td>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => select(row.id)}
                               >
-                                {row.isActive ? "Activa" : "Inactiva"}
-                              </span>{" "}
-                            </td>
-                            <td>
-                              {open
-                                ? "#" + open.id + " · Abierto"
-                                : "Sin turno abierto"}
-                            </td>
-                            <td>{open?.openedBy.fullName ?? "—"}</td>
-                            <td>
-                              {cashDate(
-                                open?.openedAt ?? null,
-                                timeZone
-                              )}
-                            </td>
-                            <td>
-                              {open && (
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() => select(open.id)}
-                                >
-                                  Consultar turno
-                                </Button>
-                              )}
+                                Consultar turno
+                              </Button>
                             </td>
                           </tr>
-                        );
-                      })
-                    : sessions.map((row) => (
-                        <tr key={row.id}>
-                          <td>
-                            <strong>#{row.id}</strong>
-                            <small>{row.cashRegister.name}</small>
-                          </td>
-                          <td>{row.cashRegister.location.name}</td>
-                          <td>
-                            {row.status === "OPEN"
-                              ? "Abierto"
-                              : "Cerrado"}
-                          </td>
-                          <td>
-                            {cashMoney(
-                              row.openingCashAmount,
-                              row.currencyCode
-                            )}
-                          </td>
-                          <td>
-                            {cashMoney(
-                              row.expectedCashAmount,
-                              row.currencyCode
-                            )}
-                          </td>
-                          <td>
-                            {cashMoney(
-                              row.differenceAmount,
-                              row.currencyCode
-                            )}
-                          </td>
-                          <td>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => select(row.id)}
-                            >
-                              Consultar turno
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                </tbody>
-              </table>
+                        ))}
+                  </tbody>
+                </table>
+              </div>
 
-              {!(tab === "registers" ? registers : sessions)
-                .length && (
-                <p>No hay resultados con estos filtros.</p>
+              {totalItems === 0 && (
+                <p className="cash-empty" role="status">
+                  No hay resultados con estos filtros.
+                </p>
               )}
-            </div>
+
+              <Pagination
+                page={currentPage}
+                pageSize={pageSize}
+                totalItems={totalItems}
+                itemLabel={tab === "registers" ? "cajas" : "turnos"}
+                disabled={resource.loading}
+                controlsId="cash-board-table"
+                onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setPage(1);
+                }}
+              />
+            </>
           )}
         </div>
       </div>
