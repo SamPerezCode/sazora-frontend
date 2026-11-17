@@ -11,12 +11,14 @@ export function OrderCancellationActions({
   status,
   pendingCount,
   hasDelivered,
+  paymentStatus,
 }: {
   resource: SalesResource;
   orderId: string | null;
   status: Order["status"];
   pendingCount: number;
   hasDelivered: boolean;
+  paymentStatus?: Order["paymentStatus"];
 }) {
   const [mode, setMode] = useState<"discard" | "cancel" | null>(null);
 
@@ -199,9 +201,11 @@ export function OrderCancellationActions({
             <p id={textId}>
               {mode === "discard"
                 ? "Los productos todavía no han sido enviados. Se eliminará el borrador y no se creará ninguna orden."
-                : confirmed
-                  ? "Se cancelarán todos los productos que todavía no hayan sido entregados. Esta acción no se puede deshacer."
-                  : "La orden ya fue guardada, pero todavía no ha sido confirmada. Sus productos serán cancelados y, si corresponde a una mesa, quedará disponible."}
+                : paymentStatus === "REFUNDED"
+                  ? "El pago ya fue devuelto. La orden se cancelará completamente."
+                  : confirmed
+                    ? "Se cancelarán todos los productos que todavía no hayan sido entregados. Esta acción no se puede deshacer."
+                    : "La orden ya fue guardada, pero todavía no ha sido confirmada. Sus productos serán cancelados y, si corresponde a una mesa, quedará disponible."}
             </p>
 
             {mode === "cancel" && (

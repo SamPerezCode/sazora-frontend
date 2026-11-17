@@ -19,6 +19,8 @@ import { PaymentBadge } from "./PreorderList";
 import { PreorderPaymentDialog } from "./PreorderPaymentDialog";
 import { OrderCancellationActions } from "./OrderCancellationActions";
 import { OrderPrintPanel } from "../../kitchen-flow/OrderPrintPanel";
+import { Eye } from "lucide-react";
+import { PreorderPaymentDetailDialog } from "./PreorderPaymentDetailDialog";
 
 export function PreorderDetail({
   order,
@@ -34,6 +36,7 @@ export function PreorderDetail({
   onClose: () => void;
 }) {
   const { session, settings } = useAppShell();
+  const [showPaymentDetail, setShowPaymentDetail] = useState(false);
 
   const [paymentMode, setPaymentMode] = useState<
     "pay" | "refund" | null
@@ -43,7 +46,9 @@ export function PreorderDetail({
 
   const load = useCallback(
     (signal: AbortSignal) =>
-      canRead && order.paymentStatus
+      canRead &&
+      order.paymentStatus &&
+      order.paymentStatus !== "PENDING"
         ? readPreorderPayment(session, order.id, signal)
         : Promise.resolve(null),
     [session, canRead, order.id, order.paymentStatus]
@@ -102,7 +107,11 @@ export function PreorderDetail({
             ? "Abierta · sin enviar"
             : order.status === "CONFIRMED"
               ? "En cocina"
-              : "Entregada"}
+              : order.status === "CANCELLED"
+                ? "Cancelada"
+                : order.status === "CLOSED"
+                  ? "Cerrada"
+                  : "Entregada"}
         </p>
 
         <div>
@@ -125,8 +134,8 @@ export function PreorderDetail({
           </p>
         )}
 
-        {verified && (
-          <p className="preorder-banner">
+        {verified && order.status === "OPEN" && (
+          <p className="preorder-banner" data-warning>
             La orden está bloqueada porque el pago ya fue verificado.
             Para cancelarla debes devolver primero el pago.
           </p>
@@ -136,6 +145,12 @@ export function PreorderDetail({
           <p className="preorder-banner" data-danger>
             El pago fue devuelto. La orden ya no puede editarse ni
             enviarse a cocina; solo puede cancelarse completamente.
+          </p>
+        )}
+
+        {verified && order.status === "CONFIRMED" && (
+          <p className="preorder-banner">
+            Orden confirmada y enviada a cocina.
           </p>
         )}
 
@@ -296,7 +311,7 @@ export function PreorderDetail({
           </div>
 
           <div>
-            <dt>Total calculado</dt>
+            <dt>Total</dt>
             <dd>
               {order.total
                 ? money(cents(order.total))
@@ -312,9 +327,23 @@ export function PreorderDetail({
           </p>
         )}
 
-        {canRead && (
+        {canRead && order.paymentStatus !== "PENDING" && (
           <section className="preorder-customer">
-            <strong>Detalle del pago</strong>
+            <div className="pp-line">
+              <strong>
+                {refunded ? "PAGO DEVUELTO" : "PAGO REGISTRADO"}
+              </strong>
+
+              <Button
+                size="sm"
+                variant="soft"
+                disabled={resource.busy || !payment.data}
+                onClick={() => setShowPaymentDetail(true)}
+              >
+                <Eye size={15} aria-hidden="true" />
+                Ver detalle del pago
+              </Button>
+            </div>
 
             {payment.loading && (
               <p role="status">Consultando pago…</p>
@@ -324,39 +353,44 @@ export function PreorderDetail({
 
             {payment.data && (
               <>
-                <PaymentBadge status={payment.data.status} />
-
                 <p>
-                  Total registrado:{" "}
-                  {money(cents(payment.data.paidTotal))}
+                  Verificado{" "}
+                  {cashDate(
+                    payment.data.verifiedAt,
+                    settings.data?.timezone ?? "America/Bogota"
+                  )}
+                  {" · "}Total pagado originalmente{" "}
+                  <strong>
+                    {money(cents(payment.data.paidTotal))}
+                  </strong>
                 </p>
 
-                {payment.data.payments.map((row) => (
-                  <p key={row.id}>
-                    {row.paymentMethodName}
-                    {" · "}
-                    {money(cents(row.amount))}
-                    {row.reference && ` · Ref. ${row.reference}`}
-                  </p>
-                ))}
+                <small>
+                  {payment.data.payments
+                    .map(
+                      (row) =>
+                        row.paymentMethodName +
+                        " " +
+                        money(cents(row.amount))
+                    )
+                    .join(" · ")}
+                </small>
               </>
             )}
 
             {payment.data === null && (
-              <p>No hay pagos registrados.</p>
+              <p>No hay un lote de pago disponible.</p>
             )}
 
-            <Button
-              size="sm"
-              variant="soft"
-              disabled={resource.busy}
-              onClick={() => {
-                payment.reload();
-                resource.retry();
-              }}
-            >
-              Actualizar detalle del pago
-            </Button>
+            {payment.error && (
+              <Button
+                size="sm"
+                variant="soft"
+                onClick={payment.reload}
+              >
+                Reintentar consulta
+              </Button>
+            )}
           </section>
         )}
 
@@ -458,11 +492,30 @@ export function PreorderDetail({
             resource={resource}
             orderId={order.id}
             status={order.status}
+            paymentStatus={order.paymentStatus}
             pendingCount={pending}
             hasDelivered={hasDelivered}
           />
         )}
       </footer>
+
+      {showPaymentDetail && canRead && payment.data && (
+        <PreorderPaymentDetailDialog
+          orderId={order.id}
+          batch={payment.data}
+          timeZone={settings.data?.timezone ?? "America/Bogota"}
+          busy={resource.busy}
+          onClose={() => setShowPaymentDetail(false)}
+          onRefund={
+            verified && canRefund && !blocked
+              ? () => {
+                  setShowPaymentDetail(false);
+                  setPaymentMode("refund");
+                }
+              : undefined
+          }
+        />
+      )}
 
       {paymentMode && (
         <PreorderPaymentDialog
