@@ -6,6 +6,8 @@ import { tableListResponseSchema } from "../../restaurant-tables/schemas/restaur
 import type { RestaurantTable } from "../../restaurant-tables/schemas/restaurant-table.schema";
 import { getOrderKitchenTickets } from "../../kitchen-flow/kitchen-flow.service";
 
+import { customerErrors, customerFields } from "../utils/preorders";
+
 import {
   cancelQuantityInputSchema,
   cancelQuantityResponseSchema,
@@ -283,6 +285,17 @@ export async function createOrder(
   token: string,
   input: CreateOrderInput
 ) {
+  if (
+    input.sourceChannel === "PUBLIC_MENU" ||
+    Object.keys(customerErrors(input)).length
+  ) {
+    throw new ApiError(
+      400,
+      "INVALID_SALES_INPUT",
+      "Revisa el origen, nombre, teléfono y correo del cliente."
+    );
+  }
+
   const validService =
     (input.serviceType === "TABLE" && !!input.restaurantTableId) ||
     (input.serviceType === "TAKEAWAY" &&
@@ -319,7 +332,11 @@ export async function createOrder(
 
   const response = await request("/orders", createdResponseSchema, {
     method: "POST",
-    body: input,
+    body: {
+      ...input,
+      ...customerFields(input),
+      sourceChannel: input.sourceChannel ?? "IN_PERSON",
+    },
     accessToken: token,
   });
 
@@ -342,8 +359,7 @@ export async function getOrder(
 
   if (
     order.location.id !== scope.location.id ||
-    order.location.locationType !== "POINT_OF_SALE" ||
-    order.serviceType === "DELIVERY"
+    order.location.locationType !== "POINT_OF_SALE"
   ) {
     throw new ApiError(
       403,

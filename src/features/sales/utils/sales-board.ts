@@ -17,8 +17,7 @@ export function isOperationalOrder(
 ) {
   return (
     ["OPEN", "CONFIRMED", "DELIVERED"].includes(order.status) &&
-    (order.serviceType === "TABLE" ||
-      order.serviceType === "TAKEAWAY")
+    ["TABLE", "TAKEAWAY", "DELIVERY"].includes(order.serviceType)
   );
 }
 

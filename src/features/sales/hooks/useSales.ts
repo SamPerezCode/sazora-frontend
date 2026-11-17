@@ -7,6 +7,12 @@ import {
 } from "react";
 
 import {
+  canEditPreorder,
+  customerErrors,
+  customerFields,
+} from "../utils/preorders";
+
+import {
   addSalesOrderItems,
   confirmSalesOrder,
   deliverPrintOnlyOrder,
@@ -779,7 +785,9 @@ export function useSales(
       !confirmationIds[id] &&
       !cancellationIds[id] &&
       data?.order?.id === id &&
-      ["OPEN", "CONFIRMED"].includes(data.order.status)
+      ["OPEN", "CONFIRMED"].includes(data.order.status) &&
+      (data.order.serviceType === "TABLE" ||
+        canEditPreorder(data.order))
     ) {
       setDrafts((previous) => ({
         ...previous,
@@ -946,6 +954,17 @@ export function useSales(
   }
 
   async function confirm(id: string) {
+    const current = await readOrder(id);
+
+    if (
+      current.serviceType !== "TABLE" &&
+      (current.status !== "OPEN" ||
+        current.paymentStatus !== "VERIFIED")
+    ) {
+      throw new RecoveryError(
+        "El pedido debe estar abierto y tener el pago verificado antes de enviarse a cocina."
+      );
+    }
     setConfirmationIds((previous) => ({
       ...previous,
       [id]: true,
@@ -1143,6 +1162,15 @@ export function useSales(
         return "Orden cancelada correctamente.";
       }
 
+      if (
+        current.serviceType !== "TABLE" &&
+        !["PENDING", "REFUNDED"].includes(current.paymentStatus ?? "")
+      ) {
+        throw new RecoveryError(
+          "Para cancelar esta orden debes devolver primero el pago."
+        );
+      }
+
       if (current.status !== expectedStatus) {
         result = {
           ok: false,
@@ -1266,6 +1294,14 @@ export function useSales(
       (method === "PATCH" || method === "DELETE") &&
       path.startsWith("/orders/") &&
       order.status !== "OPEN"
+    ) {
+      return Promise.resolve(false);
+    }
+
+    if (
+      order.serviceType !== "TABLE" &&
+      path.startsWith("/orders/") &&
+      !canEditPreorder(order)
     ) {
       return Promise.resolve(false);
     }
@@ -1462,6 +1498,7 @@ export function useSales(
       !order ||
       order.id !== id ||
       order.status !== "CONFIRMED" ||
+      order.serviceType !== "TABLE" ||
       item?.status !== "ACTIVE" ||
       !preparation ||
       !["PENDING", "PREPARING", "IN_PREPARATION", "READY"].includes(
@@ -1649,6 +1686,29 @@ export function useSales(
       return false;
     }
 
+    if (
+      local &&
+      (local.sourceChannel === "PUBLIC_MENU" ||
+        Object.keys(customerErrors(local)).length)
+    ) {
+      setNotice(
+        "Completa los datos del cliente antes de guardar el pedido."
+      );
+
+      return false;
+    }
+
+    if (
+      order &&
+      !local &&
+      order.serviceType !== "TABLE" &&
+      !canEditPreorder(order)
+    ) {
+      setNotice("La orden ya no permite editar productos.");
+
+      return false;
+    }
+
     if (order && !local && cancellationIds[order.id]) {
       return false;
     }
@@ -1705,7 +1765,8 @@ export function useSales(
               serviceType: local.serviceType,
               restaurantTableId: local.restaurantTableId,
               customerCount: local.customerCount,
-              notes: local.notes?.trim() || null,
+              ...customerFields(local),
+              sourceChannel: local.sourceChannel ?? "IN_PERSON",
               items,
             });
           } catch (cause) {
@@ -1784,6 +1845,10 @@ export function useSales(
             return next;
           });
 
+          if (local.serviceType !== "TABLE") {
+            return "Pedido guardado. Puedes registrar y verificar el pago.";
+          }
+
           return confirm(id);
         }
 
@@ -1830,6 +1895,10 @@ export function useSales(
             ...previous,
             [order.id]: {},
           }));
+        }
+
+        if (order.serviceType !== "TABLE") {
+          return "Pedido guardado.";
         }
 
         if (order.status === "OPEN") {
@@ -1919,6 +1988,8 @@ export function useSales(
       order.id !== id ||
       order.status !== "CONFIRMED" ||
       order.kitchenWorkflowMode !== "PRINT_ONLY" ||
+      (order.serviceType !== "TABLE" &&
+        order.paymentStatus !== "VERIFIED") ||
       confirmationIds[id] ||
       cancellationIds[id] ||
       Object.keys(drafts[id] ?? {}).length > 0 ||
@@ -1980,6 +2051,8 @@ export function useSales(
     kitchenSettings,
     printing,
     deliver,
+    paymentOperation: (work: () => Promise<string>) =>
+      run(work, "Pago actualizado."),
     clearNotice: () => setNotice(""),
     select,
     start,

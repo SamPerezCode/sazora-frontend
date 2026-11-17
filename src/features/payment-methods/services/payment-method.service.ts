@@ -25,6 +25,9 @@ function options(
         "cash.sessions.read",
         "business.settings.read",
         "orders.close",
+        "orders.payments.read",
+        "orders.payments.manage",
+        "orders.payments.refund",
       ]);
 
   if (!allowed) {

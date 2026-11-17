@@ -16,6 +16,9 @@ export function CheckoutPayment({
   disabled,
   change,
   remove,
+  referenceLabel = "Referencia obligatoria",
+  referencePlaceholder,
+  showOptionalReference = false,
 }: {
   payment: PaymentDraft;
   index: number;
@@ -25,6 +28,9 @@ export function CheckoutPayment({
   disabled: boolean;
   change: (next: PaymentDraft) => void;
   remove: () => void;
+  referenceLabel?: string;
+  referencePlaceholder?: string;
+  showOptionalReference?: boolean;
 }) {
   const method = methods.find(
     (row) => row.id === payment.paymentMethodId
@@ -102,10 +108,12 @@ export function CheckoutPayment({
           </>
         )}
 
-        {method?.requiresReference && (
+        {(method?.requiresReference ||
+          (method && showOptionalReference)) && (
           <TextField
-            label="Referencia obligatoria"
-            required
+            label={referenceLabel}
+            placeholder={referencePlaceholder}
+            required={method?.requiresReference}
             maxLength={120}
             value={payment.reference}
             onChange={(event) =>

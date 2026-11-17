@@ -16,6 +16,15 @@ import {
 } from "lucide-react";
 import { OrderStatusBadge } from "./OrderStatusBadge";
 
+import { OrderCustomerForm } from "./OrderCustomerForm";
+
+import {
+  canEditPreorder,
+  customerErrors,
+  customerFields,
+  CHANNELS,
+} from "../utils/preorders";
+
 import { OrderPrintPanel } from "../../kitchen-flow/OrderPrintPanel";
 
 import {
@@ -55,9 +64,11 @@ export function OrderWorkspace({
   order,
   data,
   onCheckout,
+  onSaved,
 }: {
   resource: SalesResource;
   onCheckout?: () => void;
+  onSaved?: () => void;
   order: Pick<
     Order,
     | "serviceType"
@@ -68,6 +79,11 @@ export function OrderWorkspace({
     | "subtotal"
     | "items"
     | "kitchenWorkflowMode"
+    | "sourceChannel"
+    | "customerName"
+    | "customerPhone"
+    | "customerEmail"
+    | "paymentStatus"
   > & {
     id: string | null;
   };
@@ -92,7 +108,10 @@ export function OrderWorkspace({
   const cancellationPending =
     !!order.id && !!resource.cancellationIds[order.id];
 
-  const awaitingConfirmation = !!order.id && order.status === "OPEN";
+  const awaitingConfirmation =
+    !!order.id &&
+    order.serviceType === "TABLE" &&
+    order.status === "OPEN";
 
   const hasDelivered = data.tickets.some(
     (ticket) =>
@@ -110,8 +129,14 @@ export function OrderWorkspace({
     needsConfirmation ||
     cancellationPending;
 
-  const editable = order.status === "OPEN";
-  const canAdd = editable || order.status === "CONFIRMED";
+  const prepaid = order.serviceType !== "TABLE";
+
+  const editable = prepaid
+    ? !order.id || canEditPreorder(order)
+    : order.status === "OPEN";
+
+  const canAdd =
+    editable || (!prepaid && order.status === "CONFIRMED");
 
   const workflowMode = resolveKitchenMode(
     order,
@@ -297,10 +322,8 @@ export function OrderWorkspace({
           id={`${accountId}-details`}
           open
           variant="modal"
-          title="Datos de la cuenta"
-          className={
-            editable ? "mp-dialog" : "mp-dialog app-confirm-dialog"
-          }
+          title={prepaid ? "Datos del cliente" : "Datos de la cuenta"}
+          className="mp-dialog mp-account-details-dialog"
           busy={resource.busy}
           onClose={() => setShowDetails(false)}
         >
@@ -309,33 +332,58 @@ export function OrderWorkspace({
               {data.location.name} · {data.location.code}
             </p>
 
-            <OrderDetailsForm
-              initial={order}
-              tables={
-                order.id
-                  ? freeTables
-                  : freeTables.filter(
-                      (table) => table.id === order.restaurantTableId
-                    )
-              }
-              busy={blocked}
-              onCancel={() => setShowDetails(false)}
-              onSave={async (input) => {
-                const ok = order.id
-                  ? await resource.action(
-                      `/orders/${order.id}`,
-                      "PATCH",
-                      input
-                    )
-                  : resource.updateLocal(input);
+            {prepaid ? (
+              <OrderCustomerForm
+                initial={order}
+                existing={!!order.id}
+                busy={blocked}
+                onCancel={() => setShowDetails(false)}
+                onSave={async (input) => {
+                  const ok = order.id
+                    ? await resource.action(
+                        `/orders/${order.id}`,
+                        "PATCH",
+                        customerFields(input)
+                      )
+                    : resource.updateLocal(input);
 
-                if (ok) {
-                  setShowDetails(false);
+                  if (ok) {
+                    setShowDetails(false);
+                  }
+
+                  return ok;
+                }}
+              />
+            ) : (
+              <OrderDetailsForm
+                initial={order}
+                tables={
+                  order.id
+                    ? freeTables
+                    : freeTables.filter(
+                        (table) =>
+                          table.id === order.restaurantTableId
+                      )
                 }
+                busy={blocked}
+                onCancel={() => setShowDetails(false)}
+                onSave={async (input) => {
+                  const ok = order.id
+                    ? await resource.action(
+                        `/orders/${order.id}`,
+                        "PATCH",
+                        input
+                      )
+                    : resource.updateLocal(input);
 
-                return ok;
-              }}
-            />
+                  if (ok) {
+                    setShowDetails(false);
+                  }
+
+                  return ok;
+                }}
+              />
+            )}
           </div>
         </BottomSheet>
       )}
@@ -403,7 +451,9 @@ export function OrderWorkspace({
 
             {showDetails
               ? "Volver al catálogo"
-              : "Datos de la cuenta"}
+              : prepaid
+                ? "Datos del cliente"
+                : "Datos de la cuenta"}
           </button>
         )}
       </div>
@@ -838,7 +888,8 @@ export function OrderWorkspace({
                         </>
                       )}
 
-                      {order.status === "CONFIRMED" &&
+                      {!prepaid &&
+                        order.status === "CONFIRMED" &&
                         item.status === "ACTIVE" &&
                         ticket &&
                         [
@@ -1047,6 +1098,32 @@ export function OrderWorkspace({
                 </details>
               )}
 
+              {prepaid && (
+                <section className="preorder-customer">
+                  <small>CLIENTE</small>
+
+                  <strong>
+                    {order.customerName?.trim() ||
+                      "Cliente ocasional"}
+                  </strong>
+
+                  {order.customerPhone && (
+                    <p>{order.customerPhone}</p>
+                  )}
+
+                  <p>
+                    Origen:{" "}
+                    {order.sourceChannel
+                      ? CHANNELS[order.sourceChannel]
+                      : "Presencial"}
+                  </p>
+
+                  {order.customerEmail && (
+                    <p>{order.customerEmail}</p>
+                  )}
+                </section>
+              )}
+
               {order.id && order.status !== "OPEN" && (
                 <OrderPrintPanel
                   orderId={order.id}
@@ -1105,20 +1182,38 @@ export function OrderWorkspace({
           )}
 
           {canAdd ? (
-            (!order.id || pendingCount > 0) && (
+            (prepaid || !order.id || pendingCount > 0) && (
               <Button
                 size="sm"
                 className="sales-primary"
                 loading={resource.sending}
                 loadingText="Enviando…"
-                disabled={blocked || invalidDraft || !pendingCount}
-                onClick={() => void resource.send()}
+                disabled={
+                  blocked ||
+                  invalidDraft ||
+                  (!pendingCount && !items.length)
+                }
+                onClick={async () => {
+                  if (
+                    prepaid &&
+                    Object.keys(customerErrors(order)).length
+                  ) {
+                    setShowDetails(true);
+                    return;
+                  }
+
+                  if (await resource.send()) {
+                    onSaved?.();
+                  }
+                }}
               >
                 <Send size={16} />
 
-                {order.status === "CONFIRMED"
-                  ? "Enviar adiciones"
-                  : "Enviar pedido"}
+                {prepaid
+                  ? "Guardar pedido"
+                  : order.status === "CONFIRMED"
+                    ? "Enviar adiciones"
+                    : "Enviar pedido"}
               </Button>
             )
           ) : order.status === "DELIVERED" && onCheckout ? (
@@ -1133,13 +1228,19 @@ export function OrderWorkspace({
           ) : null}
         </div>
 
-        <OrderCancellationActions
-          resource={resource}
-          orderId={order.id}
-          status={order.status}
-          pendingCount={pendingCount}
-          hasDelivered={hasDelivered}
-        />
+        {(!prepaid ||
+          !order.id ||
+          ["PENDING", "REFUNDED"].includes(
+            order.paymentStatus ?? ""
+          )) && (
+          <OrderCancellationActions
+            resource={resource}
+            orderId={order.id}
+            status={order.status}
+            pendingCount={pendingCount}
+            hasDelivered={hasDelivered}
+          />
+        )}
 
         {order.status === "DELIVERED" && (
           <p className="sales-price-note">

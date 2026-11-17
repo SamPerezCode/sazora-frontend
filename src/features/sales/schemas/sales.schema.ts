@@ -27,7 +27,32 @@ export const orderLocationSchema = z.object({
   isActive: z.boolean(),
 });
 
+export const paymentStatusSchema = z.enum([
+  "PENDING",
+  "VERIFIED",
+  "CONSUMED",
+  "REFUNDED",
+  "VOIDED",
+]);
+
+export const sourceChannelSchema = z.enum([
+  "IN_PERSON",
+  "WHATSAPP",
+  "PHONE",
+  "PUBLIC_MENU",
+]);
+
 const orderBase = z.object({
+  paymentStatus: paymentStatusSchema.optional(),
+  paymentVerifiedAt: z.iso
+    .datetime({ offset: true })
+    .nullable()
+    .optional(),
+  sourceChannel: sourceChannelSchema.optional(),
+  customerName: z.string().nullable().optional(),
+  customerPhone: z.string().nullable().optional(),
+  customerEmail: z.string().nullable().optional(),
+  total: moneySchema.optional(),
   id,
   locationId: id,
   businessId: id.optional(),
@@ -163,6 +188,10 @@ export type Ticket = z.infer<
 >["data"]["kitchenTickets"][number];
 
 export type OrderInput = {
+  sourceChannel?: z.infer<typeof sourceChannelSchema>;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
   serviceType: ServiceType;
   restaurantTableId: string | null;
   customerCount: number | null;

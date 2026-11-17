@@ -2179,3 +2179,596 @@ dialog.mp-workspace-summary {
     justify-self: end;
   }
 }
+/* Formulario de datos del cliente / cuenta */
+
+dialog.bottom-sheet.bottom-sheet-modal.mp-account-details-dialog {
+  box-sizing: border-box;
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(30rem, calc(100% - 2rem));
+  min-width: 0;
+  max-width: calc(100% - 2rem);
+  height: auto;
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  overflow: hidden;
+  border-radius: 0.9rem;
+}
+
+dialog.mp-account-details-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+dialog.mp-account-details-dialog > .bottom-sheet-heading {
+  flex: 0 0 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 1rem 1.25rem 0.75rem;
+}
+
+dialog.mp-account-details-dialog > .sales-details {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 1.25rem 1.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+dialog.mp-account-details-dialog .sales-details > p {
+  margin: 0 0 1rem;
+  overflow-wrap: anywhere;
+}
+
+dialog.mp-account-details-dialog .sales-form {
+  min-width: 0;
+}
+
+dialog.mp-account-details-dialog :is(input, textarea) {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 16px;
+}
+
+dialog.mp-account-details-dialog .sales-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+dialog.mp-account-details-dialog .sales-form-actions > button {
+  min-height: 44px;
+}
+
+/* Página: impedir que el contenido ensanche las columnas */
+
+.mp-page {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.mp-page > :not(dialog) {
+  min-width: 0;
+}
+
+.mp-page > .sales-room {
+  grid-column: auto;
+  grid-row: auto;
+  width: min(100%, 33.75rem);
+}
+
+.mp-page .sales-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mp-page .sales-stats > div {
+  min-width: 0;
+  padding-inline: 0.35rem;
+}
+
+.mp-page .sales-stats span {
+  overflow-wrap: anywhere;
+}
+
+.mp-page .preorders,
+.mp-page .preorder-track,
+.mp-page .preorder-filters,
+.mp-page .mesa-filters {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mp-page .mesa-filters {
+  margin-block: 1rem 1.5rem;
+}
+
+.mp-page .mesa-filters > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Editor: tablet y móvil */
+
+@media (max-width: 63.999rem) {
+  dialog.bottom-sheet.bottom-sheet-modal.mp-workspace:not(
+      .mp-workspace-summary
+    ) {
+    box-sizing: border-box;
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: calc(100% - 2rem);
+    min-width: 0;
+    max-width: calc(100% - 2rem);
+    height: min(54rem, 88dvh);
+    max-height: calc(100dvh - 2rem);
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--sazora-outline);
+    border-radius: 0.9rem;
+  }
+
+  .mp-workspace > .bottom-sheet-heading {
+    flex: 0 0 auto;
+    min-width: 0;
+    margin: 0;
+    padding: 1rem 1.25rem;
+  }
+
+  .mp-workspace > .bottom-sheet-heading h2 {
+    font-size: 1.25rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .mp-workspace > .sales-order-body,
+  .mp-workspace .sales-workspace-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .mp-workspace .sales-order-meta.sales-account-context {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+    flex: 0 0 auto;
+    max-height: none;
+    padding: 0.6rem 1.25rem;
+    overflow: visible;
+    font-size: 0.75rem;
+  }
+
+  .mp-workspace .sales-account-context-location {
+    flex: 1 1 18rem;
+    min-width: 0;
+  }
+
+  .mp-workspace .sales-account-context-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .mp-workspace .sales-account-context > .sales-link {
+    flex: 0 0 auto;
+    min-height: 2.25rem;
+    margin: 0;
+    padding: 0.35rem 0;
+    white-space: nowrap;
+  }
+
+  .mp-workspace .sales-order-layout {
+    display: grid;
+    flex: 1 1 0%;
+    grid-template-columns: minmax(0, 1fr) 19rem;
+    grid-template-rows: minmax(0, 1fr);
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .mp-workspace .sales-order-layout > .sales-catalog,
+  .mp-workspace .sales-order-layout > .sales-current {
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .mp-workspace .sales-catalog-tools {
+    position: static;
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 1rem 1.25rem;
+  }
+
+  .mp-workspace .sales-search {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .mp-workspace .sales-search input {
+    width: 100%;
+    min-width: 0;
+    font-size: 16px;
+  }
+
+  .mp-workspace .sales-chips {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+    min-width: 0;
+    margin-top: 0.75rem;
+    padding-bottom: 0.25rem;
+    overflow-x: auto;
+  }
+
+  .mp-workspace .sales-chips > button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .mp-workspace .sales-product-grid,
+  .mp-workspace .sales-lines {
+    flex: 1 1 0%;
+    min-width: 0;
+    min-height: 0;
+    padding: 1.25rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .mp-workspace .sales-product-grid {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 0.75rem;
+  }
+
+  .mp-workspace .sales-product {
+    min-height: 8.5rem;
+    padding: 1rem;
+  }
+
+  .mp-workspace .sales-current > h3 {
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 1rem 1.25rem;
+    font-size: 0.875rem;
+  }
+
+  .mp-workspace .sales-order-body > .sales-order-footer {
+    position: static;
+    display: grid;
+    flex: 0 0 auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.85rem 1.25rem;
+    border-left: 0;
+  }
+
+  .mp-workspace .sales-total {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .mp-workspace .sales-cancellation-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .mp-workspace .sales-footer-actions {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .mp-workspace .sales-cancellation-actions,
+  .mp-workspace .sales-footer-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    align-self: center;
+    gap: 0.5rem;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .mp-workspace .sales-order-footer > p {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+
+  .mp-workspace .sales-workspace-content .sales-order-notice {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 25%;
+    overflow-y: auto;
+  }
+}
+
+/* Tablet: dos paneles y acciones en una misma fila */
+
+@media (min-width: 48rem) and (max-width: 63.999rem) {
+  .mp-page .mp-toolbar {
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .mp-page .mp-toolbar-actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+
+  .mp-workspace .sales-mobile-tabs {
+    display: none;
+  }
+
+  .mp-workspace .sales-order-layout > .sales-catalog,
+  .mp-workspace
+    .sales-order-layout[data-account="true"]
+    > .sales-catalog {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .mp-workspace .sales-order-layout > .sales-current {
+    display: flex;
+    grid-column: 2;
+    grid-row: 1;
+    border-left: 1px solid var(--sazora-outline);
+  }
+}
+
+/* Móvil: página y editor */
+
+@media (max-width: 47.999rem) {
+  .mp-page {
+    gap: 1.5rem;
+  }
+
+  .mp-page .mp-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .mp-page .mp-location-control {
+    width: 100%;
+  }
+
+  .mp-page .mp-location-control > :last-child {
+    flex: 1 1 0%;
+    width: auto;
+    min-width: 0;
+  }
+
+  .mp-page .mp-toolbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 0.5rem;
+  }
+
+  .mp-page .mp-toolbar-actions > :last-child {
+    flex: 0 1 auto;
+    max-width: 100%;
+  }
+
+  .mp-page > .mp-section-heading {
+    align-items: flex-start;
+  }
+
+  .mp-page > .mp-section-heading > div {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .mp-page > .mp-section-heading h2 {
+    font-size: 1.25rem;
+    line-height: 1.35;
+  }
+
+  dialog.bottom-sheet.bottom-sheet-modal.mp-workspace:not(
+      .mp-workspace-summary
+    ) {
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .mp-workspace > .bottom-sheet-heading {
+    padding: max(1rem, env(safe-area-inset-top)) 1rem 1rem;
+  }
+
+  .mp-workspace .sales-order-meta.sales-account-context {
+    gap: 0.5rem 0.75rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .mp-workspace .sales-account-context-location {
+    flex: 1 1 100%;
+  }
+
+  .mp-workspace .sales-account-context-status {
+    flex: 1 1 8rem;
+  }
+
+  .mp-workspace .sales-account-context > .sales-link {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  .mp-workspace .sales-mobile-tabs {
+    display: grid;
+    flex: 0 0 auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .mp-workspace .sales-mobile-tabs > button {
+    min-width: 0;
+    min-height: 2.25rem;
+    padding: 0.5rem;
+    border: 0;
+    border-radius: 0.65rem;
+    background: transparent;
+    color: var(--sazora-heading);
+    font-size: 0.875rem;
+  }
+
+  .mp-workspace .sales-mobile-tabs > button[aria-pressed="true"] {
+    background: var(--sazora-secondary);
+    color: var(--sazora-heading);
+  }
+
+  .mp-workspace .sales-order-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mp-workspace .sales-order-layout > .sales-catalog,
+  .mp-workspace .sales-order-layout > .sales-current {
+    grid-column: 1;
+    grid-row: 1;
+    border-left: 0;
+  }
+
+  .mp-workspace .sales-order-layout > .sales-catalog {
+    display: flex;
+  }
+
+  .mp-workspace .sales-order-layout > .sales-current {
+    display: none;
+  }
+
+  .mp-workspace
+    .sales-order-layout[data-account="true"]
+    > .sales-catalog {
+    display: none;
+  }
+
+  .mp-workspace
+    .sales-order-layout[data-account="true"]
+    > .sales-current {
+    display: flex;
+  }
+
+  .mp-workspace .sales-catalog-tools,
+  .mp-workspace .sales-product-grid,
+  .mp-workspace .sales-lines {
+    padding: 1rem;
+  }
+
+  .mp-workspace .sales-order-body > .sales-order-footer {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 0.5rem;
+    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  }
+
+  .mp-workspace .sales-total {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .mp-workspace .sales-cancellation-actions {
+    grid-column: 1;
+    grid-row: 2;
+    justify-content: flex-start;
+  }
+
+  .mp-workspace .sales-footer-actions {
+    grid-column: 2;
+    grid-row: 2;
+    justify-content: flex-end;
+  }
+
+  .mp-workspace .sales-cancellation-actions > .ui-button,
+  .mp-workspace .sales-footer-actions > .ui-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.5rem;
+    height: auto;
+    padding: 0.5rem 0.4rem;
+    font-size: 0.8rem;
+    line-height: 1.25;
+    white-space: normal;
+  }
+
+  /* El formulario ocupa el ancho del móvil, como en la referencia. */
+  dialog.bottom-sheet.bottom-sheet-modal.mp-account-details-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 2rem);
+    border-radius: 0;
+  }
+
+  dialog.mp-account-details-dialog > .bottom-sheet-heading {
+    padding: 1.25rem 1.5rem 0.75rem;
+  }
+
+  dialog.mp-account-details-dialog > .sales-details {
+    padding: 0 1.5rem 1.5rem;
+    scrollbar-gutter: auto;
+  }
+
+  dialog.mp-account-details-dialog .sales-form-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 0.4rem;
+  }
+
+  dialog.mp-account-details-dialog .sales-form-actions > button {
+    width: 100%;
+    margin: 0;
+  }
+}
+
+/* Cuenta bloqueada: mostrar solamente la cuenta */
+
+@media (max-width: 63.999rem) {
+  .mp-workspace .sales-order-layout[data-readonly="true"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mp-workspace
+    .sales-order-layout[data-readonly="true"]
+    > .sales-catalog {
+    display: none;
+  }
+
+  .mp-workspace
+    .sales-order-layout[data-readonly="true"]
+    > .sales-current {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+    border-left: 0;
+  }
+}

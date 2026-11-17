@@ -1,16 +1,11 @@
 import { useId, useMemo, useState } from "react";
 
 import {
-  ArrowRight,
-  ChevronDown,
-  Clock,
   History,
   MapPin,
   Plus,
   RefreshCw,
-  ShoppingBag,
   Store,
-  Users,
   UtensilsCrossed,
 } from "lucide-react";
 
@@ -26,6 +21,12 @@ import type { AuthSession } from "../../auth/types/auth.types";
 
 import { useSales } from "../hooks/useSales";
 import { useSalesLocations } from "../hooks/useSalesLocations";
+
+import { PreorderList } from "../components/PreorderList";
+import { PreorderDetail } from "../components/PreorderDetail";
+import { canEditPreorder } from "../utils/preorders";
+
+import "../preorders.css";
 
 import { OrderWorkspace } from "../components/OrderWorkspace";
 import { OrderSummaryView } from "../components/OrderSummaryView";
@@ -48,9 +49,6 @@ import {
 } from "../utils/sales-board";
 
 import type { SalesFilter } from "../utils/sales-board";
-
-import { cents, money } from "../schemas/sales.schema";
-import type { OrderSummary } from "../schemas/sales.schema";
 
 import type { SalesLocation } from "../services/sales.service";
 
@@ -203,10 +201,11 @@ function SalesContent({
   );
 
   const modalId = useId();
-  const pickupId = useId();
 
   const [filter, setFilter] = useState<SalesFilter>("ALL");
-  const [takeawayOpen, setTakeawayOpen] = useState(false);
+  const [editingPreorderId, setEditingPreorderId] = useState<
+    string | null
+  >(null);
   const [chooseTable, setChooseTable] = useState(false);
   const [history, setHistory] = useState(false);
 
@@ -235,11 +234,6 @@ function SalesContent({
         : !!order && matchesOrder(order, filter)
   );
 
-  const takeaway = (data?.orders ?? []).filter(
-    (order) =>
-      order.serviceType === "TAKEAWAY" && matchesOrder(order, filter)
-  );
-
   const active =
     data?.order?.id === resource.selectedId ? data.order : null;
 
@@ -254,12 +248,27 @@ function SalesContent({
           restaurantTableId: draft.restaurantTableId,
           customerCount: draft.customerCount,
           notes: draft.notes,
+          sourceChannel: draft.sourceChannel ?? "IN_PERSON",
+          customerName: draft.customerName ?? null,
+          customerPhone: draft.customerPhone ?? null,
+          customerEmail: draft.customerEmail ?? null,
+          paymentStatus: "PENDING" as const,
           status: "OPEN" as const,
           kitchenWorkflowMode: null,
           subtotal: "0",
           items: [],
         }
       : null);
+
+  const preorderDetail =
+    !!active &&
+    active.serviceType !== "TABLE" &&
+    (editingPreorderId !== active.id ||
+      (!canEditPreorder(active) &&
+        !(
+          active.status === "CONFIRMED" &&
+          active.paymentStatus === "VERIFIED"
+        )));
 
   const table = data?.tables.find(
     (entry) => entry.id === workspaceOrder?.restaurantTableId
@@ -314,10 +323,16 @@ function SalesContent({
   }
 
   function startTakeaway() {
+    setEditingPreorderId(null);
+
     resource.start({
       serviceType: "TAKEAWAY",
+      sourceChannel: "IN_PERSON",
       restaurantTableId: null,
       customerCount: null,
+      customerName: null,
+      customerPhone: null,
+      customerEmail: null,
       notes: null,
     });
   }
@@ -330,6 +345,7 @@ function SalesContent({
   }
 
   function closeWorkspace() {
+    setEditingPreorderId(null);
     if (draft && Object.keys(draft.items).length) {
       setLeaving({ kind: "close" });
     } else if (draft) {
@@ -357,46 +373,6 @@ function SalesContent({
       Nuevo pedido para recoger
     </Button>
   );
-
-  function orderInfo(order: OrderSummary) {
-    return (
-      <>
-        <div className="mp-card-line">
-          <strong>Orden #{order.id}</strong>
-
-          {order.customerCount !== null && (
-            <span>
-              <Users size={14} />
-              {order.customerCount}
-            </span>
-          )}
-        </div>
-
-        <p>
-          {order.activeItemCount}{" "}
-          {order.activeItemCount === 1
-            ? "producto guardado"
-            : "productos guardados"}{" "}
-          ·{" "}
-          {order.status === "OPEN"
-            ? "Sin enviar a cocina"
-            : order.status === "DELIVERED"
-              ? "Por cerrar"
-              : order.kitchenWorkflowMode === "PRINT_ONLY"
-                ? "Comandas impresas"
-                : "Consultar preparación"}
-        </p>
-
-        {pendingCount(order.id) > 0 && (
-          <p className="mp-accent">
-            {pendingCount(order.id)} unidades locales por enviar
-          </p>
-        )}
-
-        <strong>{money(cents(order.subtotal))}</strong>
-      </>
-    );
-  }
 
   return (
     <section className="mp-page sales-page sales-board">
@@ -559,100 +535,14 @@ function SalesContent({
                 }
               />
 
-              <div
-                className="mesa-filters flex gap-2 overflow-x-auto pb-1"
-                role="group"
-                aria-label="Estado de mesas y pedidos"
-              >
-                {SALES_FILTERS.map((option) => (
-                  <Button
-                    key={option.id}
-                    size="compact"
-                    variant={
-                      filter === option.id ? "primary" : "secondary"
-                    }
-                    aria-pressed={filter === option.id}
-                    onClick={() => setFilter(option.id)}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-
-              {filter !== "FREE" && (
-                <section className="mp-pickup">
-                  <div className="mp-section-heading">
-                    <button
-                      className="mp-pickup-toggle"
-                      type="button"
-                      aria-controls={pickupId}
-                      aria-expanded={takeawayOpen}
-                      onClick={() => setTakeawayOpen((open) => !open)}
-                    >
-                      <ShoppingBag size={18} />
-                      <strong>Pedidos para recoger</strong>
-                      <span className="mp-neutral">
-                        {takeaway.length}
-                      </span>
-                      <ChevronDown size={16} />
-                    </button>
-
-                    <Button
-                      variant="soft"
-                      size="compact"
-                      disabled={blocked}
-                      onClick={startTakeaway}
-                    >
-                      <Plus size={16} />
-                      Nuevo pedido para recoger
-                    </Button>
-                  </div>
-
-                  <div id={pickupId} hidden={!takeawayOpen}>
-                    <div className="mp-cards">
-                      {takeaway.map((order) => (
-                        <button
-                          type="button"
-                          className="mp-card"
-                          key={order.id}
-                          disabled={resource.busy}
-                          onClick={() => resource.select(order.id)}
-                        >
-                          <div className="mp-card-line">
-                            <strong>Pedido #{order.id}</strong>
-                            <OrderStatusBadge status={order.status} />
-                          </div>
-
-                          {orderInfo(order)}
-
-                          <small>
-                            <Clock size={13} />
-                            {new Date(
-                              order.createdAt
-                            ).toLocaleTimeString("es-CO", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </small>
-
-                          <span className="mp-card-action">
-                            {order.status === "DELIVERED"
-                              ? "Cerrar cuenta"
-                              : "Ver cuenta"}
-                            <ArrowRight size={16} />
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-
-                    {!takeaway.length && (
-                      <p className="mp-empty">
-                        No hay pedidos para recoger en este estado.
-                      </p>
-                    )}
-                  </div>
-                </section>
-              )}
+              <PreorderList
+                orders={data.orders}
+                disabled={blocked}
+                onOpen={(id) => {
+                  setEditingPreorderId(null);
+                  resource.select(id);
+                }}
+              />
 
               <section>
                 <div className="mp-section-heading">
@@ -662,6 +552,26 @@ function SalesContent({
                     {visible.length}{" "}
                     {visible.length === 1 ? "mesa" : "mesas"}
                   </span>
+                </div>
+
+                <div
+                  className="mesa-filters flex gap-2 overflow-x-auto pb-1"
+                  role="group"
+                  aria-label="Estado de las mesas"
+                >
+                  {SALES_FILTERS.map((option) => (
+                    <Button
+                      key={option.id}
+                      size="compact"
+                      variant={
+                        filter === option.id ? "primary" : "secondary"
+                      }
+                      aria-pressed={filter === option.id}
+                      onClick={() => setFilter(option.id)}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
                 </div>
 
                 <MesasGrid
@@ -728,16 +638,24 @@ function SalesContent({
           id={`${modalId}-order`}
           open
           variant="modal"
-          title={title}
+          title={
+            preorderDetail && active
+              ? `Orden Pedido #${active.id}`
+              : title
+          }
           busy={resource.busy}
-          className={`sales-workspace mp-workspace ${
-            active?.status === "DELIVERED"
-              ? "mp-workspace-summary"
-              : ""
-          }`}
+          className={
+            preorderDetail
+              ? "preorder-dialog"
+              : `sales-workspace mp-workspace ${
+                  active?.status === "DELIVERED"
+                    ? "mp-workspace-summary"
+                    : ""
+                }`
+          }
           onClose={closeWorkspace}
         >
-          {active?.status === "DELIVERED" && (
+          {!preorderDetail && active?.status === "DELIVERED" && (
             <div className="mp-workspace-location">
               <MapPin size={14} />
               Punto de venta:
@@ -751,7 +669,16 @@ function SalesContent({
             </div>
           )}
 
-          {active?.status === "DELIVERED" ? (
+          {preorderDetail && active ? (
+            <PreorderDetail
+              key={active.id}
+              order={active}
+              resource={resource}
+              scope={scope}
+              onEdit={() => setEditingPreorderId(active.id)}
+              onClose={closeWorkspace}
+            />
+          ) : active?.status === "DELIVERED" ? (
             <OrderSummaryView
               order={active}
               table={table}
@@ -770,6 +697,7 @@ function SalesContent({
               order={workspaceOrder}
               data={data}
               onCheckout={canCheckout ? startCheckout : undefined}
+              onSaved={() => setEditingPreorderId(null)}
             />
           ) : (
             <div className="mp-dialog-content">
