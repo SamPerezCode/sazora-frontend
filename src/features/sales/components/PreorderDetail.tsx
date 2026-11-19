@@ -6,6 +6,8 @@ import { BottomSheet } from "../../../components/layout/BottomSheet";
 import { Button } from "../../../components/ui/Button";
 import { buildWhatsAppUrl } from "../../../lib/whatsapp";
 
+import { Link } from "react-router";
+
 import { hasPermission } from "../../auth/utils/permissions";
 import { cashDate } from "../../cash/utils/cash-format";
 import { useCashResource } from "../../cash/hooks/useCashResource";
@@ -669,6 +671,17 @@ export function PreorderDetail({
           >
             Actualizar orden
           </Button>
+
+          {order.serviceType === "DELIVERY" &&
+            hasPermission(session, "deliveries.read") &&
+            !resource.busy && (
+              <Link
+                className="por-link"
+                to={"/domicilios?orderId=" + order.id}
+              >
+                Ver domicilio
+              </Link>
+            )}
 
           {editable && (
             <Button

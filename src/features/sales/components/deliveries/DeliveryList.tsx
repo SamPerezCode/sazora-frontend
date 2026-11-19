@@ -1,70 +1,149 @@
+import { useCallback, useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router";
+import { Bike, MapPin, RotateCcw } from "lucide-react";
+
 import { SelectField } from "../../../../components/forms/SelectField";
 import { TextField } from "../../../../components/forms/TextField";
 import { Button } from "../../../../components/ui/Button";
+
 import { hasPermission } from "../../../auth/utils/permissions";
+
 import { usePresentation } from "../../hooks/usePublicOrdersPresentation";
 import { useRemote } from "../../hooks/usePublicOrders";
-import type { Delivery } from "../../schemas/public-orders.schema";
-import { deliveryStates } from "../../schemas/public-orders.schema";
+
+import {
+  deliveryStates,
+  id,
+} from "../../schemas/public-orders.schema";
+
 import { listDeliveries } from "../../services/deliveries.service";
-import { active } from "../../utils/public-orders.utils";
-import { allLocations } from "../../utils/public-orders.utils";
-import { labels } from "../../utils/public-orders.utils";
-import { options } from "../../utils/public-orders.utils";
-import { text } from "../../utils/public-orders.utils";
-import { Badge } from "../public-orders/PublicOrderShared";
-import { Feedback } from "../public-orders/PublicOrderShared";
-import { Pager } from "../public-orders/PublicOrderShared";
+
+import { active, text } from "../../utils/public-orders.utils";
+
+import {
+  deliveryLabels,
+  deliveryResponsible,
+  orderLabels,
+} from "../../utils/deliveries";
+
+import { Feedback, Pager } from "../public-orders/PublicOrderShared";
+
 import { DeliveryDialog } from "./DeliveryDialog";
-import { Bike } from "lucide-react";
-import { MapPin } from "lucide-react";
-import { RotateCcw } from "lucide-react";
-import { Link } from "react-router";
-import { useCallback } from "react";
-import { useState } from "react";
+import { DeliveryLinks } from "./DeliveryLinks";
 
 export function DeliveryList() {
-  const { session, business, date, price } = usePresentation();
+  const { session, date } = usePresentation();
   const token = session.accessToken;
-  const slug = business.slug;
 
   const loader = useCallback(
-    (signal: AbortSignal) => listDeliveries(token, slug, signal),
-    [token, slug]
+    (signal: AbortSignal) => listDeliveries(token, signal),
+    [token]
   );
 
   const resource = useRemote(loader);
 
+  const [params, setParams] = useSearchParams();
+
+  const deliveryId = params.get("deliveryId");
+  const orderId = params.get("orderId");
+  const requestId = params.get("requestId");
+
+  const invalidTarget = [deliveryId, orderId, requestId].some(
+    (value) => value !== null && !id.safeParse(value).success
+  );
+
   const [filter, setFilter] = useState({
     q: "",
-    location: "ALL",
     status: "ACTIVE",
   });
 
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<Delivery | null>(null);
   const [notice, setNotice] = useState("");
+
   const rows = resource.data ?? [];
 
-  const locations = Array.from(
-    new Map(
-      rows.flatMap((row) =>
-        row.tracking
-          ? [
-              [
-                row.tracking.locationId,
-                row.tracking.locationName,
-              ] as const,
-            ]
-          : []
-      )
-    )
+  // Resolver con la lista completa recibida,
+  // antes de los filtros visuales.
+  useEffect(() => {
+    if (
+      deliveryId !== null ||
+      invalidTarget ||
+      (!orderId && !requestId) ||
+      !resource.data
+    ) {
+      return;
+    }
+
+    const matches = resource.data.filter(
+      (row) =>
+        (!orderId || row.orderId === orderId) &&
+        (!requestId || row.publicOrderRequestId === requestId)
+    );
+
+    if (matches.length !== 1) return;
+
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+
+        next.delete("orderId");
+        next.delete("requestId");
+        next.set("deliveryId", matches[0].id);
+
+        return next;
+      },
+      { replace: true }
+    );
+  }, [
+    deliveryId,
+    orderId,
+    requestId,
+    invalidTarget,
+    resource.data,
+    setParams,
+  ]);
+
+  const linked = rows.filter(
+    (row) =>
+      (!orderId || row.orderId === orderId) &&
+      (!requestId || row.publicOrderRequestId === requestId)
   );
+
+  const unresolved =
+    deliveryId === null &&
+    !invalidTarget &&
+    !!(orderId || requestId) &&
+    !!resource.data &&
+    linked.length !== 1;
+
+  function select(value: string | null) {
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+
+        for (const key of ["deliveryId", "orderId", "requestId"]) {
+          next.delete(key);
+        }
+
+        if (value) next.set("deliveryId", value);
+
+        return next;
+      },
+      { replace: value === null }
+    );
+  }
+
+  function change(key: keyof typeof filter, value: string) {
+    setFilter((previous) => ({
+      ...previous,
+      [key]: value,
+    }));
+
+    setPage(1);
+  }
 
   const visible = rows.filter(
     (row) =>
-      (filter.location === "ALL" ||
-        row.tracking?.locationId === filter.location) &&
       (filter.status === "ALL" ||
         (filter.status === "ACTIVE"
           ? active(row.status)
@@ -76,6 +155,8 @@ export function DeliveryList() {
           row.customerName,
           row.customerPhone,
           row.deliveryAddress,
+          row.assignedDriverName,
+          row.externalProviderName,
         ].join(" ")
       ).includes(text(filter.q.trim()))
   );
@@ -85,15 +166,12 @@ export function DeliveryList() {
     Math.min(page, Math.ceil(visible.length / 20))
   );
 
-  function change(key: keyof typeof filter, value: string) {
-    setFilter((previous) => ({ ...previous, [key]: value }));
-    setPage(1);
-  }
-
   return (
     <section className="por-page">
       <div className="por-toolbar">
-        <p>Pedidos a domicilio aceptados.</p>
+        <p>
+          Gestiona la asignación y el recorrido de los domicilios.
+        </p>
 
         <div className="por-actions">
           <Button
@@ -117,6 +195,34 @@ export function DeliveryList() {
         <p role="status" className="por-notice">
           {notice}
         </p>
+      )}
+
+      {(invalidTarget || unresolved) && (
+        <div role="status" className="por-error">
+          <p>
+            {invalidTarget
+              ? "El enlace contiene un identificador inválido."
+              : linked.length > 1
+                ? "Hay varios domicilios vinculados. Selecciona el correspondiente."
+                : "No se encontró un domicilio vinculado a ese pedido o solicitud."}
+          </p>
+
+          {unresolved &&
+            linked.length > 1 &&
+            linked.map((row) => (
+              <Button
+                key={row.id}
+                variant="secondary"
+                onClick={() => select(row.id)}
+              >
+                {row.publicCode} · {deliveryLabels[row.status]}
+              </Button>
+            ))}
+
+          <Button variant="secondary" onClick={() => select(null)}>
+            Continuar en el listado
+          </Button>
+        </div>
       )}
 
       <div className="por-stats">
@@ -145,42 +251,52 @@ export function DeliveryList() {
 
       <div className="por-filters">
         <TextField
-          label="Buscar pedido o cliente"
+          label="Buscar domicilio"
           value={filter.q}
-          placeholder="Pedido, cliente, teléfono o dirección"
+          placeholder="Código, cliente, teléfono, dirección o repartidor"
           onChange={(event) => change("q", event.target.value)}
-        />
-
-        <SelectField
-          label="Punto de venta"
-          value={filter.location}
-          options={[
-            allLocations,
-            ...locations.map(([value, label]) => ({ value, label })),
-          ]}
-          onValueChange={(value) => change("location", value)}
         />
 
         <SelectField
           label="Estado del domicilio"
           value={filter.status}
           options={[
-            { value: "ACTIVE", label: "Domicilios activos" },
-            { value: "ALL", label: "Todos los estados" },
-            ...options(deliveryStates),
+            {
+              value: "ACTIVE",
+              label: "Domicilios activos",
+            },
+            {
+              value: "ALL",
+              label: "Todos los estados",
+            },
+            ...deliveryStates.map((value) => ({
+              value,
+              label: deliveryLabels[value],
+            })),
           ]}
           onValueChange={(value) => change("status", value)}
         />
+
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setFilter({
+              q: "",
+              status: "ACTIVE",
+            });
+            setPage(1);
+          }}
+        >
+          Limpiar filtros
+        </Button>
       </div>
 
       <Feedback loading={resource.loading} error={resource.error} />
 
-      {rows.some((row) => !row.tracking) && (
-        <p role="status">
-          Algunos seguimientos no están disponibles. Actualiza para
-          consultar su punto de venta, productos y preparación.
-        </p>
-      )}
+      <small>
+        La preparación y el punto de venta se consultan al abrir el
+        domicilio.
+      </small>
 
       {resource.data && !visible.length && (
         <p className="por-empty">
@@ -196,9 +312,12 @@ export function DeliveryList() {
               <div className="por-toolbar">
                 <strong className="por-inline">
                   <Bike size={18} />
-                  Pedido #{row.orderId}
+                  {row.publicCode}
                 </strong>
-                <Badge value={row.status} />
+
+                <span className="por-badge" data-status={row.status}>
+                  {deliveryLabels[row.status]}
+                </span>
               </div>
 
               <div>
@@ -212,27 +331,15 @@ export function DeliveryList() {
               </p>
 
               <small>
-                {row.tracking?.locationName ??
-                  "Punto de venta no disponible"}{" "}
-                · {date(row.createdAt)}
+                Pedido #{row.orderId} · Creado {date(row.createdAt)}
               </small>
 
               <hr />
 
-              <p>
-                {row.tracking
-                  ? labels[
-                      row.tracking.preparationStatus ??
-                        row.orderStatus
-                    ]
-                  : "Preparación sin consultar"}
-              </p>
+              <p>Orden: {orderLabels[row.orderStatus]}</p>
 
               <p>
-                Repartidor:{" "}
-                {row.assignedDriverName ??
-                  row.externalProviderName ??
-                  "Sin asignar"}
+                Responsable: {deliveryResponsible(row)}
                 {row.deliveryMode && (
                   <small>
                     {row.deliveryMode === "INTERNAL"
@@ -242,21 +349,21 @@ export function DeliveryList() {
                 )}
               </p>
 
-              <div className="por-toolbar">
-                <strong>Subtotal de productos</strong>
-                <strong>
-                  {row.tracking ? price(row.tracking.subtotal) : "—"}
-                </strong>
-              </div>
+              {row.status === "DELIVERED" &&
+                row.orderStatus !== "CLOSED" && (
+                  <small>
+                    Pedido entregado. El cierre financiero se
+                    realizará desde el flujo de la orden.
+                  </small>
+                )}
 
-              <hr />
+              <DeliveryLinks row={row} />
 
               <Button
                 variant="secondary"
-                size="sm"
-                onClick={() => setSelected(row)}
+                onClick={() => select(row.id)}
               >
-                Ver pedido y gestionar
+                Ver domicilio
               </Button>
             </article>
           ))}
@@ -268,13 +375,12 @@ export function DeliveryList() {
         change={setPage}
       />
 
-      {selected && (
+      {deliveryId !== null && !invalidTarget && (
         <DeliveryDialog
-          key={selected.id}
-          row={selected}
-          close={() => setSelected(null)}
+          key={deliveryId}
+          deliveryId={deliveryId}
+          close={() => select(null)}
           saved={(message) => {
-            setSelected(null);
             setNotice(message);
             resource.reload();
           }}

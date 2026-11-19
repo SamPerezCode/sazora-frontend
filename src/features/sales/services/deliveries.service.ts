@@ -1,87 +1,156 @@
-import { request } from "../../../lib/http/client";
-import type { PublicTracking } from "../../public-menu/schemas/public-menu.schema";
-import { getPublicTracking } from "../../public-menu/services/public-menu.service";
-import type { Assignment } from "../schemas/public-orders.schema";
-import type { Delivery } from "../schemas/public-orders.schema";
-import type { DeliveryAction } from "../schemas/public-orders.schema";
-import { deliveryResponse } from "../schemas/public-orders.schema";
-import { deliverySchema } from "../schemas/public-orders.schema";
-import { id } from "../schemas/public-orders.schema";
 import { z } from "zod";
+
+import { ApiError, request } from "../../../lib/http/client";
+
+import {
+  deliveryResponse,
+  deliverySchema,
+  id,
+  type Assignment,
+  type Delivery,
+  type DeliveryAction,
+} from "../schemas/public-orders.schema";
+
+import {
+  orderResponseSchema,
+  type Order,
+} from "../schemas/sales.schema";
+
+import {
+  getOrderKitchenHistory,
+  type OrderKitchenHistory,
+} from "./sales-history.service";
+
+import { deliveryError, deliveryFailure } from "../utils/deliveries";
+
+const listResponse = z.object({
+  status: z.literal("success"),
+  data: z.object({
+    deliveries: z.array(deliverySchema),
+  }),
+});
 
 export async function listDeliveries(
   accessToken: string,
-  slug: string,
   signal: AbortSignal
-) {
-  const result = await request(
-    "/deliveries",
-    z.object({
-      status: z.literal("success"),
-      data: z.object({ deliveries: z.array(deliverySchema) }),
-    }),
-    { accessToken, signal, cache: "no-store" }
-  );
+): Promise<Delivery[]> {
+  const result = await request("/deliveries", listResponse, {
+    accessToken,
+    signal,
+    cache: "no-store",
+  });
 
-  const rows: Delivery[] = result.data.deliveries.map((row) => ({
+  return result.data.deliveries.map((row) => ({
     ...row,
     tracking: null,
   }));
-
-  // El seguimiento aporta punto de venta, productos y preparación.
-  // Un fallo individual no oculta el domicilio.
-  let index = 0;
-
-  await Promise.all(
-    Array.from({ length: Math.min(4, rows.length) }, async () => {
-      while (index < rows.length && !signal.aborted) {
-        const row = rows[index++];
-
-        try {
-          row.tracking = await getPublicTracking(
-            slug,
-            row.publicCode,
-            signal
-          );
-        } catch (error) {
-          if (signal.aborted) throw error;
-        }
-      }
-    })
-  );
-
-  return rows;
 }
 
 export async function readDelivery(
   value: string,
   accessToken: string,
-  slug: string,
   signal: AbortSignal
 ): Promise<Delivery> {
-  const result = await request(
-    "/deliveries/" + id.parse(value),
-    deliveryResponse,
-    { accessToken, signal, cache: "no-store" }
-  );
+  try {
+    const result = await request(
+      "/deliveries/" + id.parse(value),
+      deliveryResponse,
+      {
+        accessToken,
+        signal,
+        cache: "no-store",
+      }
+    );
 
-  if (result.data.delivery.id !== value) {
-    throw new Error("El domicilio recibido no corresponde.");
+    if (result.data.delivery.id !== value) {
+      throw new Error("El domicilio recibido no corresponde.");
+    }
+
+    return {
+      ...result.data.delivery,
+      tracking: null,
+    };
+  } catch (cause) {
+    throw deliveryFailure(cause);
   }
+}
 
-  let tracking: PublicTracking | null = null;
+export type DeliveryContext = {
+  delivery: Delivery;
+  order: Order | null;
+  history: OrderKitchenHistory | null;
+  orderError: string;
+  historyError: string;
+};
+
+export async function readDeliveryContext(
+  value: string,
+  accessToken: string,
+  businessId: string,
+  canReadOrder: boolean,
+  signal: AbortSignal
+): Promise<DeliveryContext> {
+  const delivery = await readDelivery(value, accessToken, signal);
+
+  const context: DeliveryContext = {
+    delivery,
+    order: null,
+    history: null,
+    orderError: "",
+    historyError: "",
+  };
+
+  if (!canReadOrder) return context;
 
   try {
-    tracking = await getPublicTracking(
-      slug,
-      result.data.delivery.publicCode,
-      signal
+    const response = await request(
+      "/orders/" + id.parse(delivery.orderId),
+      orderResponseSchema,
+      {
+        accessToken,
+        signal,
+        cache: "no-store",
+      }
     );
-  } catch (error) {
-    if (signal.aborted) throw error;
+
+    const order = response.data.order;
+
+    if (
+      order.id !== delivery.orderId ||
+      order.businessId !== businessId ||
+      order.location.id !== order.locationId ||
+      order.serviceType !== "DELIVERY"
+    ) {
+      throw new Error(
+        "La orden recibida no corresponde a este domicilio."
+      );
+    }
+
+    context.order = order;
+  } catch (cause) {
+    signal.throwIfAborted();
+    context.orderError = deliveryError(cause);
+    return context;
   }
 
-  return { ...result.data.delivery, tracking };
+  if (context.order.status === "CONFIRMED") {
+    try {
+      context.history = await getOrderKitchenHistory(
+        accessToken,
+        {
+          businessId,
+          location: context.order.location,
+        },
+        context.order.id,
+        signal
+      );
+    } catch (cause) {
+      signal.throwIfAborted();
+      context.historyError = deliveryError(cause);
+    }
+  }
+
+  return context;
 }
 
 export function assignDelivery(
@@ -95,9 +164,11 @@ export function assignDelivery(
       ? {
           deliveryMode: body.deliveryMode,
           driverMembershipId: id.parse(body.driverMembershipId),
+          externalProviderName: null,
         }
       : {
           deliveryMode: body.deliveryMode,
+          driverMembershipId: null,
           externalProviderName: z
             .string()
             .trim()
@@ -111,7 +182,12 @@ export function assignDelivery(
       id.parse(value) +
       "/configure",
     deliveryResponse,
-    { method: "POST", body: input, accessToken, signal }
+    {
+      method: "POST",
+      body: input,
+      accessToken,
+      signal,
+    }
   );
 }
 
@@ -124,6 +200,18 @@ export function advanceDelivery(
   return request(
     "/deliveries/" + id.parse(value) + "/" + action,
     deliveryResponse,
-    { method: "POST", accessToken, signal }
+    {
+      method: "POST",
+      accessToken,
+      signal,
+    }
+  );
+}
+
+export function staleDelivery(): never {
+  throw new ApiError(
+    409,
+    "INVALID_DELIVERY_TRANSITION",
+    "El domicilio cambió. Actualiza antes de continuar."
   );
 }

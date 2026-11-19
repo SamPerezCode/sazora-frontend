@@ -530,12 +530,14 @@ export function RequestDialog({
             </Link>
           )}
 
-          {following &&
-            order?.serviceType === "DELIVERY" &&
+          {order?.serviceType === "DELIVERY" &&
             has("deliveries.read") &&
             !resource.busy && (
-              <Link className="por-link" to="/domicilios">
-                Ver domicilios
+              <Link
+                className="por-link"
+                to={"/domicilios?requestId=" + id}
+              >
+                Ver domicilio
               </Link>
             )}
 

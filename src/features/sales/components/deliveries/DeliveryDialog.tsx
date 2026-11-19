@@ -1,46 +1,68 @@
+import { useCallback, useState } from "react";
+
 import { BottomSheet } from "../../../../components/layout/BottomSheet";
 import { Button } from "../../../../components/ui/Button";
 import { buildWhatsAppUrl } from "../../../../lib/whatsapp";
+
 import { hasPermission } from "../../../auth/utils/permissions";
+
 import { usePresentation } from "../../hooks/usePublicOrdersPresentation";
-import { useMutation } from "../../hooks/usePublicOrders";
-import { useRemote } from "../../hooks/usePublicOrders";
-import type { Delivery } from "../../schemas/public-orders.schema";
-import type { DeliveryAction } from "../../schemas/public-orders.schema";
-import { advanceDelivery } from "../../services/deliveries.service";
-import { assignDelivery } from "../../services/deliveries.service";
-import { readDelivery } from "../../services/deliveries.service";
-import { labels } from "../../utils/public-orders.utils";
-import { Address } from "../public-orders/PublicOrderShared";
-import { DeliveryCostNotice } from "../public-orders/DeliveryCostNotice";
-import { Badge } from "../public-orders/PublicOrderShared";
-import { External } from "../public-orders/PublicOrderShared";
-import { Feedback } from "../public-orders/PublicOrderShared";
-import { Items } from "../public-orders/PublicOrderShared";
+import { useMutation, useRemote } from "../../hooks/usePublicOrders";
+
+import type {
+  Assignment,
+  DeliveryAction,
+} from "../../schemas/public-orders.schema";
+
+import {
+  advanceDelivery,
+  assignDelivery,
+  readDeliveryContext,
+  staleDelivery,
+} from "../../services/deliveries.service";
+
+import {
+  actionLabels,
+  deliveryLabels,
+  deliveryResponsible,
+  deliveryPolicy,
+  deliveryFailure,
+  orderLabels,
+} from "../../utils/deliveries";
+
+import {
+  Address,
+  External,
+  Feedback,
+} from "../public-orders/PublicOrderShared";
+
 import { AssignmentForm } from "./AssignmentForm";
-import { MessageCircle } from "lucide-react";
-import { Link } from "react-router";
-import { useCallback } from "react";
-import { useState } from "react";
+import { DeliveryLinks } from "./DeliveryLinks";
 
 export function DeliveryDialog({
-  row: initial,
+  deliveryId,
   close,
   saved,
 }: {
-  row: Delivery;
+  deliveryId: string;
   close: () => void;
   saved: (message: string) => void;
 }) {
-  const { session, business, price } = usePresentation();
+  const { session, business, date } = usePresentation();
   const token = session.accessToken;
-  const slug = business.slug;
 
-  // Consulta el estado actual antes de ofrecer acciones.
+  const canReadOrder = hasPermission(session, "orders.read");
+
   const loader = useCallback(
     (signal: AbortSignal) =>
-      readDelivery(initial.id, token, slug, signal),
-    [initial.id, token, slug]
+      readDeliveryContext(
+        deliveryId,
+        token,
+        business.id,
+        canReadOrder,
+        signal
+      ),
+    [deliveryId, token, business.id, canReadOrder]
   );
 
   const resource = useRemote(loader);
@@ -50,36 +72,41 @@ export function DeliveryDialog({
     "detail" | "assign" | DeliveryAction
   >("detail");
 
-  const row = resource.data;
-  const manage = hasPermission(session, "deliveries.manage");
+  const [notice, setNotice] = useState("");
 
-  const canExecute =
-    row &&
-    hasPermission(session, "deliveries.execute") &&
-    (row.deliveryMode === "INTERNAL"
-      ? row.assignedDriverMembershipId === session.membership.id
-      : row.deliveryMode === "EXTERNAL" && manage);
+  const context = resource.data;
+  const row = context?.delivery;
 
-  const next: DeliveryAction | null =
-    row?.status === "ASSIGNED"
-      ? "pick-up"
-      : row?.status === "PICKED_UP"
-        ? "start"
-        : row?.status === "OUT_FOR_DELIVERY"
-          ? "deliver"
-          : null;
-
-  const actionLabels = {
-    "pick-up": "Marcar recogido",
-    start: "Marcar en camino",
-    deliver: "Confirmar entrega",
+  const access = {
+    manage: hasPermission(session, "deliveries.manage"),
+    execute: hasPermission(session, "deliveries.execute"),
+    membershipId: session.membership.id,
   };
 
-  const ready =
-    row?.orderStatus === "CONFIRMED" &&
-    ["READY", "DELIVERED"].includes(
-      row.tracking?.preparationStatus ?? ""
+  const policy =
+    context &&
+    deliveryPolicy(
+      context.delivery,
+      access,
+      context.order,
+      context.history,
+      context.orderError
     );
+
+  const blocked = mutation.busy || resource.loading;
+
+  const status = policy?.cancelled
+    ? "CANCELLED"
+    : (context?.order?.status ?? row?.orderStatus);
+
+  const preparation =
+    status !== "CONFIRMED"
+      ? status && orderLabels[status]
+      : policy?.ready
+        ? "Listo para recoger"
+        : context?.history
+          ? "En preparación"
+          : "Preparación sin verificar";
 
   const whatsapp =
     row &&
@@ -94,20 +121,91 @@ export function DeliveryDialog({
         "."
     );
 
-  function advance(action: DeliveryAction) {
+  function refresh() {
+    setPanel("detail");
+    resource.reload();
+  }
+
+  function perform(
+    action: "assign" | DeliveryAction,
+    body?: Assignment
+  ) {
+    if (!row || !policy || blocked) return;
+
     if (
-      !row ||
-      !canExecute ||
-      next !== action ||
-      (action === "pick-up" && !ready)
+      action === "assign"
+        ? !policy.assign
+        : !policy.advance || policy.next !== action
     ) {
       return;
     }
 
+    setNotice("");
+
     void mutation.run(
-      (signal) => advanceDelivery(row.id, action, token, signal),
-      () => saved("Estado del domicilio actualizado."),
-      resource.reload
+      async (signal) => {
+        try {
+          // Revalidar evita actuar sobre una asignación
+          // o preparación antigua.
+          const fresh = await loader(signal);
+
+          const allowed = deliveryPolicy(
+            fresh.delivery,
+            access,
+            fresh.order,
+            fresh.history,
+            fresh.orderError
+          );
+
+          if (
+            fresh.delivery.orderId !== row.orderId ||
+            fresh.delivery.publicOrderRequestId !==
+              row.publicOrderRequestId
+          ) {
+            staleDelivery();
+          }
+
+          if (action === "assign") {
+            if (!allowed.assign || !body) {
+              staleDelivery();
+            }
+
+            await assignDelivery(
+              fresh.delivery.publicOrderRequestId,
+              body,
+              token,
+              signal
+            );
+          } else {
+            if (!allowed.advance || allowed.next !== action) {
+              staleDelivery();
+            }
+
+            await advanceDelivery(
+              fresh.delivery.id,
+              action,
+              token,
+              signal
+            );
+          }
+        } catch (cause) {
+          throw deliveryFailure(cause);
+        }
+      },
+      () => {
+        const message =
+          action === "assign"
+            ? "Asignación guardada."
+            : "Estado del domicilio actualizado.";
+
+        setNotice(message);
+        refresh();
+        saved(message);
+      },
+      () => {
+        refresh();
+        saved("");
+      }
     );
   }
 
@@ -119,9 +217,9 @@ export function DeliveryDialog({
       className="por-dialog"
       title={
         panel === "assign"
-          ? "Asignar entrega"
+          ? "Asignar domiciliario"
           : panel === "detail"
-            ? "Pedido #" + initial.orderId
+            ? "Domicilio " + (row?.publicCode ?? "#" + deliveryId)
             : actionLabels[panel]
       }
       busy={mutation.busy}
@@ -131,143 +229,192 @@ export function DeliveryDialog({
       }
     >
       <div className="por-dialog-body">
-        <Feedback
-          loading={resource.loading}
-          error={resource.error ?? mutation.error}
-        />
+        <Feedback loading={resource.loading} error={resource.error} />
 
-        {resource.error && (
-          <Button variant="secondary" onClick={resource.reload}>
-            Reintentar consulta
-          </Button>
+        {mutation.error && (
+          <p role="alert" className="por-error">
+            {mutation.error}
+          </p>
+        )}
+
+        {notice && (
+          <p role="status" className="por-notice">
+            {notice}
+          </p>
+        )}
+
+        {context?.orderError && (
+          <p role="alert" className="por-error">
+            No se pudo actualizar la orden: {context.orderError}{" "}
+            Actualiza antes de continuar.
+          </p>
+        )}
+
+        {context?.historyError && (
+          <p role="alert" className="por-error">
+            No se pudo verificar la preparación:{" "}
+            {context.historyError}
+          </p>
         )}
 
         {row &&
+          policy &&
           (panel === "assign" ? (
-            <AssignmentForm
-              busy={mutation.busy}
-              submit={(body) => {
-                if (
-                  !manage ||
-                  !["PENDING_ASSIGNMENT", "ASSIGNED"].includes(
-                    row.status
-                  )
-                ) {
-                  return;
-                }
-
-                void mutation.run(
-                  (signal) =>
-                    assignDelivery(
-                      row.publicOrderRequestId,
-                      body,
-                      token,
-                      signal
-                    ),
-                  () => saved("Domiciliario asignado."),
-                  resource.reload
-                );
-              }}
-            />
+            policy.assign ? (
+              <AssignmentForm
+                busy={blocked}
+                submit={(body) => perform("assign", body)}
+              />
+            ) : (
+              <p>
+                La asignación ya no está disponible. Vuelve al
+                detalle.
+              </p>
+            )
           ) : panel === "detail" ? (
             <>
               <div className="por-toolbar">
                 <strong>{row.customerName}</strong>
-                <Badge value={row.status} />
+
+                <span className="por-badge" data-status={row.status}>
+                  {deliveryLabels[row.status]}
+                </span>
               </div>
 
               <p>{row.customerPhone}</p>
+
               <Address value={row.deliveryAddress} />
-              <DeliveryCostNotice />
+
+              <dl className="por-details">
+                <div>
+                  <dt>Pedido</dt>
+                  <dd>#{row.orderId}</dd>
+                </div>
+
+                <div>
+                  <dt>Estado de la orden</dt>
+                  <dd>{status && orderLabels[status]}</dd>
+                </div>
+
+                <div>
+                  <dt>Modalidad</dt>
+                  <dd>
+                    {row.deliveryMode === "INTERNAL"
+                      ? "Equipo propio"
+                      : row.deliveryMode === "EXTERNAL"
+                        ? "Proveedor externo"
+                        : "Sin asignar"}
+                  </dd>
+                </div>
+
+                <div>
+                  <dt>Responsable</dt>
+                  <dd>{deliveryResponsible(row)}</dd>
+                </div>
+
+                <div>
+                  <dt>Punto de venta</dt>
+                  <dd>
+                    {context.order?.location.name ?? "No disponible"}
+                  </dd>
+                </div>
+
+                <div>
+                  <dt>Creado</dt>
+                  <dd>{date(row.createdAt)}</dd>
+                </div>
+              </dl>
+
               <p>
-                Repartidor:{" "}
-                {row.assignedDriverName ??
-                  row.externalProviderName ??
-                  "Sin asignar"}
+                <strong>Preparación: </strong>
+                {preparation}
               </p>
 
-              {row.tracking ? (
-                <>
-                  <p>
-                    {row.tracking.locationName} ·{" "}
-                    {
-                      labels[
-                        row.tracking.preparationStatus ??
-                          row.orderStatus
-                      ]
-                    }
+              {!canReadOrder && (
+                <small>
+                  No tienes permiso para consultar la preparación del
+                  pedido.
+                </small>
+              )}
+
+              {policy.cancelled && (
+                <p role="status" className="por-error">
+                  El pedido relacionado está cancelado. Las acciones
+                  de reparto están bloqueadas.
+                </p>
+              )}
+
+              {row.status === "ASSIGNED" &&
+                !policy.ready &&
+                !policy.cancelled && (
+                  <p role="status">
+                    {context.history
+                      ? "El pedido todavía está en preparación. Podrás marcarlo como recogido cuando todos los productos estén listos."
+                      : "Es necesario verificar la confirmación y la preparación antes de recoger el pedido."}
                   </p>
+                )}
 
-                  <Items items={row.tracking.items} />
-
-                  <div className="por-toolbar">
-                    <strong>Subtotal de productos</strong>
-                    <strong>{price(row.tracking.subtotal)}</strong>
-                  </div>
-                </>
-              ) : (
-                <p>
-                  Seguimiento no disponible. Actualiza antes de
-                  recoger.
+              {row.status === "DELIVERED" && status !== "CLOSED" && (
+                <p className="por-notice">
+                  Pedido entregado. El cierre financiero se realizará
+                  desde el flujo de la orden.
                 </p>
               )}
 
               {whatsapp && (
                 <External href={whatsapp}>
-                  <MessageCircle size={16} />
                   Contactar al cliente
                 </External>
               )}
 
-              <div className="por-actions">
-                {manage &&
-                  ["PENDING_ASSIGNMENT", "ASSIGNED"].includes(
-                    row.status
-                  ) && (
-                    <Button onClick={() => setPanel("assign")}>
-                      Asignar domiciliario
-                    </Button>
-                  )}
+              <DeliveryLinks row={row} />
 
-                {canExecute && next && (
+              <div className="por-actions">
+                {policy.assign && (
                   <Button
-                    disabled={next === "pick-up" && !ready}
-                    onClick={() => setPanel(next)}
+                    disabled={blocked}
+                    onClick={() => setPanel("assign")}
                   >
-                    {actionLabels[next]}
+                    {row.status === "ASSIGNED"
+                      ? "Cambiar asignación"
+                      : "Asignar domiciliario"}
+                  </Button>
+                )}
+
+                {policy.next && (
+                  <Button
+                    disabled={blocked || !policy.advance}
+                    onClick={() =>
+                      policy.next && setPanel(policy.next)
+                    }
+                  >
+                    {actionLabels[policy.next]}
                   </Button>
                 )}
               </div>
 
-              {next === "pick-up" && !ready && (
-                <small>
-                  Esperando confirmación de cocina. Actualiza cuando
-                  el pedido esté listo.
-                </small>
-              )}
-
-              {hasPermission(session, "public_orders.read") && (
-                <Link
-                  className="por-link"
-                  to={
-                    "/pedidos-publicos?solicitud=" +
-                    row.publicOrderRequestId
-                  }
-                >
-                  Revisar solicitud / enviar a preparación
-                </Link>
-              )}
-
-              {hasPermission(session, "kitchen.dashboard.read") && (
-                <Link className="por-link" to="/cocina">
-                  Abrir cocina
-                </Link>
-              )}
+              {access.execute &&
+                ((row.deliveryMode === "INTERNAL" &&
+                  row.assignedDriverMembershipId !==
+                    access.membershipId) ||
+                  (row.deliveryMode === "EXTERNAL" &&
+                    !access.manage)) &&
+                [
+                  "ASSIGNED",
+                  "PICKED_UP",
+                  "OUT_FOR_DELIVERY",
+                ].includes(row.status) &&
+                !policy.cancelled && (
+                  <small>
+                    Solo el responsable autorizado puede avanzar este
+                    domicilio.
+                  </small>
+                )}
             </>
           ) : (
             <p>
-              Confirma la acción «{actionLabels[panel]}» para el
-              pedido #{row.orderId} de {row.customerName}.
+              Confirma «{actionLabels[panel]}» para el pedido #
+              {row.orderId} de {row.customerName}.
             </p>
           ))}
       </div>
@@ -285,8 +432,8 @@ export function DeliveryDialog({
 
         <Button
           variant="secondary"
-          disabled={mutation.busy || resource.loading}
-          onClick={resource.reload}
+          disabled={blocked}
+          onClick={refresh}
         >
           Actualizar
         </Button>
@@ -295,11 +442,9 @@ export function DeliveryDialog({
           <Button
             loading={mutation.busy}
             disabled={
-              !canExecute ||
-              next !== panel ||
-              (panel === "pick-up" && !ready)
+              blocked || !policy?.advance || policy.next !== panel
             }
-            onClick={() => advance(panel)}
+            onClick={() => perform(panel)}
           >
             Confirmar
           </Button>
