@@ -1,26 +1,50 @@
 import { useCallback, useState } from "react";
+import { Eye, MessageCircle } from "lucide-react";
 
 import { useAppShell } from "../../../app/layout/shell-context";
-import { hasPermission } from "../../auth/utils/permissions";
-
+import { BottomSheet } from "../../../components/layout/BottomSheet";
 import { Button } from "../../../components/ui/Button";
+import { buildWhatsAppUrl } from "../../../lib/whatsapp";
+
+import { hasPermission } from "../../auth/utils/permissions";
 import { cashDate } from "../../cash/utils/cash-format";
 import { useCashResource } from "../../cash/hooks/useCashResource";
+import { OrderPrintPanel } from "../../kitchen-flow/OrderPrintPanel";
 
-import type { Order } from "../schemas/sales.schema";
-import { cents, money } from "../schemas/sales.schema";
+import { cents, money, type Order } from "../schemas/sales.schema";
+
 import type { SalesResource } from "../hooks/useSales";
 import type { SalesScope } from "../services/sales.service";
 
-import { readPreorderPayment } from "../services/preorder-payments.service";
+import { getOrderKitchenHistory } from "../services/sales-history.service";
+
+import {
+  readPreorderPayment,
+  type PreorderPaymentBatch,
+} from "../services/preorder-payments.service";
+
 import { CHANNELS, canEditPreorder } from "../utils/preorders";
 
 import { PaymentBadge } from "./PreorderList";
 import { PreorderPaymentDialog } from "./PreorderPaymentDialog";
-import { OrderCancellationActions } from "./OrderCancellationActions";
-import { OrderPrintPanel } from "../../kitchen-flow/OrderPrintPanel";
-import { Eye } from "lucide-react";
 import { PreorderPaymentDetailDialog } from "./PreorderPaymentDetailDialog";
+
+const STATES = {
+  OPEN: "Abierta · sin enviar",
+  CONFIRMED: "Confirmada · en cocina",
+  DELIVERED: "Entregada · pendiente de cierre",
+  CLOSED: "Cerrada",
+  CANCELLED: "Cancelada",
+};
+
+const PREPARATION = {
+  PENDING: "Pendiente",
+  PREPARING: "En preparación",
+  IN_PREPARATION: "En preparación",
+  READY: "Listo",
+  DELIVERED: "Entregado",
+  CANCELLED: "Cancelado",
+};
 
 export function PreorderDetail({
   order,
@@ -36,25 +60,93 @@ export function PreorderDetail({
   onClose: () => void;
 }) {
   const { session, settings } = useAppShell();
-  const [showPaymentDetail, setShowPaymentDetail] = useState(false);
 
   const [paymentMode, setPaymentMode] = useState<
     "pay" | "refund" | null
   >(null);
 
-  const canRead = hasPermission(session, "orders.payments.read");
+  const [paymentDetail, setPaymentDetail] =
+    useState<PreorderPaymentBatch | null>(null);
 
-  const load = useCallback(
-    (signal: AbortSignal) =>
-      canRead &&
-      order.paymentStatus &&
-      order.paymentStatus !== "PENDING"
-        ? readPreorderPayment(session, order.id, signal)
-        : Promise.resolve(null),
-    [session, canRead, order.id, order.paymentStatus]
+  const [confirmation, setConfirmation] = useState<
+    "cancel" | "deliver" | null
+  >(null);
+
+  const [reason, setReason] = useState("");
+  const [actionError, setActionError] = useState("");
+
+  const canManage = hasPermission(session, "orders.manage");
+
+  const canReadPayment = hasPermission(
+    session,
+    "orders.payments.read"
   );
 
-  const payment = useCashResource(load);
+  const canPay = hasPermission(session, "orders.payments.manage");
+
+  const canRefund =
+    hasPermission(session, "orders.payments.refund") &&
+    canReadPayment;
+
+  const canCancel = hasPermission(session, "orders.cancel");
+
+  const zone = settings.data?.timezone ?? "America/Bogota";
+
+  const load = useCallback(
+    async (signal: AbortSignal) => {
+      const [payment, history] = await Promise.allSettled([
+        canReadPayment &&
+        order.paymentStatus &&
+        order.paymentStatus !== "PENDING"
+          ? readPreorderPayment(session, order.id, signal)
+          : Promise.resolve(null),
+
+        order.status !== "OPEN"
+          ? getOrderKitchenHistory(
+              session.accessToken,
+              scope,
+              order.id,
+              signal
+            )
+          : Promise.resolve(null),
+      ]);
+
+      const message = (result: PromiseRejectedResult) =>
+        result.reason instanceof Error
+          ? result.reason.message
+          : "No fue posible consultar.";
+
+      return {
+        payment:
+          payment.status === "fulfilled" ? payment.value : null,
+
+        paymentError:
+          payment.status === "rejected" ? message(payment) : "",
+
+        history:
+          history.status === "fulfilled" ? history.value : null,
+
+        historyError:
+          history.status === "rejected" ? message(history) : "",
+      };
+    },
+    [session, scope, order, canReadPayment]
+  );
+
+  const related = useCashResource(load);
+
+  const batch = related.data?.payment;
+  const history = related.data?.history;
+
+  const terminal =
+    order.status === "CLOSED" ||
+    order.status === "CANCELLED" ||
+    order.paymentStatus === "CONSUMED";
+
+  const pendingPayment = canEditPreorder(order);
+  const editable = pendingPayment && canManage;
+  const verified = order.paymentStatus === "VERIFIED";
+  const refunded = order.paymentStatus === "REFUNDED";
 
   const pending = Object.values(
     resource.drafts[order.id] ?? {}
@@ -62,36 +154,105 @@ export function PreorderDetail({
 
   const blocked =
     resource.busy ||
+    resource.loading ||
     resource.uncertain ||
     !!resource.error ||
-    resource.loading ||
     resource.accessLost;
 
-  const editable = canEditPreorder(order);
-  const verified = order.paymentStatus === "VERIFIED";
-  const refunded = order.paymentStatus === "REFUNDED";
-
-  const cancellable =
-    ["OPEN", "CONFIRMED"].includes(order.status) &&
-    (order.paymentStatus === "PENDING" || refunded);
-
-  const canPay = hasPermission(session, "orders.payments.manage");
-
-  const canRefund =
-    hasPermission(session, "orders.payments.refund") && canRead;
-
-  const items = order.items.filter(
-    (item) => item.status === "ACTIVE"
-  );
+  const cancelling = !!resource.cancellationIds[order.id];
 
   const hasDelivered =
-    resource.data?.tickets.some(
-      (ticket) =>
-        ticket.orderId === order.id &&
-        ticket.items.some(
-          (item) => item.preparationStatus === "DELIVERED"
-        )
-    ) ?? false;
+    !!resource.deliveredIds[order.id] ||
+    !!history?.tickets.some((ticket) =>
+      ticket.items.some(
+        (item) => item.preparationStatus === "DELIVERED"
+      )
+    );
+
+  const cancellable =
+    !terminal &&
+    canCancel &&
+    (pendingPayment ||
+      (refunded &&
+        (order.status === "OPEN" ||
+          (order.status === "CONFIRMED" &&
+            !!history &&
+            !hasDelivered))));
+
+  const refundable =
+    !terminal && order.status === "OPEN" && verified && canRefund;
+
+  const printable =
+    !terminal &&
+    (order.status === "CONFIRMED" || order.status === "DELIVERED");
+
+  const directDelivery =
+    !terminal &&
+    canManage &&
+    verified &&
+    order.status === "CONFIRMED" &&
+    order.kitchenWorkflowMode === "PRINT_ONLY";
+
+  const items = terminal
+    ? order.items
+    : order.items.filter((item) => item.status === "ACTIVE");
+
+  const whatsapp = buildWhatsAppUrl(
+    order.customerPhone,
+    "Hola, te contactamos sobre tu pedido #" + order.id + "."
+  );
+
+  function update() {
+    resource.retry();
+    related.reload();
+  }
+
+  async function submitConfirmation() {
+    if (blocked) return;
+
+    setActionError("");
+
+    if (confirmation === "deliver") {
+      if (directDelivery && (await resource.deliver())) {
+        setConfirmation(null);
+      }
+
+      return;
+    }
+
+    if (
+      !cancellable ||
+      cancelling ||
+      (order.status !== "OPEN" && order.status !== "CONFIRMED")
+    ) {
+      return;
+    }
+
+    const clean = reason.trim();
+
+    if (clean.length < 3 || clean.length > 500) {
+      setActionError(
+        "El motivo debe contener entre 3 y 500 caracteres."
+      );
+      return;
+    }
+
+    const result = await resource.cancelOrder(
+      order.id,
+      clean,
+      order.status
+    );
+
+    if (result.ok) {
+      setConfirmation(null);
+    } else {
+      setActionError(
+        result.reason ??
+          result.message ??
+          "Revisa el estado actualizado antes de reintentar."
+      );
+    }
+  }
 
   return (
     <>
@@ -103,32 +264,12 @@ export function PreorderDetail({
             ? "A domicilio"
             : "Para recoger en sitio"}
           {" · "}
-          {order.status === "OPEN"
-            ? "Abierta · sin enviar"
-            : order.status === "CONFIRMED"
-              ? "En cocina"
-              : order.status === "CANCELLED"
-                ? "Cancelada"
-                : order.status === "CLOSED"
-                  ? "Cerrada"
-                  : "Entregada"}
+          {STATES[order.status]}
         </p>
 
-        <div>
-          <PaymentBadge status={order.paymentStatus} />
-        </div>
+        <PaymentBadge status={order.paymentStatus} />
 
-        {order.paymentVerifiedAt && (
-          <small>
-            Verificado:{" "}
-            {cashDate(
-              order.paymentVerifiedAt,
-              settings.data?.timezone ?? "America/Bogota"
-            )}
-          </small>
-        )}
-
-        {editable && (
+        {pendingPayment && (
           <p className="preorder-banner">
             Esta orden debe pagarse antes de enviarse a cocina.
           </p>
@@ -143,14 +284,29 @@ export function PreorderDetail({
 
         {refunded && (
           <p className="preorder-banner" data-danger>
-            El pago fue devuelto. La orden ya no puede editarse ni
-            enviarse a cocina; solo puede cancelarse completamente.
+            {order.status === "CANCELLED"
+              ? "El pago fue devuelto y la orden está cancelada."
+              : "El pago fue devuelto. No puedes editar ni volver a pagar o confirmar esta orden."}
           </p>
         )}
 
-        {verified && order.status === "CONFIRMED" && (
+        {order.status === "CONFIRMED" && !refunded && (
           <p className="preorder-banner">
             Orden confirmada y enviada a cocina.
+          </p>
+        )}
+
+        {order.status === "DELIVERED" && (
+          <p className="preorder-banner">
+            Orden entregada. Conserva el pago anticipado registrado;
+            no requiere un nuevo cobro.
+          </p>
+        )}
+
+        {terminal && (
+          <p className="preorder-banner">
+            Consulta histórica. Esta orden no admite nuevas
+            operaciones desde este detalle.
           </p>
         )}
 
@@ -171,7 +327,7 @@ export function PreorderDetail({
             </Button>
 
             {resource.uncertainAdditions && (
-              <>
+              <div className="sales-form-actions">
                 <Button
                   disabled={resource.busy}
                   onClick={() => void resource.reconcile("applied")}
@@ -187,7 +343,7 @@ export function PreorderDetail({
                 >
                   Las adiciones no se guardaron
                 </Button>
-              </>
+              </div>
             )}
           </div>
         )}
@@ -211,6 +367,18 @@ export function PreorderDetail({
           </small>
 
           {order.notes && <p>{order.notes}</p>}
+
+          {whatsapp && !terminal && (
+            <a
+              className="preorder-contact"
+              href={whatsapp}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <MessageCircle size={16} aria-hidden="true" />
+              Contactar por WhatsApp
+            </a>
+          )}
         </section>
 
         <div className="mp-card-line">
@@ -234,6 +402,14 @@ export function PreorderDetail({
               <span>
                 {item.quantity} × {item.productName}
                 {item.notes && <small>{item.notes}</small>}
+                {item.status === "CANCELLED" && (
+                  <small>
+                    Cancelado
+                    {item.cancellationReason
+                      ? ": " + item.cancellationReason
+                      : ""}
+                  </small>
+                )}
               </span>
 
               <strong>{money(cents(item.lineTotal))}</strong>
@@ -243,11 +419,13 @@ export function PreorderDetail({
                   <Button
                     size="icon"
                     variant="soft"
-                    aria-label={`Quitar una unidad de ${item.productName}`}
+                    aria-label={
+                      "Quitar una unidad de " + item.productName
+                    }
                     disabled={blocked || item.quantity <= 1}
                     onClick={() =>
                       void resource.action(
-                        `/orders/${order.id}/items/${item.id}`,
+                        "/orders/" + order.id + "/items/" + item.id,
                         "PATCH",
                         {
                           quantity: item.quantity - 1,
@@ -262,11 +440,13 @@ export function PreorderDetail({
                   <Button
                     size="icon"
                     variant="soft"
-                    aria-label={`Agregar una unidad de ${item.productName}`}
+                    aria-label={
+                      "Agregar una unidad de " + item.productName
+                    }
                     disabled={blocked}
                     onClick={() =>
                       void resource.action(
-                        `/orders/${order.id}/items/${item.id}`,
+                        "/orders/" + order.id + "/items/" + item.id,
                         "PATCH",
                         {
                           quantity: item.quantity + 1,
@@ -281,11 +461,11 @@ export function PreorderDetail({
                   <Button
                     size="sm"
                     variant="soft"
-                    aria-label={`Retirar ${item.productName}`}
+                    aria-label={"Retirar " + item.productName}
                     disabled={blocked}
                     onClick={() =>
                       void resource.action(
-                        `/orders/${order.id}/items/${item.id}`,
+                        "/orders/" + order.id + "/items/" + item.id,
                         "DELETE"
                       )
                     }
@@ -311,6 +491,11 @@ export function PreorderDetail({
           </div>
 
           <div>
+            <dt>Impuestos</dt>
+            <dd>No desglosados</dd>
+          </div>
+
+          <div>
             <dt>Total</dt>
             <dd>
               {order.total
@@ -320,81 +505,140 @@ export function PreorderDetail({
           </div>
         </dl>
 
-        {pending > 0 && (
+        {pending > 0 && !terminal && (
           <p role="alert">
-            Hay {pending} unidades locales sin guardar. Edita la orden
-            antes de pagar.
+            Hay {pending} unidades locales sin guardar.
+            {editable
+              ? " Edita la orden antes de pagar."
+              : " Revisa los cambios pendientes."}
           </p>
         )}
 
-        {canRead && order.paymentStatus !== "PENDING" && (
-          <section className="preorder-customer">
-            <div className="pp-line">
-              <strong>
-                {refunded ? "PAGO DEVUELTO" : "PAGO REGISTRADO"}
-              </strong>
+        {canReadPayment &&
+          order.paymentStatus &&
+          order.paymentStatus !== "PENDING" && (
+            <section className="preorder-customer">
+              <div className="pp-line">
+                <strong>
+                  {refunded ? "PAGO DEVUELTO" : "PAGO REGISTRADO"}
+                </strong>
 
-              <Button
-                size="sm"
-                variant="soft"
-                disabled={resource.busy || !payment.data}
-                onClick={() => setShowPaymentDetail(true)}
-              >
-                <Eye size={15} aria-hidden="true" />
-                Ver detalle del pago
-              </Button>
-            </div>
+                <Button
+                  size="sm"
+                  variant="soft"
+                  disabled={resource.busy || !batch}
+                  onClick={() => batch && setPaymentDetail(batch)}
+                >
+                  <Eye size={15} aria-hidden="true" />
+                  Ver detalle del pago
+                </Button>
+              </div>
 
-            {payment.loading && (
-              <p role="status">Consultando pago…</p>
-            )}
+              {related.loading && (
+                <p role="status">Consultando pago…</p>
+              )}
 
-            {payment.error && <p role="alert">{payment.error}</p>}
+              {related.error && <p role="alert">{related.error}</p>}
 
-            {payment.data && (
-              <>
-                <p>
-                  Verificado{" "}
-                  {cashDate(
-                    payment.data.verifiedAt,
-                    settings.data?.timezone ?? "America/Bogota"
+              {related.data?.paymentError && (
+                <p role="alert">{related.data.paymentError}</p>
+              )}
+
+              {batch && (
+                <>
+                  <p>
+                    Total pagado originalmente:{" "}
+                    <strong>{money(cents(batch.paidTotal))}</strong>
+                  </p>
+
+                  {batch.verifiedAt && (
+                    <small>
+                      Verificado: {cashDate(batch.verifiedAt, zone)}
+                    </small>
                   )}
-                  {" · "}Total pagado originalmente{" "}
-                  <strong>
-                    {money(cents(payment.data.paidTotal))}
-                  </strong>
-                </p>
 
-                <small>
-                  {payment.data.payments
-                    .map(
-                      (row) =>
-                        row.paymentMethodName +
-                        " " +
-                        money(cents(row.amount))
-                    )
-                    .join(" · ")}
-                </small>
-              </>
+                  <small>
+                    {batch.payments
+                      .map(
+                        (row) =>
+                          row.paymentMethodName +
+                          " " +
+                          money(cents(row.amount))
+                      )
+                      .join(" · ")}
+                  </small>
+                </>
+              )}
+
+              {!related.loading &&
+                !batch &&
+                !related.data?.paymentError && (
+                  <p>No hay un lote de pago disponible.</p>
+                )}
+
+              {related.data?.paymentError && (
+                <Button
+                  size="sm"
+                  variant="soft"
+                  onClick={related.reload}
+                >
+                  Reintentar consulta
+                </Button>
+              )}
+            </section>
+          )}
+
+        {order.status !== "OPEN" && (
+          <section className="preorder-customer">
+            <strong>Seguimiento de preparación</strong>
+
+            {related.loading && (
+              <p role="status">Consultando preparación…</p>
             )}
 
-            {payment.data === null && (
-              <p>No hay un lote de pago disponible.</p>
+            {related.data?.historyError && (
+              <p role="alert">{related.data.historyError}</p>
             )}
 
-            {payment.error && (
+            {history?.tickets.map((ticket) => (
+              <div className="preorder-ticket" key={ticket.id}>
+                <strong>
+                  {ticket.preparationAreaName}
+                  {" · "}
+                  {PREPARATION[ticket.status]}
+                </strong>
+
+                {ticket.items.map((item) => (
+                  <div className="pp-line" key={item.id}>
+                    <span>
+                      {item.quantity} × {item.productName}
+                    </span>
+
+                    <small>
+                      {PREPARATION[item.preparationStatus]}
+                    </small>
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            {history && !history.tickets.length && (
+              <p>No hay comandas disponibles para esta orden.</p>
+            )}
+
+            {related.data?.historyError && (
               <Button
                 size="sm"
                 variant="soft"
-                onClick={payment.reload}
+                onClick={related.reload}
               >
-                Reintentar consulta
+                Reintentar seguimiento
               </Button>
             )}
           </section>
         )}
 
-        {order.status !== "OPEN" && (
+        {printable && (
           <OrderPrintPanel
             orderId={order.id}
             printing={resource.printing}
@@ -421,7 +665,7 @@ export function PreorderDetail({
           <Button
             variant="secondary"
             disabled={resource.busy}
-            onClick={resource.retry}
+            onClick={update}
           >
             Actualizar orden
           </Button>
@@ -436,13 +680,13 @@ export function PreorderDetail({
             </Button>
           )}
 
-          {editable && (
+          {pendingPayment && canManage && (
             <Button variant="soft" disabled>
-              Enviar a cocina
+              Confirmar y enviar a cocina
             </Button>
           )}
 
-          {editable && canPay && (
+          {pendingPayment && canPay && (
             <Button
               disabled={
                 blocked ||
@@ -456,7 +700,7 @@ export function PreorderDetail({
             </Button>
           )}
 
-          {verified && canRefund && (
+          {refundable && (
             <Button
               variant="soft"
               disabled={blocked}
@@ -466,50 +710,86 @@ export function PreorderDetail({
             </Button>
           )}
 
-          {verified && order.status === "CONFIRMED" && (
+          {order.status === "OPEN" && verified && canManage && (
             <Button
-              variant="soft"
-              disabled={blocked}
-              onClick={onEdit}
-            >
-              Ver preparación y entrega
-            </Button>
-          )}
-
-          {verified && order.status === "OPEN" && (
-            <Button
-              disabled={blocked || pending > 0}
+              disabled={blocked || pending > 0 || cancelling}
               loading={resource.sending}
               onClick={() => void resource.retryConfirmation()}
             >
               Confirmar y enviar a cocina
             </Button>
           )}
+
+          {cancellable && (
+            <Button
+              variant="danger"
+              disabled={blocked || cancelling}
+              onClick={() => {
+                setReason("");
+                setActionError("");
+                setConfirmation("cancel");
+              }}
+            >
+              Cancelar orden
+            </Button>
+          )}
+
+          {cancelling && canCancel && (
+            <Button
+              variant="secondary"
+              disabled={resource.busy}
+              onClick={() => void resource.verifyCancellation()}
+            >
+              Verificar cancelación
+            </Button>
+          )}
+
+          {directDelivery && (
+            <Button
+              disabled={blocked || pending > 0}
+              onClick={() => setConfirmation("deliver")}
+            >
+              Marcar entregado
+            </Button>
+          )}
         </div>
 
-        {cancellable && (
-          <OrderCancellationActions
-            resource={resource}
-            orderId={order.id}
-            status={order.status}
-            paymentStatus={order.paymentStatus}
-            pendingCount={pending}
-            hasDelivered={hasDelivered}
-          />
+        {refunded && order.status === "CONFIRMED" && hasDelivered && (
+          <p role="alert">
+            La orden tiene productos entregados y no puede cancelarse
+            completamente.
+          </p>
         )}
       </footer>
 
-      {showPaymentDetail && canRead && payment.data && (
+      {paymentMode && (
+        <PreorderPaymentDialog
+          key={order.id + ":" + paymentMode}
+          mode={paymentMode}
+          order={order}
+          scope={scope}
+          resource={resource}
+          onClose={() => {
+            setPaymentMode(null);
+            related.reload();
+          }}
+        />
+      )}
+
+      {paymentDetail && canReadPayment && (
         <PreorderPaymentDetailDialog
           orderId={order.id}
-          batch={payment.data}
-          timeZone={settings.data?.timezone ?? "America/Bogota"}
+          batch={{
+            ...paymentDetail,
+            status: order.paymentStatus ?? paymentDetail.status,
+          }}
+          timeZone={zone}
           busy={resource.busy}
-          onClose={() => setShowPaymentDetail(false)}
+          onClose={() => setPaymentDetail(null)}
           onRefund={
-            verified && canRefund && !blocked
+            refundable && !blocked
               ? () => {
-                  setShowPaymentDetail(false);
+                  setPaymentDetail(null);
                   setPaymentMode("refund");
                 }
               : undefined
@@ -517,17 +797,91 @@ export function PreorderDetail({
         />
       )}
 
-      {paymentMode && (
-        <PreorderPaymentDialog
-          mode={paymentMode}
-          order={order}
-          scope={scope}
-          resource={resource}
-          onClose={() => {
-            setPaymentMode(null);
-            payment.reload();
-          }}
-        />
+      {confirmation && (
+        <BottomSheet
+          id={"preorder-confirm-" + order.id}
+          open
+          variant="modal"
+          className="mp-dialog app-confirm-dialog"
+          title={
+            confirmation === "cancel"
+              ? "¿Cancelar la orden #" + order.id + "?"
+              : "¿Marcar el pedido como entregado?"
+          }
+          busy={resource.busy}
+          onClose={() => setConfirmation(null)}
+        >
+          <div className="mp-dialog-content">
+            <p>
+              {confirmation === "deliver"
+                ? "Confirma que todos los productos de esta orden fueron entregados."
+                : refunded
+                  ? "El pago ya fue devuelto. La orden se cancelará completamente."
+                  : "La orden no tiene pagos registrados y se cancelará completamente."}
+            </p>
+
+            {confirmation === "cancel" && (
+              <label className="sales-label">
+                Motivo de cancelación
+                <textarea
+                  value={reason}
+                  minLength={3}
+                  maxLength={500}
+                  required
+                  disabled={resource.busy}
+                  onChange={(event) => setReason(event.target.value)}
+                />
+              </label>
+            )}
+
+            {actionError && <p role="alert">{actionError}</p>}
+
+            {resource.notice && (
+              <p role="status">{resource.notice}</p>
+            )}
+
+            {resource.error && <p role="alert">{resource.error}</p>}
+
+            {cancelling && (
+              <Button
+                disabled={resource.busy}
+                onClick={() => void resource.verifyCancellation()}
+              >
+                Verificar cancelación
+              </Button>
+            )}
+
+            <div className="sales-form-actions">
+              <Button
+                variant="secondary"
+                disabled={resource.busy}
+                onClick={() => setConfirmation(null)}
+              >
+                Volver
+              </Button>
+
+              <Button
+                variant={
+                  confirmation === "cancel" ? "danger" : "primary"
+                }
+                loading={resource.busy}
+                disabled={
+                  blocked ||
+                  (confirmation === "cancel"
+                    ? !cancellable ||
+                      cancelling ||
+                      reason.trim().length < 3
+                    : !directDelivery)
+                }
+                onClick={() => void submitConfirmation()}
+              >
+                {confirmation === "cancel"
+                  ? "Cancelar orden"
+                  : "Confirmar entrega"}
+              </Button>
+            </div>
+          </div>
+        </BottomSheet>
       )}
     </>
   );

@@ -4,6 +4,8 @@ import { Button } from "../../../components/ui/Button";
 
 import type { Order } from "../schemas/sales.schema";
 import type { SalesResource } from "../hooks/useSales";
+import { useAppShell } from "../../../app/layout/shell-context";
+import { hasPermission } from "../../auth/utils/permissions";
 
 export function OrderCancellationActions({
   resource,
@@ -32,16 +34,29 @@ export function OrderCancellationActions({
   const textId = useId();
   const reasonId = useId();
 
-  const confirmed = status === "CONFIRMED";
+  const { session } = useAppShell();
 
+  const prepaid =
+    (orderId
+      ? resource.data?.order?.serviceType
+      : resource.localDraft?.serviceType) !== "TABLE";
+
+  const allowed = !prepaid || hasPermission(session, "orders.cancel");
+
+  const confirmed = status === "CONFIRMED";
   const verificationPending =
     !!orderId && !!resource.cancellationIds[orderId];
 
   const delivered =
     hasDelivered || (!!orderId && !!resource.deliveredIds[orderId]);
 
-  const cancellable = !!orderId && (status === "OPEN" || confirmed);
-
+  const cancellable =
+    allowed &&
+    !!orderId &&
+    (status === "OPEN" || confirmed) &&
+    (!prepaid ||
+      paymentStatus === "PENDING" ||
+      paymentStatus === "REFUNDED");
   const disabled =
     resource.busy || resource.sending || resource.uncertain;
 

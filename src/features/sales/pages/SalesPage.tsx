@@ -1,5 +1,9 @@
-import { useId, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 
+import { useSearchParams } from "react-router";
+import { request } from "../../../lib/http/client";
+import { orderResponseSchema } from "../schemas/sales.schema";
+import { useRemote } from "../hooks/usePublicOrders";
 import {
   History,
   MapPin,
@@ -40,6 +44,7 @@ import { WORKFLOW_LABELS } from "../../kitchen-flow/kitchen-flow.schema";
 import {
   hasEveryPermission,
   hasGlobalLocationAccess,
+  hasPermission,
 } from "../../auth/utils/permissions";
 
 import {
@@ -123,6 +128,31 @@ export function SalesPage() {
 
 function SalesLocations({ session }: { session: AuthSession }) {
   const locations = useSalesLocations(session);
+  const [params, setParams] = useSearchParams();
+  const orderId = params.get("orderId");
+
+  function closeLinkedOrder() {
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.delete("orderId");
+        return next;
+      },
+      { replace: true }
+    );
+  }
+
+  if (orderId !== null) {
+    return (
+      <LinkedSalesOrder
+        key={orderId}
+        orderId={orderId}
+        session={session}
+        locations={locations}
+        onClose={closeLinkedOrder}
+      />
+    );
+  }
 
   if (!locations.location) {
     return (
@@ -177,14 +207,131 @@ function SalesLocations({ session }: { session: AuthSession }) {
   );
 }
 
+function LinkedSalesOrder({
+  orderId,
+  session,
+  locations,
+  onClose,
+}: {
+  orderId: string;
+  session: AuthSession;
+  locations: Locations;
+  onClose: () => void;
+}) {
+  const loader = useCallback(
+    async (signal: AbortSignal) => {
+      if (!/^[1-9]\d*$/.test(orderId)) {
+        throw new Error("El identificador del pedido no es válido.");
+      }
+
+      const response = await request(
+        "/orders/" + orderId,
+        orderResponseSchema,
+        {
+          accessToken: session.accessToken,
+          signal,
+          cache: "no-store",
+        }
+      );
+
+      const order = response.data.order;
+
+      if (
+        order.id !== orderId ||
+        order.businessId !== session.business.id ||
+        order.location.id !== order.locationId ||
+        order.location.locationType !== "POINT_OF_SALE"
+      ) {
+        throw new Error(
+          "El pedido no corresponde al negocio o punto de venta."
+        );
+      }
+
+      return order;
+    },
+    [orderId, session.accessToken, session.business.id]
+  );
+
+  const resource = useRemote(loader);
+
+  const location = locations.options.find(
+    (option) => option.id === resource.data?.locationId
+  );
+
+  const issue =
+    resource.error ||
+    locations.error ||
+    (!resource.loading && !locations.loading && !location
+      ? "No tienes acceso al punto de venta de este pedido."
+      : "");
+
+  if (resource.loading || locations.loading || issue || !location) {
+    return (
+      <section className="mp-page">
+        <BottomSheet
+          id="linked-order-loading"
+          open
+          variant="modal"
+          className="mp-dialog"
+          title="Abrir pedido"
+          onClose={onClose}
+        >
+          <div className="mp-dialog-content">
+            {issue ? (
+              <Alert>{issue}</Alert>
+            ) : (
+              <p role="status">Consultando pedido…</p>
+            )}
+
+            <div className="sales-form-actions">
+              <Button variant="secondary" onClick={onClose}>
+                Cerrar
+              </Button>
+
+              {issue && (
+                <Button
+                  onClick={() => {
+                    resource.reload();
+                    locations.retry();
+                  }}
+                >
+                  Reintentar
+                </Button>
+              )}
+            </div>
+          </div>
+        </BottomSheet>
+      </section>
+    );
+  }
+
+  return (
+    <SalesContent
+      key={orderId + ":" + location.id}
+      session={session}
+      location={location}
+      locations={locations}
+      initialOrderId={orderId}
+      onLinkedOrderClose={() => {
+        locations.select(location.id);
+        onClose();
+      }}
+    />
+  );
+}
+
 function SalesContent({
   session,
   location,
   locations,
+  initialOrderId = null,
+  onLinkedOrderClose,
 }: {
   session: AuthSession;
   location: SalesLocation;
   locations: Locations;
+  initialOrderId?: string | null;
+  onLinkedOrderClose?: () => void;
 }) {
   const scope = useMemo(
     () => ({
@@ -197,7 +344,8 @@ function SalesContent({
   const resource = useSales(
     session.accessToken,
     scope,
-    locations.invalidate
+    locations.invalidate,
+    initialOrderId
   );
 
   const modalId = useId();
@@ -260,15 +408,14 @@ function SalesContent({
         }
       : null);
 
+  const canManageOrders = hasPermission(session, "orders.manage");
+
   const preorderDetail =
     !!active &&
     active.serviceType !== "TABLE" &&
     (editingPreorderId !== active.id ||
-      (!canEditPreorder(active) &&
-        !(
-          active.status === "CONFIRMED" &&
-          active.paymentStatus === "VERIFIED"
-        )));
+      !canEditPreorder(active) ||
+      !canManageOrders);
 
   const table = data?.tables.find(
     (entry) => entry.id === workspaceOrder?.restaurantTableId
@@ -284,7 +431,9 @@ function SalesContent({
   const title = workspaceOrder
     ? workspaceOrder.serviceType === "TABLE"
       ? (table?.name ?? "Mesa")
-      : "Pedido para recoger"
+      : workspaceOrder.serviceType === "DELIVERY"
+        ? "Pedido a domicilio"
+        : "Pedido para recoger"
     : "Cargando cuenta…";
 
   function startCheckout() {
@@ -323,6 +472,8 @@ function SalesContent({
   }
 
   function startTakeaway() {
+    if (!canManageOrders || blocked) return;
+
     setEditingPreorderId(null);
 
     resource.start({
@@ -345,6 +496,28 @@ function SalesContent({
   }
 
   function closeWorkspace() {
+    if (resource.busy) return;
+
+    if (
+      active?.serviceType !== "TABLE" &&
+      active &&
+      editingPreorderId === active.id
+    ) {
+      setEditingPreorderId(null);
+      resource.retry();
+      return;
+    }
+
+    if (onLinkedOrderClose) {
+      if (resource.uncertain || resource.hasPending) {
+        setLeaving({ kind: "close" });
+        return;
+      }
+
+      onLinkedOrderClose();
+      return;
+    }
+
     setEditingPreorderId(null);
     if (draft && Object.keys(draft.items).length) {
       setLeaving({ kind: "close" });
@@ -368,7 +541,11 @@ function SalesContent({
   }
 
   const newPickup = (
-    <Button size="compact" disabled={blocked} onClick={startTakeaway}>
+    <Button
+      size="compact"
+      disabled={blocked || !canManageOrders}
+      onClick={startTakeaway}
+    >
       <Plus size={16} />
       Nuevo pedido para recoger
     </Button>
@@ -639,9 +816,7 @@ function SalesContent({
           open
           variant="modal"
           title={
-            preorderDetail && active
-              ? `Orden Pedido #${active.id}`
-              : title
+            preorderDetail && active ? `Orden #${active.id}` : title
           }
           busy={resource.busy}
           className={
@@ -771,6 +946,8 @@ function SalesContent({
                 onClick={() => {
                   if (leaving.kind === "location") {
                     locations.select(leaving.id);
+                  } else if (onLinkedOrderClose) {
+                    onLinkedOrderClose();
                   } else {
                     resource.discardLocal();
                   }

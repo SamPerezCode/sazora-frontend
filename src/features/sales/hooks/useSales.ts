@@ -18,6 +18,10 @@ import {
   deliverPrintOnlyOrder,
 } from "../services/sales.service";
 
+import { hasPermission } from "../../auth/utils/permissions";
+import { cents } from "../schemas/sales.schema";
+import { readPreorderPayment } from "../services/preorder-payments.service";
+
 import { createKitchenPrintStore } from "../../kitchen-flow/kitchen-print.store";
 
 import { getOrderKitchenTickets } from "../../kitchen-flow/kitchen-flow.service";
@@ -126,7 +130,8 @@ const confirmationMessages: Record<string, string> = {
 export function useSales(
   token: string,
   scope: SalesScope,
-  onLocationLost: (message: string) => void
+  onLocationLost: (message: string) => void,
+  initialOrderId: string | null = null
 ) {
   const { session } = useAppShell();
   const { logout } = useAuth();
@@ -143,8 +148,11 @@ export function useSales(
   const knownOrders = useRef(new Set<string>());
   const [data, setData] = useState<SalesData | null>(null);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = useRef<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialOrderId
+  );
+
+  const selected = useRef<string | null>(initialOrderId);
 
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
@@ -186,46 +194,57 @@ export function useSales(
   const alive = useRef(false);
   const reader = useRef<AbortController | null>(null);
 
-  const forgetOrder = useCallback((id: string) => {
-    if (selected.current === id) {
-      selected.current = null;
-      setSelectedId(null);
-    }
+  const forgetOrder = useCallback(
+    (id: string, keepDetail = false) => {
+      if (
+        !keepDetail &&
+        selected.current === id &&
+        id !== initialOrderId
+      ) {
+        selected.current = null;
+        setSelectedId(null);
+      }
 
-    setDrafts((previous) => {
-      const next = { ...previous };
-      delete next[id];
-      return next;
-    });
+      setDrafts((previous) => {
+        const next = { ...previous };
+        delete next[id];
+        return next;
+      });
 
-    setConfirmationIds((previous) => {
-      const next = { ...previous };
-      delete next[id];
-      return next;
-    });
+      setConfirmationIds((previous) => {
+        const next = { ...previous };
+        delete next[id];
+        return next;
+      });
 
-    setCancellationIds((previous) => {
-      const next = { ...previous };
-      delete next[id];
-      return next;
-    });
+      setCancellationIds((previous) => {
+        const next = { ...previous };
+        delete next[id];
+        return next;
+      });
 
-    setData((previous) =>
-      previous
-        ? {
-            ...previous,
-            order: previous.order?.id === id ? null : previous.order,
-            orders: previous.orders.filter(
-              (order) => order.id !== id
-            ),
-            tickets: previous.tickets.filter(
-              (ticket) => ticket.orderId !== id
-            ),
-          }
-        : previous
-    );
-  }, []);
-
+      setData((previous) =>
+        previous
+          ? {
+              ...previous,
+              order:
+                !keepDetail &&
+                previous.order?.id === id &&
+                id !== initialOrderId
+                  ? null
+                  : previous.order,
+              orders: previous.orders.filter(
+                (order) => order.id !== id
+              ),
+              tickets: previous.tickets.filter(
+                (ticket) => ticket.orderId !== id
+              ),
+            }
+          : previous
+      );
+    },
+    [initialOrderId]
+  );
   function clearConfirmation(id: string) {
     setConfirmationIds((previous) => {
       const next = { ...previous };
@@ -244,7 +263,18 @@ export function useSales(
 
   function acceptOrder(order: Order) {
     if (!isOperationalOrder(order)) {
-      forgetOrder(order.id);
+      const keepDetail =
+        order.serviceType !== "TABLE" &&
+        selected.current === order.id;
+
+      forgetOrder(order.id, keepDetail);
+
+      if (keepDetail) {
+        setData((previous) =>
+          previous ? { ...previous, order } : previous
+        );
+      }
+
       return;
     }
 
@@ -337,7 +367,12 @@ export function useSales(
         });
       }
 
-      if (detail && !isOperationalOrder(detail)) {
+      if (
+        detail &&
+        !isOperationalOrder(detail) &&
+        detail.serviceType === "TABLE" &&
+        detail.id !== initialOrderId
+      ) {
         forgetOrder(detail.id);
 
         setData({
@@ -394,6 +429,7 @@ export function useSales(
     reportAccessError,
     setNotice,
     printing,
+    initialOrderId,
   ]);
 
   useEffect(() => {
@@ -677,6 +713,13 @@ export function useSales(
 
   function start(input: OrderInput) {
     if (
+      input.serviceType !== "TABLE" &&
+      !hasPermission(session, "orders.manage")
+    ) {
+      return;
+    }
+
+    if (
       locked.current ||
       uncertain ||
       error ||
@@ -958,6 +1001,15 @@ export function useSales(
 
     if (
       current.serviceType !== "TABLE" &&
+      !hasPermission(session, "orders.manage")
+    ) {
+      throw new RecoveryError(
+        "No tienes permiso para confirmar pedidos."
+      );
+    }
+
+    if (
+      current.serviceType !== "TABLE" &&
       (current.status !== "OPEN" ||
         current.paymentStatus !== "VERIFIED")
     ) {
@@ -965,6 +1017,28 @@ export function useSales(
         "El pedido debe estar abierto y tener el pago verificado antes de enviarse a cocina."
       );
     }
+    if (
+      current.serviceType !== "TABLE" &&
+      hasPermission(session, "orders.payments.read")
+    ) {
+      const batch = await readPreorderPayment(
+        session,
+        id,
+        new AbortController().signal
+      );
+
+      if (
+        !current.total ||
+        !batch ||
+        batch.status !== "VERIFIED" ||
+        cents(batch.paidTotal) !== cents(current.total)
+      ) {
+        throw new RecoveryError(
+          "El pago verificado no coincide con el total actual. Actualiza la orden."
+        );
+      }
+    }
+
     setConfirmationIds((previous) => ({
       ...previous,
       [id]: true,
@@ -1157,6 +1231,15 @@ export function useSales(
     await run(async () => {
       const current = await checkCancellation(id);
 
+      if (
+        current.serviceType !== "TABLE" &&
+        !hasPermission(session, "orders.cancel")
+      ) {
+        throw new RecoveryError(
+          "No tienes permiso para cancelar pedidos."
+        );
+      }
+
       if (current.status === "CANCELLED") {
         result = { ok: true };
         return "Orden cancelada correctamente.";
@@ -1184,7 +1267,7 @@ export function useSales(
       try {
         const response = await cancelOrderRequest(token, id, clean);
 
-        forgetOrder(response.order.id);
+        await readOrder(response.order.id);
 
         result = { ok: true };
 
@@ -1301,7 +1384,8 @@ export function useSales(
     if (
       order.serviceType !== "TABLE" &&
       path.startsWith("/orders/") &&
-      !canEditPreorder(order)
+      (!canEditPreorder(order) ||
+        !hasPermission(session, "orders.manage"))
     ) {
       return Promise.resolve(false);
     }
@@ -1678,6 +1762,13 @@ export function useSales(
 
     const order =
       data.order?.id === selected.current ? data.order : null;
+
+    if (
+      (local?.serviceType ?? order?.serviceType) !== "TABLE" &&
+      !hasPermission(session, "orders.manage")
+    ) {
+      return false;
+    }
 
     if (
       !local &&

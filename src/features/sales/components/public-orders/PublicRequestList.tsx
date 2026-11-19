@@ -48,12 +48,28 @@ export function RequestList() {
   });
 
   const [page, setPage] = useState(1);
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const requestId = params.get("solicitud");
 
-  const [selected, setSelected] = useState<string | null>(() => {
-    const value = params.get("solicitud");
-    return value && /^[1-9]\d*$/.test(value) ? value : null;
-  });
+  const selected =
+    requestId && /^[1-9]\d*$/.test(requestId) ? requestId : null;
+
+  function setSelected(value: string | null) {
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+
+        if (value) {
+          next.set("solicitud", value);
+        } else {
+          next.delete("solicitud");
+        }
+
+        return next;
+      },
+      { replace: true }
+    );
+  }
 
   const [notice, setNotice] = useState("");
   const rows = resource.data ?? [];
@@ -96,7 +112,8 @@ export function RequestList() {
     <section className="por-page">
       <div className="por-toolbar">
         <p>
-          Revisa disponibilidad y coordina el pago antes de aceptar.
+          Revisa disponibilidad y contacta al cliente antes de
+          aceptar.
         </p>
 
         <div className="por-actions">

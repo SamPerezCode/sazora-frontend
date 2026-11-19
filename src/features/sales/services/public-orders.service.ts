@@ -28,7 +28,8 @@ export async function listRequests(
 export async function readRequest(
   value: string,
   accessToken: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  includeOrder = true
 ) {
   const result = await request(requestPath(value), requestResponse, {
     accessToken,
@@ -40,7 +41,11 @@ export async function readRequest(
     throw new Error("La solicitud recibida no corresponde.");
   }
 
-  if (result.data.request.orderId) {
+  if (
+    includeOrder &&
+    (result.data.request.status === "ACCEPTED" ||
+      !!result.data.request.orderId)
+  ) {
     const related = await request(
       requestPath(value) + "/order",
       orderResponse,
@@ -49,14 +54,21 @@ export async function readRequest(
 
     if (
       related.data.request.id !== value ||
-      related.data.request.orderId !== related.data.order.id
+      (related.data.request.orderId !== null &&
+        related.data.request.orderId !== related.data.order.id)
     ) {
       throw new Error(
         "El pedido recibido no corresponde a la solicitud."
       );
     }
 
-    return related.data;
+    return {
+      ...related.data,
+      request: {
+        ...related.data.request,
+        orderId: related.data.order.id,
+      },
+    };
   }
 
   return { request: result.data.request, order: null };
@@ -76,7 +88,7 @@ export async function changeRequest(
         }
       : undefined;
 
-  if (action === "accept" || action === "confirm-order") {
+  if (action === "accept") {
     return request(requestPath(value) + "/" + action, orderResponse, {
       method: "POST",
       accessToken,

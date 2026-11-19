@@ -5,7 +5,7 @@ import type {
 } from "../schemas/sales.schema";
 
 export const CHANNELS = {
-  IN_PERSON: "Presencial",
+  IN_PERSON: "Punto de venta",
   WHATSAPP: "WhatsApp",
   PHONE: "Teléfono",
   PUBLIC_MENU: "Menú público",
@@ -54,15 +54,14 @@ export function preorderRows(
     )
     .sort(
       (a, b) =>
-        Date.parse(a.createdAt) - Date.parse(b.createdAt) ||
+        Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
         (BigInt(a.id) < BigInt(b.id)
-          ? -1
+          ? 1
           : BigInt(a.id) > BigInt(b.id)
-            ? 1
+            ? -1
             : 0)
     );
 }
-
 export function customerFields(input: OrderInput) {
   return {
     customerName: input.customerName?.trim() || null,

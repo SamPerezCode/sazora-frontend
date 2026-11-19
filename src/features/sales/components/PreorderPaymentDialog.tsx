@@ -40,7 +40,7 @@ export function PreorderPaymentDialog({
   mode: "pay" | "refund";
   order: Order;
   scope: SalesScope;
-  resource: SalesResource;
+  resource: Pick<SalesResource, "busy" | "paymentOperation">;
   onClose: () => void;
 }) {
   const { session } = useAppShell();

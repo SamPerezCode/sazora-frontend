@@ -59,8 +59,12 @@ export function PreorderList({
             Pedidos para recoger y domicilio
             <span className="mp-neutral">{count}</span>
           </h3>
-
           <p>Se pagan y verifican antes de enviarse a cocina.</p>
+          <small>
+            Los filtros incluyen las órdenes activas del punto de
+            venta. Las cerradas y canceladas se consultan en el
+            historial.
+          </small>
         </div>
       </div>
 
@@ -87,7 +91,7 @@ export function PreorderList({
           key={filter}
           className="preorder-track"
           role="region"
-          aria-label="Pedidos, del más antiguo al más reciente. Desplazamiento horizontal."
+          aria-label="Pedidos, del más reciente al más antiguo."
           tabIndex={0}
         >
           {rows.map((order) => (

@@ -108,11 +108,7 @@ export type Delivery = z.infer<typeof deliverySchema> & {
   tracking: PublicTracking | null;
 };
 
-export type RequestAction =
-  | "contact"
-  | "reject"
-  | "accept"
-  | "confirm-order";
+export type RequestAction = "contact" | "reject" | "accept";
 
 export type DeliveryAction = "pick-up" | "start" | "deliver";
 
