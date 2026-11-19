@@ -18,6 +18,10 @@ import {
   deliverPrintOnlyOrder,
 } from "../services/sales.service";
 
+import { useOperationsSync } from "../../../hooks/useOperationsSync";
+
+import { operationKeys as keys } from "../../../lib/operations-sync";
+
 import { hasPermission } from "../../auth/utils/permissions";
 import { cents } from "../schemas/sales.schema";
 import { readPreorderPayment } from "../services/preorder-payments.service";
@@ -332,6 +336,8 @@ export function useSales(
 
   const refresh = useCallback(async () => {
     if (accessLost) return false;
+
+    setLoading(true);
     reader.current?.abort();
 
     const controller = new AbortController();
@@ -478,15 +484,12 @@ export function useSales(
     const initial = window.setTimeout(update, 0);
     const timer = window.setInterval(update, 15000);
 
-    window.addEventListener("focus", update);
-
     return () => {
       alive.current = false;
       reader.current?.abort();
 
       window.clearTimeout(initial);
       window.clearInterval(timer);
-      window.removeEventListener("focus", update);
     };
   }, [refresh]);
 
@@ -628,6 +631,13 @@ export function useSales(
     logout,
     setNotice,
   ]);
+
+  useOperationsSync(
+    token,
+    [keys.orders],
+    refresh,
+    busy || accessLost
+  );
 
   function closeLocal() {
     const key = currentLocal.current;

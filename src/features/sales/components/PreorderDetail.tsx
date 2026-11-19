@@ -6,8 +6,7 @@ import { BottomSheet } from "../../../components/layout/BottomSheet";
 import { Button } from "../../../components/ui/Button";
 import { buildWhatsAppUrl } from "../../../lib/whatsapp";
 
-import { Link } from "react-router";
-
+import { OrderRelations } from "./OrderRelations";
 import { hasPermission } from "../../auth/utils/permissions";
 import { cashDate } from "../../cash/utils/cash-format";
 import { useCashResource } from "../../cash/hooks/useCashResource";
@@ -79,6 +78,10 @@ export function PreorderDetail({
 
   const canManage = hasPermission(session, "orders.manage");
 
+  const canReadKitchen = hasPermission(
+    session,
+    "kitchen.tickets.read"
+  );
   const canReadPayment = hasPermission(
     session,
     "orders.payments.read"
@@ -103,7 +106,7 @@ export function PreorderDetail({
           ? readPreorderPayment(session, order.id, signal)
           : Promise.resolve(null),
 
-        order.status !== "OPEN"
+        order.status !== "OPEN" && canReadKitchen
           ? getOrderKitchenHistory(
               session.accessToken,
               scope,
@@ -132,7 +135,7 @@ export function PreorderDetail({
           history.status === "rejected" ? message(history) : "",
       };
     },
-    [session, scope, order, canReadPayment]
+    [session, scope, order, canReadPayment, canReadKitchen]
   );
 
   const related = useCashResource(load);
@@ -672,16 +675,7 @@ export function PreorderDetail({
             Actualizar orden
           </Button>
 
-          {order.serviceType === "DELIVERY" &&
-            hasPermission(session, "deliveries.read") &&
-            !resource.busy && (
-              <Link
-                className="por-link"
-                to={"/domicilios?orderId=" + order.id}
-              >
-                Ver domicilio
-              </Link>
-            )}
+          {!blocked && <OrderRelations order={order} />}
 
           {editable && (
             <Button
@@ -789,13 +783,10 @@ export function PreorderDetail({
         />
       )}
 
-      {paymentDetail && canReadPayment && (
+      {paymentDetail && canReadPayment && batch && (
         <PreorderPaymentDetailDialog
           orderId={order.id}
-          batch={{
-            ...paymentDetail,
-            status: order.paymentStatus ?? paymentDetail.status,
-          }}
+          batch={batch}
           timeZone={zone}
           busy={resource.busy}
           onClose={() => setPaymentDetail(null)}

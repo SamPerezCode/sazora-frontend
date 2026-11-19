@@ -1,6 +1,8 @@
 import { useCallback, useId, useMemo, useState } from "react";
 
-import { useSearchParams } from "react-router";
+import { useSearchParams, useNavigate } from "react-router";
+
+import { useRouteState } from "../../../hooks/useRouteState";
 import { request } from "../../../lib/http/client";
 import { orderResponseSchema } from "../schemas/sales.schema";
 import { useRemote } from "../hooks/usePublicOrders";
@@ -135,7 +137,7 @@ function SalesLocations({ session }: { session: AuthSession }) {
     setParams(
       (previous) => {
         const next = new URLSearchParams(previous);
-        next.delete("orderId");
+        next.delete("requestId");
         return next;
       },
       { replace: true }
@@ -313,7 +315,6 @@ function LinkedSalesOrder({
       locations={locations}
       initialOrderId={orderId}
       onLinkedOrderClose={() => {
-        locations.select(location.id);
         onClose();
       }}
     />
@@ -350,7 +351,14 @@ function SalesContent({
 
   const modalId = useId();
 
-  const [filter, setFilter] = useState<SalesFilter>("ALL");
+  const [navigationParams] = useSearchParams();
+
+  const navigate = useNavigate();
+
+  const [filter, setFilter] = useRouteState<SalesFilter>(
+    "salesFilter",
+    "ALL"
+  );
   const [editingPreorderId, setEditingPreorderId] = useState<
     string | null
   >(null);
@@ -717,7 +725,16 @@ function SalesContent({
                 disabled={blocked}
                 onOpen={(id) => {
                   setEditingPreorderId(null);
-                  resource.select(id);
+
+                  const next = new URLSearchParams(navigationParams);
+
+                  next.set("orderId", id);
+                  next.delete("requestId");
+
+                  navigate({
+                    pathname: "/ventas",
+                    search: next.toString(),
+                  });
                 }}
               />
 

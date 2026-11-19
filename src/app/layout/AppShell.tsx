@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+import { acquireSessionSocket } from "../../lib/realtime/session-socket";
 import { Outlet, useLocation } from "react-router";
 import { Alert } from "../../components/feedback/Alert";
 import { Button } from "../../components/ui/Button";
@@ -24,6 +26,19 @@ export function AppShell() {
 
   const session =
     state.status === "authenticated" ? state.session : null;
+
+  useEffect(() => {
+    if (!session) return;
+
+    const lease = acquireSessionSocket({
+      accessToken: session.accessToken,
+      businessId: session.business.id,
+      membershipId: session.membership.id,
+      userId: session.user.id,
+    });
+
+    return () => lease.release();
+  }, [session]);
 
   const { business, settings, error, retry } =
     useBusinessProfile(session);

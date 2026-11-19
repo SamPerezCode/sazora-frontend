@@ -88,6 +88,7 @@ export async function readDeliveryContext(
   accessToken: string,
   businessId: string,
   canReadOrder: boolean,
+  canReadKitchen: boolean,
   signal: AbortSignal
 ): Promise<DeliveryContext> {
   const delivery = await readDelivery(value, accessToken, signal);
@@ -130,6 +131,13 @@ export async function readDeliveryContext(
   } catch (cause) {
     signal.throwIfAborted();
     context.orderError = deliveryError(cause);
+    return context;
+  }
+
+  if (context.order.status === "CONFIRMED" && !canReadKitchen) {
+    context.historyError =
+      "No tienes permiso para consultar el seguimiento de cocina.";
+
     return context;
   }
 

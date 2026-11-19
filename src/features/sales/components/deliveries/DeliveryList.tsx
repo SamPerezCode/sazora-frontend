@@ -11,6 +11,8 @@ import { hasPermission } from "../../../auth/utils/permissions";
 import { usePresentation } from "../../hooks/usePublicOrdersPresentation";
 import { useRemote } from "../../hooks/usePublicOrders";
 
+import { useRouteState } from "../../../../hooks/useRouteState";
+
 import {
   deliveryStates,
   id,
@@ -40,8 +42,11 @@ export function DeliveryList() {
     [token]
   );
 
-  const resource = useRemote(loader);
-
+  const resource = useRemote(loader, {
+    token,
+    keys: ["deliveries"],
+    pollMs: 15000,
+  });
   const [params, setParams] = useSearchParams();
 
   const deliveryId = params.get("deliveryId");
@@ -52,12 +57,12 @@ export function DeliveryList() {
     (value) => value !== null && !id.safeParse(value).success
   );
 
-  const [filter, setFilter] = useState({
+  const [filter, setFilter] = useRouteState("deliveryFilters", {
     q: "",
     status: "ACTIVE",
   });
 
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useRouteState("deliveryPage", 1);
   const [notice, setNotice] = useState("");
 
   const rows = resource.data ?? [];

@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { ContextLink } from "../ContextLink";
 
 import { useAppShell } from "../../../../app/layout/shell-context";
 
@@ -19,23 +19,26 @@ export function DeliveryLinks({ row }: { row: Delivery }) {
         "tables.read",
         "catalog.read",
       ]) && (
-        <Link
-          className="por-link"
-          to={"/ventas?orderId=" + row.orderId}
+        <ContextLink
+          to={
+            "/ventas?orderId=" +
+            row.orderId +
+            "&requestId=" +
+            row.publicOrderRequestId
+          }
         >
           Abrir pedido
-        </Link>
+        </ContextLink>
       )}
 
       {hasPermission(session, "public_orders.read") && (
-        <Link
-          className="por-link"
+        <ContextLink
           to={
             "/pedidos-publicos?solicitud=" + row.publicOrderRequestId
           }
         >
           Ver solicitud
-        </Link>
+        </ContextLink>
       )}
     </div>
   );

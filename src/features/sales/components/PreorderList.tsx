@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRouteState } from "../../../hooks/useRouteState";
 import { Bike, ShoppingBag } from "lucide-react";
 
 import { Button } from "../../../components/ui/Button";
@@ -42,8 +42,10 @@ export function PreorderList({
   disabled: boolean;
   onOpen: (id: string) => void;
 }) {
-  const [filter, setFilter] = useState<PreorderFilter>("ALL");
-
+  const [filter, setFilter] = useRouteState<PreorderFilter>(
+    "preorderFilter",
+    "ALL"
+  );
   const rows = preorderRows(orders, filter);
   const count = preorderRows(orders, "ALL").length;
 

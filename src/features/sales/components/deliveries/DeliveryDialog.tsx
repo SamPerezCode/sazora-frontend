@@ -53,6 +53,13 @@ export function DeliveryDialog({
 
   const canReadOrder = hasPermission(session, "orders.read");
 
+  const canReadKitchen = hasPermission(
+    session,
+    "kitchen.tickets.read"
+  );
+
+  const mutation = useMutation();
+
   const loader = useCallback(
     (signal: AbortSignal) =>
       readDeliveryContext(
@@ -60,17 +67,22 @@ export function DeliveryDialog({
         token,
         business.id,
         canReadOrder,
+        canReadKitchen,
         signal
       ),
-    [deliveryId, token, business.id, canReadOrder]
+    [deliveryId, token, business.id, canReadOrder, canReadKitchen]
   );
-
-  const resource = useRemote(loader);
-  const mutation = useMutation();
 
   const [panel, setPanel] = useState<
     "detail" | "assign" | DeliveryAction
   >("detail");
+
+  const resource = useRemote(loader, {
+    token,
+    keys: ["deliveries:" + deliveryId],
+    paused: mutation.busy || panel !== "detail",
+    pollMs: 15000,
+  });
 
   const [notice, setNotice] = useState("");
 

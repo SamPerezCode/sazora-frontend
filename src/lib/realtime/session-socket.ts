@@ -2,6 +2,12 @@ import { io } from "socket.io-client";
 import { z } from "zod";
 import { API_BASE_URL } from "../../config/env";
 
+import {
+  invalidateOperations,
+  invalidateRelated,
+  clearOperations,
+} from "../operations-sync";
+
 export type ConnectionStatus =
   | "connecting"
   | "connected"
@@ -84,6 +90,9 @@ function createEntry(credentials: Credentials) {
 
   function publish(next: ConnectionStatus) {
     state = next;
+    if (next === "connected") {
+      invalidateOperations(credentials.accessToken, ["*"]);
+    }
     listeners.forEach((listener) => listener(next));
   }
 
@@ -156,6 +165,81 @@ function createEntry(credentials: Credentials) {
     }
   }
 
+  const operationEvents = [
+    "public-order-request:created",
+    "public-order-request:status-updated",
+    "public-order-request:order-confirmed",
+    "public-order-request:preparation-updated",
+    "public-order-request:order-closed",
+
+    "order:created",
+    "order:confirmed",
+    "order:items-added",
+    "order:item-updated",
+    "order:item-removed",
+    "order:item-cancelled",
+    "order:item-quantity-cancelled",
+    "order:updated",
+    "order:status-updated",
+
+    "kitchen-ticket:item-status-updated",
+  ];
+
+  const operationPayload = z.object({
+    businessId: z.string(),
+    orderId: z
+      .string()
+      .regex(/^[1-9]\d*$/)
+      .optional(),
+  });
+
+  const operationSeen = new Map<string, number>();
+
+  const operationListeners = operationEvents.map((name) => {
+    const listener = (raw: unknown) => {
+      const parsed = operationPayload.safeParse(raw);
+
+      if (
+        state !== "connected" ||
+        !parsed.success ||
+        parsed.data.businessId !== credentials.businessId
+      ) {
+        return;
+      }
+
+      const key = name + ":" + JSON.stringify(raw);
+
+      const now = Date.now();
+
+      if (now - (operationSeen.get(key) ?? 0) < 250) {
+        return;
+      }
+
+      operationSeen.set(key, now);
+
+      if (operationSeen.size > 500) {
+        operationSeen.delete(operationSeen.keys().next().value!);
+      }
+
+      if (parsed.data.orderId) {
+        invalidateRelated(credentials.accessToken, {
+          orderId: parsed.data.orderId,
+        });
+      } else {
+        invalidateOperations(credentials.accessToken, [
+          "requests:*",
+          "orders:*",
+          "deliveries:*",
+          "kitchen:*",
+        ]);
+      }
+    };
+
+    socket.on(name, listener);
+
+    return () => socket.off(name, listener);
+  });
+
   socket.on("connect", connect);
   socket.on("disconnect", disconnect);
   socket.on("connect_error", error);
@@ -184,6 +268,9 @@ function createEntry(credentials: Credentials) {
     },
 
     destroy() {
+      operationListeners.forEach((remove) => remove());
+
+      operationSeen.clear();
       clearTimeout(inventoryTimer);
       inventoryListeners.clear();
       processedInventoryEvents.clear();
@@ -255,6 +342,7 @@ export function acquireSessionSocket(credentials: Credentials) {
 }
 
 export function disconnectSessionSockets(): void {
+  clearOperations();
   for (const entry of entries.values()) {
     entry.destroy();
   }

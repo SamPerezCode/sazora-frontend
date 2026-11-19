@@ -26,6 +26,7 @@ import { Link } from "react-router";
 import { useSearchParams } from "react-router";
 import { useCallback } from "react";
 import { useState } from "react";
+import { useRouteState } from "../../../../hooks/useRouteState";
 
 export function RequestList() {
   const { session, date, day, zone, price } = usePresentation();
@@ -39,7 +40,7 @@ export function RequestList() {
   const resource = useRemote(loader);
 
   usePublicRequestsRealtime(session, resource.reload);
-  const [filter, setFilter] = useState({
+  const [filter, setFilter] = useRouteState("requestFilters", {
     q: "",
     location: "ALL",
     status: "PENDING",
@@ -47,7 +48,7 @@ export function RequestList() {
     type: "ALL",
   });
 
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useRouteState("requestPage", 1);
   const [params, setParams] = useSearchParams();
   const requestId = params.get("solicitud");
 
@@ -67,7 +68,7 @@ export function RequestList() {
 
         return next;
       },
-      { replace: true }
+      { replace: value === null }
     );
   }
 

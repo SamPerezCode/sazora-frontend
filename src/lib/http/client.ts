@@ -2,6 +2,11 @@ import { z } from "zod";
 import { API_BASE_URL } from "../../config/env";
 import type { ApiFieldError } from "../../types/api";
 
+import {
+  observeOperation,
+  readOperationStamp,
+} from "../operations-sync";
+
 const errorResponseSchema = z.object({
   status: z.literal("error"),
   code: z.string(),
@@ -57,7 +62,7 @@ export function subscribeToUnauthorized(
   };
 }
 
-export async function request<T>(
+async function sendRequest<T>(
   path: string,
   schema: z.ZodType<T>,
   options: RequestOptions = {}
@@ -157,4 +162,49 @@ export async function request<T>(
   }
 
   return parsedResponse.data;
+}
+
+export async function request<T>(
+  path: string,
+  schema: z.ZodType<T>,
+  options: RequestOptions = {}
+): Promise<T> {
+  const token = options.accessToken ?? "";
+
+  const write = !!options.method && options.method !== "GET";
+
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const stamp = token ? readOperationStamp(token, path) : 0;
+
+      const result = await sendRequest(path, schema, options);
+
+      if (
+        !write &&
+        token &&
+        stamp !== readOperationStamp(token, path)
+      ) {
+        options.signal?.throwIfAborted();
+        continue;
+      }
+
+      observeOperation(token, path, result, write);
+
+      return result;
+    }
+
+    throw new ApiError(
+      409,
+      "STALE_READ",
+      "La información cambió mientras se consultaba. Actualiza antes de continuar."
+    );
+  } catch (cause) {
+    // Reconciliar también una escritura
+    // cuyo resultado sea incierto.
+    if (write) {
+      observeOperation(token, path, null, true);
+    }
+
+    throw cause;
+  }
 }

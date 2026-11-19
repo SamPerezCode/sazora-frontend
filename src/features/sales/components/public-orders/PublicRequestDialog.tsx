@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
+import { ContextLink } from "../ContextLink";
+
+import { RelatedDeliveryLink } from "../OrderRelations";
 import { MessageCircle } from "lucide-react";
 
 import { BottomSheet } from "../../../../components/layout/BottomSheet";
@@ -66,8 +68,11 @@ export function RequestDialog({
   const [checked, setChecked] = useState(false);
   const [reason, setReason] = useState("");
 
-  const resource = usePublicRequestOrder(id, modal !== null, saved);
-
+  const resource = usePublicRequestOrder(
+    id,
+    modal !== null && modal !== "payment",
+    saved
+  );
   const row = resource.data?.request;
   const order = resource.data?.order;
   const payment = resource.data?.payment;
@@ -522,24 +527,16 @@ export function RequestDialog({
           )}
 
           {orderId && canOpen && !resource.busy && (
-            <Link
-              className="por-link"
-              to={"/ventas?orderId=" + orderId}
+            <ContextLink
+              to={"/ventas?orderId=" + orderId + "&requestId=" + id}
             >
               Abrir pedido
-            </Link>
+            </ContextLink>
           )}
 
-          {order?.serviceType === "DELIVERY" &&
-            has("deliveries.read") &&
-            !resource.busy && (
-              <Link
-                className="por-link"
-                to={"/domicilios?requestId=" + id}
-              >
-                Ver domicilio
-              </Link>
-            )}
+          {row?.serviceType === "DELIVERY" && orderId && !blocked && (
+            <RelatedDeliveryLink orderId={orderId} requestId={id} />
+          )}
 
           {canCancel && (
             <Button

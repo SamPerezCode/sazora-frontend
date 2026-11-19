@@ -30,7 +30,9 @@ import {
   type OrderKitchenHistory,
 } from "../services/sales-history.service";
 
-import { usePublicRequestsRealtime } from "./usePublicRequestsRealtime";
+import { useOperationsSync } from "../../../hooks/useOperationsSync";
+
+import { operationKeys as keys } from "../../../lib/operations-sync";
 
 type Snapshot = Awaited<ReturnType<typeof readRequest>> & {
   payment: PreorderPaymentBatch | null;
@@ -123,6 +125,7 @@ export function usePublicRequestOrder(
 
         order &&
         scope &&
+        hasPermission(session, "kitchen.tickets.read") &&
         ["CONFIRMED", "DELIVERED", "CLOSED"].includes(order.status)
           ? getOrderKitchenHistory(
               session.accessToken,
@@ -194,18 +197,27 @@ export function usePublicRequestOrder(
     }
   }, [paused, reload]);
 
-  usePublicRequestsRealtime(session, refreshIfIdle);
+  useOperationsSync(
+    session.accessToken,
+    [
+      keys.request(id),
+      ...(data?.order
+        ? [
+            keys.order(data.order.id),
+            keys.payment(data.order.id),
+            keys.preparation(data.order.id),
+          ]
+        : []),
+    ],
+    refreshIfIdle,
+    paused || busy
+  );
 
   useEffect(() => {
     const timer = window.setInterval(refreshIfIdle, 15000);
 
-    window.addEventListener("focus", refreshIfIdle);
-    document.addEventListener("visibilitychange", refreshIfIdle);
-
     return () => {
       window.clearInterval(timer);
-      window.removeEventListener("focus", refreshIfIdle);
-      document.removeEventListener("visibilitychange", refreshIfIdle);
     };
   }, [refreshIfIdle]);
 

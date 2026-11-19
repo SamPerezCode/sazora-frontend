@@ -8,6 +8,8 @@ import { getLocations } from "../../business/services/organization.service";
 import type { SalesLocation } from "../services/sales.service";
 import { hasGlobalLocationAccess } from "../../auth/utils/permissions";
 
+import { useRouteState } from "../../../hooks/useRouteState";
+
 const selectedLocations = new Map<string, string>();
 
 export function clearSalesLocationSelections(): void {
@@ -90,8 +92,9 @@ export function useSalesLocations(session: AuthSession) {
   ].join(":");
 
   const [revision, setRevision] = useState(0);
-  const [selectedId, setSelectedId] = useState(() =>
-    readSelection(selectionKey)
+  const [routeLocation, setRouteLocation] = useRouteState("pos", "");
+  const [selectedId, setSelectedId] = useState(
+    () => routeLocation || readSelection(selectionKey)
   );
   const [issue, setIssue] = useState("");
 
@@ -135,10 +138,12 @@ export function useSalesLocations(session: AuthSession) {
           error: "",
         });
 
+        const preferred = routeLocation || selected.current;
+
         const next = options.some(
-          (location) => location.id === selected.current
+          (location) => location.id === preferred
         )
-          ? selected.current
+          ? preferred
           : initialSalesLocation(session, options);
 
         selected.current = next;
@@ -161,8 +166,7 @@ export function useSalesLocations(session: AuthSession) {
     void run();
 
     return () => controller.abort();
-  }, [session, globalAccess, revision, selectionKey]);
-
+  }, [session, globalAccess, revision, selectionKey, routeLocation]);
   const options =
     snapshot?.revision === revision ? snapshot.options : [];
 
@@ -206,6 +210,7 @@ export function useSalesLocations(session: AuthSession) {
 
       selected.current = id;
       saveSelection(selectionKey, id);
+      setRouteLocation(id);
       setSelectedId(id);
       setIssue("");
     },
