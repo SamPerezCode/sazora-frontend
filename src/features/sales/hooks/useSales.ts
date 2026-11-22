@@ -495,9 +495,6 @@ export function useSales(
 
   useEffect(() => {
     let live = true;
-    let flushing = false;
-    let requested = false;
-
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const queue = new Map<string, QuantityCancelledEvent>();
@@ -510,56 +507,28 @@ export function useSales(
       userId,
     });
 
-    function schedule() {
-      clearTimeout(timer);
+    function flush() {
+      timer = undefined;
 
-      timer = setTimeout(() => {
-        void flush();
-      }, 300);
-    }
-
-    async function flush() {
       if (!live) return;
 
-      if (locked.current || flushing) {
-        schedule();
+      if (locked.current) {
+        timer = setTimeout(flush, 300);
         return;
       }
 
-      if (!requested && !queue.size) return;
+      const external = [...queue.entries()].filter(
+        ([key]) => !ownQuantityChanges.current.has(key)
+      );
 
-      flushing = true;
-      requested = false;
-
-      const events = [...queue.entries()];
       queue.clear();
 
-      const updated = await refresh();
-
-      if (live) {
-        const external = events.filter(
-          ([key]) => !ownQuantityChanges.current.has(key)
+      if (external.length) {
+        setNotice(
+          external.length === 1
+            ? `Cantidad modificada · Orden #${external[0][1].orderId}.`
+            : `Se modificaron cantidades en ${external.length} productos.`
         );
-
-        if (external.length) {
-          setNotice(
-            external.length === 1
-              ? `Cantidad modificada · Orden #${external[0][1].orderId}.${
-                  updated ? "" : " Falta actualizar la cuenta."
-                }`
-              : `Se modificaron cantidades en ${
-                  external.length
-                } productos.${
-                  updated ? "" : " Falta actualizar la cuenta."
-                }`
-          );
-        }
-
-        flushing = false;
-
-        if (requested || queue.size) {
-          schedule();
-        }
       }
     }
 
@@ -589,24 +558,20 @@ export function useSales(
       if (ownQuantityChanges.current.has(key)) return;
 
       queue.set(key, parsed.data);
-      requested = true;
 
-      if (!locked.current) {
-        reader.current?.abort();
+      if (timer === undefined) {
+        timer = setTimeout(flush, 300);
       }
-
-      schedule();
     }
 
     function connectionChanged(status: ConnectionStatus) {
       if (status === "rejected") {
         logout();
-      } else if (status === "connected") {
-        requested = true;
-        schedule();
       }
     }
 
+    // La consulta se actualiza desde useOperationsSync.
+    // Este listener conserva únicamente los avisos de cantidades.
     lease.socket.on("order:item-quantity-cancelled", receive);
 
     const unsubscribe = lease.subscribe(connectionChanged);
@@ -615,22 +580,16 @@ export function useSales(
 
     return () => {
       live = false;
+
       clearTimeout(timer);
+      queue.clear();
 
       lease.socket.off("order:item-quantity-cancelled", receive);
 
       unsubscribe();
       lease.release();
     };
-  }, [
-    token,
-    businessId,
-    membershipId,
-    userId,
-    refresh,
-    logout,
-    setNotice,
-  ]);
+  }, [token, businessId, membershipId, userId, logout, setNotice]);
 
   useOperationsSync(
     token,

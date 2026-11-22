@@ -125,7 +125,7 @@ export function usePublicRequestOrder(
 
         order &&
         scope &&
-        hasPermission(session, "kitchen.tickets.read") &&
+        hasPermission(session, "orders.read") &&
         ["CONFIRMED", "DELIVERED", "CLOSED"].includes(order.status)
           ? getOrderKitchenHistory(
               session.accessToken,

@@ -150,7 +150,7 @@ export function deliveryError(cause: unknown): string {
         "Este domicilio está asignado a otro domiciliario.",
       INVALID_DELIVERY_TRANSITION:
         "El domicilio cambió de estado. Revisa la información actualizada.",
-      ORDER_NOT_READY:
+      DELIVERY_ORDER_NOT_READY:
         "Cocina todavía no terminó el pedido. Actualiza el seguimiento antes de recoger.",
     };
 

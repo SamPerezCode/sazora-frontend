@@ -183,11 +183,23 @@ function createEntry(credentials: Credentials) {
     "order:status-updated",
 
     "kitchen-ticket:item-status-updated",
+    "delivery:status-updated",
   ];
 
   const operationPayload = z.object({
     businessId: z.string(),
+
     orderId: z
+      .string()
+      .regex(/^[1-9]\d*$/)
+      .nullish(),
+
+    requestId: z
+      .string()
+      .regex(/^[1-9]\d*$/)
+      .optional(),
+
+    deliveryId: z
       .string()
       .regex(/^[1-9]\d*$/)
       .optional(),
@@ -221,9 +233,15 @@ function createEntry(credentials: Credentials) {
         operationSeen.delete(operationSeen.keys().next().value!);
       }
 
-      if (parsed.data.orderId) {
+      if (
+        parsed.data.orderId ||
+        parsed.data.requestId ||
+        parsed.data.deliveryId
+      ) {
         invalidateRelated(credentials.accessToken, {
-          orderId: parsed.data.orderId,
+          orderId: parsed.data.orderId ?? undefined,
+          requestId: parsed.data.requestId,
+          deliveryId: parsed.data.deliveryId,
         });
       } else {
         invalidateOperations(credentials.accessToken, [

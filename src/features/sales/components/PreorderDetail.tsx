@@ -78,10 +78,7 @@ export function PreorderDetail({
 
   const canManage = hasPermission(session, "orders.manage");
 
-  const canReadKitchen = hasPermission(
-    session,
-    "kitchen.tickets.read"
-  );
+  const canReadKitchen = hasPermission(session, "orders.read");
   const canReadPayment = hasPermission(
     session,
     "orders.payments.read"

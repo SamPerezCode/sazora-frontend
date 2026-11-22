@@ -137,7 +137,10 @@ function SalesLocations({ session }: { session: AuthSession }) {
     setParams(
       (previous) => {
         const next = new URLSearchParams(previous);
+
+        next.delete("orderId");
         next.delete("requestId");
+
         return next;
       },
       { replace: true }

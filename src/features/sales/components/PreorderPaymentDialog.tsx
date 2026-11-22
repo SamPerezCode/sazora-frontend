@@ -1,5 +1,10 @@
-import { useCallback, useId, useRef, useState } from "react";
-
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { ApiError } from "../../../lib/http/client";
 
@@ -35,7 +40,7 @@ export function PreorderPaymentDialog({
   order,
   scope,
   resource,
-  onClose,
+  onClose: close,
 }: {
   mode: "pay" | "refund";
   order: Order;
@@ -49,8 +54,12 @@ export function PreorderPaymentDialog({
   const load = useCallback(
     async (signal: AbortSignal) => {
       const [options, batch] = await Promise.all([
-        readPreorderPaymentOptions(session, scope, signal),
-
+        readPreorderPaymentOptions(
+          session,
+          scope,
+          signal,
+          mode === "pay"
+        ),
         mode === "refund"
           ? readPreorderPayment(session, order.id, signal)
           : null,
@@ -86,12 +95,39 @@ export function PreorderPaymentDialog({
     Record<string, string>
   >({});
 
-  const [error, setError] = useState("");
-
-  const [intent, setIntent] = useState<{
+  const [error, setErrorState] = useState("");
+  const [intent, setIntentState] = useState<{
     body: unknown;
     total: string;
   } | null>(null);
+
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  function setError(value: string) {
+    if (mounted.current) {
+      setErrorState(value);
+    }
+  }
+
+  function setIntent(value: typeof intent) {
+    if (mounted.current) {
+      setIntentState(value);
+    }
+  }
+
+  function onClose() {
+    if (mounted.current) {
+      close();
+    }
+  }
 
   const lock = useRef(false);
   const data = result.data;
@@ -105,22 +141,9 @@ export function PreorderPaymentDialog({
     order.total ?? "0"
   );
 
-  const unknownMethod = data?.batch?.payments.some(
-    (payment) =>
-      !data.methods.some(
-        (method) => method.id === payment.paymentMethodId
-      )
-  );
-
   const cashRequired =
     mode === "pay" ||
-    !!unknownMethod ||
-    !!data?.batch?.payments.some(
-      (payment) =>
-        data.methods.find(
-          (method) => method.id === payment.paymentMethodId
-        )?.affectsCash
-    );
+    !!data?.batch?.payments.some((payment) => payment.affectsCash);
 
   const frozen = resource.busy || !!intent;
 
@@ -240,14 +263,6 @@ export function PreorderPaymentDialog({
           return;
         }
 
-        if (unknownMethod) {
-          setError(
-            "No se pudo consultar la configuración de todos los medios originales."
-          );
-
-          return;
-        }
-
         if (reason.trim().length < 5 || reason.trim().length > 500) {
           setError("El motivo debe tener entre 5 y 500 caracteres.");
 
@@ -257,9 +272,8 @@ export function PreorderPaymentDialog({
         if (
           data.batch.payments.some(
             (payment) =>
-              data.methods.find(
-                (method) => method.id === payment.paymentMethodId
-              )?.requiresReference && !references[payment.id]?.trim()
+              payment.requiresReference &&
+              !references[payment.id]?.trim()
           )
         ) {
           setError(
@@ -562,13 +576,6 @@ export function PreorderPaymentDialog({
               </>
             ) : (
               <>
-                {unknownMethod && (
-                  <p role="alert">
-                    No se pudo consultar la configuración de todos los
-                    medios originales.
-                  </p>
-                )}
-
                 {!data.batch && (
                   <p role="alert">
                     No hay un lote de pago disponible.
@@ -576,9 +583,7 @@ export function PreorderPaymentDialog({
                 )}
 
                 {data.batch?.payments.map((payment) => {
-                  const required = data.methods.find(
-                    (method) => method.id === payment.paymentMethodId
-                  )?.requiresReference;
+                  const required = payment.requiresReference;
 
                   return (
                     <section className="pp-payment" key={payment.id}>

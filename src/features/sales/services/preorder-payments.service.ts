@@ -30,6 +30,8 @@ const paymentBatchSchema = z.object({
       paymentMethodId: id,
       paymentMethodName: z.string(),
       paymentType: z.string(),
+      requiresReference: z.boolean(),
+      affectsCash: z.boolean(),
       amount,
       tenderedAmount: amount.nullable(),
       changeAmount: amount,
@@ -73,7 +75,8 @@ export async function readPreorderPayment(
 export async function readPreorderPaymentOptions(
   session: AuthSession,
   scope: SalesScope,
-  signal: AbortSignal
+  signal: AbortSignal,
+  includeMethods = true
 ) {
   const query = new URLSearchParams({
     locationId: scope.location.id,
@@ -81,8 +84,9 @@ export async function readPreorderPaymentOptions(
   });
 
   const [methods, response] = await Promise.all([
-    getPaymentMethods(session, signal),
-
+    includeMethods
+      ? getPaymentMethods(session, signal)
+      : Promise.resolve([]),
     hasPermission(session, "cash.sessions.read")
       ? request(
           "/cash-sessions?" + query,

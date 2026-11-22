@@ -53,10 +53,7 @@ export function DeliveryDialog({
 
   const canReadOrder = hasPermission(session, "orders.read");
 
-  const canReadKitchen = hasPermission(
-    session,
-    "kitchen.tickets.read"
-  );
+  const canReadKitchen = hasPermission(session, "orders.read");
 
   const mutation = useMutation();
 

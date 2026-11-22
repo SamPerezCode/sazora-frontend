@@ -357,6 +357,14 @@ export async function getOrder(
 
   const order = assertOrderScope(response.data.order, scope);
 
+  if (order.id !== id) {
+    throw new ApiError(
+      502,
+      "INVALID_RESPONSE",
+      "El pedido recibido no corresponde al solicitado."
+    );
+  }
+
   if (
     order.location.id !== scope.location.id ||
     order.location.locationType !== "POINT_OF_SALE"
