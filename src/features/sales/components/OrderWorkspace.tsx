@@ -1,5 +1,4 @@
-import { useId, useState } from "react";
-
+import { useId, useState, type ReactNode } from "react";
 import {
   Check,
   Minus,
@@ -65,10 +64,16 @@ export function OrderWorkspace({
   data,
   onCheckout,
   onSaved,
+  quickSale = false,
+  summary,
+  onBeforeSave,
 }: {
   resource: SalesResource;
   onCheckout?: () => void;
   onSaved?: () => void;
+  onBeforeSave?: () => void;
+  quickSale?: boolean;
+  summary?: ReactNode;
   order: Pick<
     Order,
     | "serviceType"
@@ -77,6 +82,10 @@ export function OrderWorkspace({
     | "notes"
     | "status"
     | "subtotal"
+    | "netSubtotal"
+    | "taxTotal"
+    | "total"
+    | "fulfillmentSummary"
     | "items"
     | "kitchenWorkflowMode"
     | "sourceChannel"
@@ -131,9 +140,11 @@ export function OrderWorkspace({
 
   const prepaid = order.serviceType !== "TABLE";
 
-  const editable = prepaid
-    ? !order.id || canEditPreorder(order)
-    : order.status === "OPEN";
+  const editable =
+    !summary &&
+    (prepaid
+      ? !order.id || canEditPreorder(order)
+      : order.status === "OPEN");
 
   const canAdd =
     editable || (!prepaid && order.status === "CONFIRMED");
@@ -175,9 +186,11 @@ export function OrderWorkspace({
     (item) => item.status === "CANCELLED"
   );
 
+  const catalog = quickSale ? data.catalogProducts : data.products;
+
   const categories = [
     ...new Map(
-      data.products.map((product) => [
+      catalog.map((product) => [
         product.categoryId,
         product.categoryName,
       ])
@@ -190,7 +203,7 @@ export function OrderWorkspace({
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
 
-  const products = data.products.filter(
+  const products = catalog.filter(
     (product) =>
       (!category || category === product.categoryId) &&
       normalized(
@@ -336,6 +349,9 @@ export function OrderWorkspace({
               <OrderCustomerForm
                 initial={order}
                 existing={!!order.id}
+                channels={
+                  quickSale ? ["IN_PERSON"] : ["WHATSAPP", "PHONE"]
+                }
                 busy={blocked}
                 onCancel={() => setShowDetails(false)}
                 onSave={async (input) => {
@@ -697,6 +713,19 @@ export function OrderWorkspace({
                     <h3>{product.name}</h3>
                     <p>{product.description}</p>
 
+                    {quickSale && (
+                      <small>
+                        {product.categoryName}
+                        {" · "}
+                        {product.fulfillmentMode === "READY_TO_SERVE"
+                          ? "Listo para servir"
+                          : "Requiere preparación"}
+                        {" · "}
+                        {product.isAvailable
+                          ? "Disponible"
+                          : "No disponible"}
+                      </small>
+                    )}
                     <div className="sales-product-bottom">
                       <strong>
                         {money(cents(product.currentPrice))}
@@ -727,7 +756,7 @@ export function OrderWorkspace({
                           <button
                             type="button"
                             className="sales-icon sales-add"
-                            disabled={blocked}
+                            disabled={blocked || !product.isAvailable}
                             aria-label={`Agregar ${product.name}`}
                             onClick={() =>
                               changeQuantity(product.id, 1)
@@ -773,481 +802,523 @@ export function OrderWorkspace({
               </span>
             </h3>
 
-            <div className="sales-lines">
-              {unsentAdditions.length > 0 && (
-                <div className="sales-order-notice" role="status">
-                  <p>
-                    Esta cuenta está por cerrar, pero conserva
-                    adiciones locales sin enviar. No están incluidas
-                    en el subtotal. Revísalas y descártalas antes de
-                    cerrar.
-                  </p>
-
-                  <ul>
-                    {unsentAdditions.map(([id, item]) => (
-                      <li key={id}>
-                        {item.quantity} × {item.name}
-                        {item.notes ? ` · ${item.notes}` : ""}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={blocked}
-                    onClick={() => {
-                      if (order.id) {
-                        resource.discardAdditions(order.id);
-                      }
-                    }}
-                  >
-                    <Trash2
-                      size={15}
-                      aria-hidden="true"
-                      className="text-[#ae483c] dark:text-[#efa38f]"
-                    />
-                    Descartar adiciones sin enviar
-                  </Button>
-                </div>
-              )}
-
-              {!items.length && !pendingCount && (
-                <div className="mp-empty">
-                  <ShoppingBag size={28} />
-                  <strong>La cuenta está vacía</strong>
-                  <p>Agrega productos para comenzar.</p>
-                </div>
-              )}
-
-              {order.status === "CONFIRMED" && items.length > 0 && (
-                <h4 className="sales-eyebrow">
-                  Productos confirmados
-                </h4>
-              )}
-
-              {items.map((item) => {
-                const ticket = ticketItems.get(item.id);
-
-                return (
-                  <article key={item.id} className="sales-line">
-                    <strong>{item.productName}</strong>
-
+            {summary ?? (
+              <div className="sales-lines">
+                {unsentAdditions.length > 0 && (
+                  <div className="sales-order-notice" role="status">
                     <p>
-                      {item.quantity} × {money(cents(item.unitPrice))}
-                      {" · "}
-                      {money(cents(item.lineTotal))}
+                      Esta cuenta está por cerrar, pero conserva
+                      adiciones locales sin enviar. No están incluidas
+                      en el subtotal. Revísalas y descártalas antes de
+                      cerrar.
                     </p>
 
-                    {item.notes && <p>{item.notes}</p>}
+                    <ul>
+                      {unsentAdditions.map(([id, item]) => (
+                        <li key={id}>
+                          {item.quantity} × {item.name}
+                          {item.notes ? ` · ${item.notes}` : ""}
+                        </li>
+                      ))}
+                    </ul>
 
-                    {(order.status === "OPEN" || screenWorkflow) && (
-                      <span className="sales-line-status">
-                        {order.status === "OPEN"
-                          ? "Sin enviar"
-                          : ticket
-                            ? PREPARATION_LABELS[
-                                ticket.preparationStatus
-                              ]
-                            : "Preparación no disponible"}
-                      </span>
-                    )}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={blocked}
+                      onClick={() => {
+                        if (order.id) {
+                          resource.discardAdditions(order.id);
+                        }
+                      }}
+                    >
+                      <Trash2
+                        size={15}
+                        aria-hidden="true"
+                        className="text-[#ae483c] dark:text-[#efa38f]"
+                      />
+                      Descartar adiciones sin enviar
+                    </Button>
+                  </div>
+                )}
 
-                    <div className="sales-line-actions">
-                      {editable && (
-                        <>
-                          <button
-                            type="button"
-                            className="sales-icon"
-                            disabled={blocked}
-                            aria-label={`Editar ${item.productName}`}
-                            onClick={() =>
-                              setEditing(
-                                editing === item.id ? null : item.id
-                              )
-                            }
-                          >
-                            <Pencil size={15} />
-                          </button>
+                {!items.length && !pendingCount && (
+                  <div className="mp-empty">
+                    <ShoppingBag size={28} />
+                    <strong>La cuenta está vacía</strong>
+                    <p>Agrega productos para comenzar.</p>
+                  </div>
+                )}
 
-                          <button
-                            type="button"
-                            className="sales-link sales-remove-product"
-                            disabled={blocked}
-                            aria-label={`Retirar ${item.productName}`}
-                            onClick={() =>
-                              void resource.action(
-                                `/orders/${order.id}/items/${item.id}`,
-                                "DELETE"
-                              )
-                            }
-                          >
-                            <Trash2 size={15} aria-hidden="true" />
-                            Quitar
-                          </button>
-                        </>
+                {order.status === "CONFIRMED" && items.length > 0 && (
+                  <h4 className="sales-eyebrow">
+                    Productos confirmados
+                  </h4>
+                )}
+
+                {items.map((item) => {
+                  const ticket = ticketItems.get(item.id);
+
+                  return (
+                    <article key={item.id} className="sales-line">
+                      <strong>{item.productName}</strong>
+
+                      <p>
+                        {item.quantity} ×{" "}
+                        {money(cents(item.unitPrice))}
+                        {" · "}
+                        {money(cents(item.lineTotal))}
+                      </p>
+
+                      {item.notes && <p>{item.notes}</p>}
+
+                      {(order.status === "OPEN" ||
+                        screenWorkflow) && (
+                        <span className="sales-line-status">
+                          {order.status === "OPEN"
+                            ? "Sin enviar"
+                            : ticket
+                              ? PREPARATION_LABELS[
+                                  ticket.preparationStatus
+                                ]
+                              : "Preparación no disponible"}
+                        </span>
                       )}
 
-                      {!prepaid &&
-                        order.status === "CONFIRMED" &&
-                        item.status === "ACTIVE" &&
-                        ticket &&
-                        [
-                          "PENDING",
-                          "PREPARING",
-                          "IN_PREPARATION",
-                          "READY",
-                        ].includes(ticket.preparationStatus) && (
+                      <div className="sales-line-actions">
+                        {editable && (
                           <>
-                            {item.quantity > 1 && (
-                              <button
-                                type="button"
-                                className="sales-link sales-remove-product"
-                                disabled={blocked}
-                                onClick={() => {
-                                  resource.clearNotice();
-                                  setEditing(null);
-                                  setPartialItemId(item.id);
-                                }}
-                              >
-                                <Minus size={15} aria-hidden="true" />
-                                Cancelar unidades
-                              </button>
-                            )}
-
                             <button
                               type="button"
-                              className="sales-link"
+                              className="sales-icon"
                               disabled={blocked}
+                              aria-label={`Editar ${item.productName}`}
                               onClick={() =>
                                 setEditing(
                                   editing === item.id ? null : item.id
                                 )
                               }
                             >
-                              {item.quantity > 1
-                                ? "Cancelar producto completo"
-                                : "Cancelar producto"}
+                              <Pencil size={15} />
+                            </button>
+
+                            <button
+                              type="button"
+                              className="sales-link sales-remove-product"
+                              disabled={blocked}
+                              aria-label={`Retirar ${item.productName}`}
+                              onClick={() =>
+                                void resource.action(
+                                  `/orders/${order.id}/items/${item.id}`,
+                                  "DELETE"
+                                )
+                              }
+                            >
+                              <Trash2 size={15} aria-hidden="true" />
+                              Quitar
                             </button>
                           </>
                         )}
 
-                      {screenWorkflow &&
-                        ticket?.preparationStatus === "READY" && (
-                          <Button
-                            size="sm"
-                            disabled={blocked}
-                            onClick={() =>
-                              void resource.action(
-                                `/kitchen-tickets/${ticket.ticketId}/items/${ticket.id}/status`,
-                                "PATCH",
-                                { status: "DELIVERED" }
-                              )
-                            }
-                          >
-                            <Check size={15} />
-                            Entregar
-                          </Button>
-                        )}
+                        {!prepaid &&
+                          order.status === "CONFIRMED" &&
+                          item.status === "ACTIVE" &&
+                          ticket &&
+                          [
+                            "PENDING",
+                            "PREPARING",
+                            "IN_PREPARATION",
+                            "READY",
+                          ].includes(ticket.preparationStatus) && (
+                            <>
+                              {item.quantity > 1 && (
+                                <button
+                                  type="button"
+                                  className="sales-link sales-remove-product"
+                                  disabled={blocked}
+                                  onClick={() => {
+                                    resource.clearNotice();
+                                    setEditing(null);
+                                    setPartialItemId(item.id);
+                                  }}
+                                >
+                                  <Minus
+                                    size={15}
+                                    aria-hidden="true"
+                                  />
+                                  Cancelar unidades
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                className="sales-link"
+                                disabled={blocked}
+                                onClick={() =>
+                                  setEditing(
+                                    editing === item.id
+                                      ? null
+                                      : item.id
+                                  )
+                                }
+                              >
+                                {item.quantity > 1
+                                  ? "Cancelar producto completo"
+                                  : "Cancelar producto"}
+                              </button>
+                            </>
+                          )}
+
+                        {screenWorkflow &&
+                          ticket?.preparationStatus === "READY" && (
+                            <Button
+                              size="sm"
+                              disabled={blocked}
+                              onClick={() =>
+                                void resource.action(
+                                  `/kitchen-tickets/${ticket.ticketId}/items/${ticket.id}/status`,
+                                  "PATCH",
+                                  { status: "DELIVERED" }
+                                )
+                              }
+                            >
+                              <Check size={15} />
+                              Entregar
+                            </Button>
+                          )}
+                      </div>
+
+                      {editing === item.id && canAdd && (
+                        <BottomSheet
+                          id={accountId + "-deliver"}
+                          open
+                          variant="modal"
+                          title="¿Marcar esta orden como entregada?"
+                          className="app-confirm-dialog"
+                          busy={resource.busy}
+                          onClose={() => setConfirmDelivery(false)}
+                        >
+                          <div className="mp-dialog-content">
+                            <ItemEditor
+                              key={`${item.id}:${order.status}`}
+                              item={item}
+                              cancel={!editable}
+                              busy={blocked}
+                              onClose={() => setEditing(null)}
+                              onSave={async (body) => {
+                                const ok = await resource.action(
+                                  `/orders/${order.id}/items/${item.id}${
+                                    editable ? "" : "/cancel"
+                                  }`,
+                                  editable ? "PATCH" : "POST",
+                                  body
+                                );
+
+                                if (ok) {
+                                  setEditing(null);
+                                }
+                              }}
+                            />
+                          </div>
+                        </BottomSheet>
+                      )}
+                    </article>
+                  );
+                })}
+
+                {canAdd && pendingCount > 0 && (
+                  <h4 className="sales-eyebrow">
+                    Productos por enviar
+                  </h4>
+                )}
+
+                {draftEntries.map(([id, item]) => (
+                  <article
+                    key={id}
+                    className="sales-line sales-draft-line"
+                  >
+                    <div className="sales-line-heading">
+                      <strong>{item.name}</strong>
+
+                      <button
+                        type="button"
+                        className="sales-link sales-remove-product"
+                        disabled={blocked || !canAdd}
+                        aria-label={`Quitar ${item.name} del carrito`}
+                        onClick={() => removeDraftItem(id)}
+                      >
+                        <Trash2 size={15} aria-hidden="true" />
+                        Quitar
+                      </button>
                     </div>
 
-                    {editing === item.id && canAdd && (
-                      <BottomSheet
-                        id={accountId + "-deliver"}
-                        open
-                        variant="modal"
-                        title="¿Marcar esta orden como entregada?"
-                        className="app-confirm-dialog"
-                        busy={resource.busy}
-                        onClose={() => setConfirmDelivery(false)}
+                    <p>
+                      {item.quantity} × {money(cents(item.price))}
+                    </p>
+
+                    <label className="sales-label">
+                      Nota del producto
+                      <input
+                        value={item.notes}
+                        placeholder="Ej. Sin cebolla"
+                        disabled={blocked}
+                        onChange={(event) =>
+                          resource.setDraft(order.id, {
+                            ...draft,
+                            [id]: {
+                              ...item,
+                              notes: event.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </label>
+
+                    <div className="sales-quantity">
+                      <button
+                        type="button"
+                        className="sales-icon"
+                        disabled={blocked}
+                        aria-label={`Quitar uno de ${item.name}`}
+                        onClick={() => changeQuantity(id, -1)}
                       >
-                        <div className="mp-dialog-content">
-                          <ItemEditor
-                            key={`${item.id}:${order.status}`}
-                            item={item}
-                            cancel={!editable}
-                            busy={blocked}
-                            onClose={() => setEditing(null)}
-                            onSave={async (body) => {
-                              const ok = await resource.action(
-                                `/orders/${order.id}/items/${item.id}${
-                                  editable ? "" : "/cancel"
-                                }`,
-                                editable ? "PATCH" : "POST",
-                                body
-                              );
+                        <Minus size={15} aria-hidden="true" />
+                      </button>
 
-                              if (ok) {
-                                setEditing(null);
-                              }
-                            }}
-                          />
-                        </div>
-                      </BottomSheet>
-                    )}
+                      <span>{item.quantity}</span>
+
+                      <button
+                        type="button"
+                        className="sales-icon"
+                        disabled={blocked || !canAdd}
+                        aria-label={`Agregar uno de ${item.name}`}
+                        onClick={() => changeQuantity(id, 1)}
+                      >
+                        <Plus size={15} aria-hidden="true" />
+                      </button>
+                    </div>
                   </article>
-                );
-              })}
+                ))}
 
-              {canAdd && pendingCount > 0 && (
-                <h4 className="sales-eyebrow">
-                  Productos por enviar
-                </h4>
-              )}
+                {cancelledItems.length > 0 && (
+                  <details className="sales-cancelled">
+                    <summary>
+                      Productos cancelados
+                      <span className="sales-cancelled-count">
+                        {cancelledItems.reduce(
+                          (sum, item) => sum + item.quantity,
+                          0
+                        )}
+                      </span>
+                    </summary>
 
-              {draftEntries.map(([id, item]) => (
-                <article
-                  key={id}
-                  className="sales-line sales-draft-line"
-                >
-                  <div className="sales-line-heading">
-                    <strong>{item.name}</strong>
+                    <p className="sales-cancelled-help">
+                      Estos productos no se incluyen en el subtotal.
+                    </p>
 
-                    <button
-                      type="button"
-                      className="sales-link sales-remove-product"
-                      disabled={blocked || !canAdd}
-                      aria-label={`Quitar ${item.name} del carrito`}
-                      onClick={() => removeDraftItem(id)}
-                    >
-                      <Trash2 size={15} aria-hidden="true" />
-                      Quitar
-                    </button>
-                  </div>
+                    {cancelledItems.map((item) => (
+                      <article
+                        key={item.id}
+                        className="sales-cancelled-item"
+                      >
+                        <strong>
+                          {item.quantity} × {item.productName}
+                        </strong>
 
-                  <p>
-                    {item.quantity} × {money(cents(item.price))}
-                  </p>
+                        <p>
+                          Motivo:{" "}
+                          {item.cancellationReason ||
+                            "Sin motivo registrado."}
+                        </p>
+                      </article>
+                    ))}
+                  </details>
+                )}
 
-                  <label className="sales-label">
-                    Nota del producto
-                    <input
-                      value={item.notes}
-                      placeholder="Ej. Sin cebolla"
-                      disabled={blocked}
-                      onChange={(event) =>
-                        resource.setDraft(order.id, {
-                          ...draft,
-                          [id]: {
-                            ...item,
-                            notes: event.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </label>
+                {prepaid && (
+                  <section className="preorder-customer">
+                    <small>CLIENTE</small>
 
-                  <div className="sales-quantity">
-                    <button
-                      type="button"
-                      className="sales-icon"
-                      disabled={blocked}
-                      aria-label={`Quitar uno de ${item.name}`}
-                      onClick={() => changeQuantity(id, -1)}
-                    >
-                      <Minus size={15} aria-hidden="true" />
-                    </button>
+                    <strong>
+                      {order.customerName?.trim() ||
+                        "Cliente ocasional"}
+                    </strong>
 
-                    <span>{item.quantity}</span>
+                    {order.customerPhone && (
+                      <p>{order.customerPhone}</p>
+                    )}
 
-                    <button
-                      type="button"
-                      className="sales-icon"
-                      disabled={blocked || !canAdd}
-                      aria-label={`Agregar uno de ${item.name}`}
-                      onClick={() => changeQuantity(id, 1)}
-                    >
-                      <Plus size={15} aria-hidden="true" />
-                    </button>
-                  </div>
-                </article>
-              ))}
+                    <p>
+                      Origen:{" "}
+                      {order.sourceChannel
+                        ? CHANNELS[order.sourceChannel]
+                        : "Presencial"}
+                    </p>
 
-              {cancelledItems.length > 0 && (
-                <details className="sales-cancelled">
-                  <summary>
-                    Productos cancelados
-                    <span className="sales-cancelled-count">
-                      {cancelledItems.reduce(
-                        (sum, item) => sum + item.quantity,
-                        0
-                      )}
-                    </span>
-                  </summary>
+                    {order.customerEmail && (
+                      <p>{order.customerEmail}</p>
+                    )}
+                  </section>
+                )}
 
-                  <p className="sales-cancelled-help">
-                    Estos productos no se incluyen en el subtotal.
-                  </p>
-
-                  {cancelledItems.map((item) => (
-                    <article
-                      key={item.id}
-                      className="sales-cancelled-item"
-                    >
-                      <strong>
-                        {item.quantity} × {item.productName}
-                      </strong>
-
-                      <p>
-                        Motivo:{" "}
-                        {item.cancellationReason ||
-                          "Sin motivo registrado."}
-                      </p>
-                    </article>
-                  ))}
-                </details>
-              )}
-
-              {prepaid && (
-                <section className="preorder-customer">
-                  <small>CLIENTE</small>
-
-                  <strong>
-                    {order.customerName?.trim() ||
-                      "Cliente ocasional"}
-                  </strong>
-
-                  {order.customerPhone && (
-                    <p>{order.customerPhone}</p>
-                  )}
-
-                  <p>
-                    Origen:{" "}
-                    {order.sourceChannel
-                      ? CHANNELS[order.sourceChannel]
-                      : "Presencial"}
-                  </p>
-
-                  {order.customerEmail && (
-                    <p>{order.customerEmail}</p>
-                  )}
-                </section>
-              )}
-
-              {order.id && order.status !== "OPEN" && (
-                <OrderPrintPanel
-                  orderId={order.id}
-                  printing={resource.printing}
-                  disabled={blocked}
-                />
-              )}
-            </div>
+                {order.id && order.status !== "OPEN" && (
+                  <OrderPrintPanel
+                    orderId={order.id}
+                    printing={resource.printing}
+                    disabled={blocked}
+                  />
+                )}
+              </div>
+            )}
           </aside>
         </div>
       </div>
 
-      <footer className="sales-order-footer">
-        <div className="sales-total">
-          <div>
-            <span>
-              {pendingCount ? "Subtotal estimado" : "Subtotal"}
-              {" · "}
-              {items.reduce((sum, item) => sum + item.quantity, 0) +
-                pendingCount}{" "}
-              unidades
-            </span>
+      {!summary && (
+        <footer className="sales-order-footer">
+          {" "}
+          <div className="sales-total">
+            <div>
+              <span>
+                {pendingCount ? "Subtotal estimado" : "Subtotal"}
+                {" · "}
+                {items.reduce((sum, item) => sum + item.quantity, 0) +
+                  pendingCount}{" "}
+                unidades
+              </span>
 
-            <strong>{money(total)}</strong>
+              <strong>{money(total)}</strong>
+            </div>
+
+            {canAdd && pendingCount > 0 && (
+              <small>{pendingCount} por enviar</small>
+            )}
           </div>
+          {quickSale && (
+            <dl className="preorder-totals">
+              <div>
+                <dt>Subtotal neto</dt>
+                <dd>
+                  {order.id && !pendingCount && order.netSubtotal
+                    ? money(cents(order.netSubtotal))
+                    : "Estimación pendiente de confirmar"}
+                </dd>
+              </div>
 
-          {canAdd && pendingCount > 0 && (
-            <small>{pendingCount} por enviar</small>
+              <div>
+                <dt>Impuestos</dt>
+                <dd>
+                  {order.id && !pendingCount && order.taxTotal
+                    ? money(cents(order.taxTotal))
+                    : "Se calculan al guardar"}
+                </dd>
+              </div>
+
+              <div>
+                <dt>Total</dt>
+                <dd>
+                  {order.id && !pendingCount && order.total
+                    ? money(cents(order.total))
+                    : "Se confirma antes del pago"}
+                </dd>
+              </div>
+            </dl>
           )}
-        </div>
-
-        {invalidDraft && (
-          <p role="alert">
-            Un producto del borrador ya no está disponible. Retíralo
-            antes de enviar.
-          </p>
-        )}
-
-        {pendingCount > 0 && (
-          <p className="sales-price-note">
-            El servidor confirma los precios al enviar.
-          </p>
-        )}
-
-        <div className="sales-footer-actions">
-          {directDelivery && (
-            <Button
-              size="sm"
-              variant="soft"
-              disabled={blocked || pendingCount > 0}
-              onClick={() => setConfirmDelivery(true)}
-            >
-              <Check size={16} aria-hidden="true" />
-              Marcar pedido como entregado
-            </Button>
+          {invalidDraft && (
+            <p role="alert">
+              Un producto del borrador ya no está disponible. Retíralo
+              antes de enviar.
+            </p>
           )}
-
-          {canAdd ? (
-            (prepaid || !order.id || pendingCount > 0) && (
+          {pendingCount > 0 && (
+            <p className="sales-price-note">
+              El servidor confirma los precios al enviar.
+            </p>
+          )}
+          <div className="sales-footer-actions">
+            {directDelivery && (
               <Button
                 size="sm"
-                className="sales-primary"
-                loading={resource.sending}
-                loadingText="Enviando…"
-                disabled={
-                  blocked ||
-                  invalidDraft ||
-                  (!pendingCount && !items.length)
-                }
-                onClick={async () => {
-                  if (
-                    prepaid &&
-                    Object.keys(customerErrors(order)).length
-                  ) {
-                    setShowDetails(true);
-                    return;
-                  }
-
-                  if (await resource.send()) {
-                    onSaved?.();
-                  }
-                }}
+                variant="soft"
+                disabled={blocked || pendingCount > 0}
+                onClick={() => setConfirmDelivery(true)}
               >
-                <Send size={16} />
-
-                {prepaid
-                  ? "Guardar pedido"
-                  : order.status === "CONFIRMED"
-                    ? "Enviar adiciones"
-                    : "Enviar pedido"}
+                <Check size={16} aria-hidden="true" />
+                Marcar pedido como entregado
               </Button>
-            )
-          ) : order.status === "DELIVERED" && onCheckout ? (
-            <Button
-              size="sm"
-              disabled={blocked || unsentAdditions.length > 0}
-              onClick={onCheckout}
-            >
-              <Check size={16} />
-              Cobrar y cerrar cuenta
-            </Button>
-          ) : null}
-        </div>
+            )}
 
-        {(!prepaid ||
-          !order.id ||
-          ["PENDING", "REFUNDED"].includes(
-            order.paymentStatus ?? ""
-          )) && (
-          <OrderCancellationActions
-            resource={resource}
-            orderId={order.id}
-            status={order.status}
-            pendingCount={pendingCount}
-            hasDelivered={hasDelivered}
-          />
-        )}
+            {canAdd ? (
+              (prepaid || !order.id || pendingCount > 0) && (
+                <Button
+                  size="sm"
+                  className="sales-primary"
+                  loading={resource.sending}
+                  loadingText="Enviando…"
+                  disabled={
+                    blocked ||
+                    invalidDraft ||
+                    (!pendingCount && !items.length)
+                  }
+                  onClick={async () => {
+                    if (
+                      prepaid &&
+                      Object.keys(customerErrors(order)).length
+                    ) {
+                      setShowDetails(true);
+                      return;
+                    }
 
-        {order.status === "DELIVERED" && (
-          <p className="sales-price-note">
-            Registra el pago para cerrar la cuenta.
-          </p>
-        )}
-      </footer>
+                    onBeforeSave?.();
+
+                    if (await resource.send()) {
+                      onSaved?.();
+                    }
+                  }}
+                >
+                  <Send size={16} />
+
+                  {quickSale
+                    ? "Continuar al pago"
+                    : prepaid
+                      ? "Guardar pedido"
+                      : order.status === "CONFIRMED"
+                        ? "Enviar adiciones"
+                        : "Enviar pedido"}
+                </Button>
+              )
+            ) : order.status === "DELIVERED" && onCheckout ? (
+              <Button
+                size="sm"
+                disabled={blocked || unsentAdditions.length > 0}
+                onClick={onCheckout}
+              >
+                <Check size={16} />
+                Cobrar y cerrar cuenta
+              </Button>
+            ) : null}
+          </div>
+          {(!prepaid ||
+            !order.id ||
+            ["PENDING", "REFUNDED"].includes(
+              order.paymentStatus ?? ""
+            )) && (
+            <OrderCancellationActions
+              resource={resource}
+              orderId={order.id}
+              status={order.status}
+              pendingCount={pendingCount}
+              hasDelivered={hasDelivered}
+              paymentStatus={order.paymentStatus}
+            />
+          )}
+          {order.status === "DELIVERED" && (
+            <p className="sales-price-note">
+              Registra el pago para cerrar la cuenta.
+            </p>
+          )}
+        </footer>
+      )}
     </div>
   );
 }

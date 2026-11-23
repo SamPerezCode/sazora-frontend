@@ -2772,3 +2772,9 @@ dialog.mp-account-details-dialog .sales-form-actions > button {
     border-left: 0;
   }
 }
+
+/* Caja rápida: fondo suave y acento naranja en ambos temas. */
+.mp-toolbar-actions
+  > .ui-button.mp-quick-sale-button[data-variant="soft"] {
+  color: var(--sazora-accent);
+}

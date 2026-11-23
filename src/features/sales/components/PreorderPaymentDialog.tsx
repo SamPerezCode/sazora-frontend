@@ -41,8 +41,10 @@ export function PreorderPaymentDialog({
   scope,
   resource,
   onClose: close,
+  initialCashSessionId = "",
 }: {
   mode: "pay" | "refund";
+  initialCashSessionId?: string;
   order: Order;
   scope: SalesScope;
   resource: Pick<SalesResource, "busy" | "paymentOperation">;
@@ -87,8 +89,9 @@ export function PreorderPaymentDialog({
 
   const [confirmedRefund, setConfirmedRefund] = useState(false);
 
-  const [cashSessionId, setCashSessionId] = useState("");
-
+  const [cashSessionId, setCashSessionId] = useState(
+    mode === "pay" ? initialCashSessionId : ""
+  );
   const [reason, setReason] = useState("");
 
   const [references, setReferences] = useState<

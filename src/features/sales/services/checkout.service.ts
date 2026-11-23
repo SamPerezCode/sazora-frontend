@@ -220,4 +220,87 @@ export async function findCheckout(
   return null;
 }
 
+const prepaidSales = new WeakMap<
+  AuthSession,
+  Map<string, import("../schemas/checkout.schema").CheckoutSale>
+>();
+
+export function cachedPrepaidSale(
+  session: AuthSession,
+  orderId: string
+) {
+  return prepaidSales.get(session)?.get(orderId) ?? null;
+}
+
+function rememberPrepaidSale(
+  session: AuthSession,
+  sale: import("../schemas/checkout.schema").CheckoutSale
+) {
+  let cache = prepaidSales.get(session);
+
+  if (!cache) {
+    cache = new Map();
+    prepaidSales.set(session, cache);
+  }
+
+  cache.set(sale.orderId, sale);
+
+  return sale;
+}
+
+export async function submitPrepaidCheckout(
+  session: AuthSession,
+  locationId: string,
+  orderId: string,
+  signal: AbortSignal
+) {
+  if (!hasEveryPermission(session, ["orders.read", "orders.close"])) {
+    throw new Error("No tienes permiso para finalizar la venta.");
+  }
+
+  const response = await request(
+    "/sales",
+    envelope(z.object({ sale: checkoutSale })),
+    {
+      ...options(session, signal),
+      method: "POST",
+      body: {
+        orderId: saleId.parse(orderId),
+        commercialCustomerId: null,
+        payments: [],
+      },
+    }
+  );
+
+  const sale = verify(response.data.sale, session, locationId);
+
+  if (sale.orderId !== orderId) {
+    throw new Error("La venta recibida corresponde a otra orden.");
+  }
+
+  return rememberPrepaidSale(session, sale);
+}
+
+export async function readPrepaidSale(
+  session: AuthSession,
+  locationId: string,
+  orderId: string,
+  id: string,
+  signal: AbortSignal
+) {
+  const response = await request(
+    "/sales/" + saleId.parse(id),
+    envelope(z.object({ sale: checkoutSale })),
+    options(session, signal)
+  );
+
+  const sale = verify(response.data.sale, session, locationId);
+
+  if (sale.id !== id || sale.orderId !== orderId) {
+    throw new Error("La venta no corresponde al pago de esta orden.");
+  }
+
+  return rememberPrepaidSale(session, sale);
+}
+
 export type CheckoutData = Awaited<ReturnType<typeof readCheckout>>;

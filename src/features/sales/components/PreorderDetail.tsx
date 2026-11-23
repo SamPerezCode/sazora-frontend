@@ -6,6 +6,7 @@ import { BottomSheet } from "../../../components/layout/BottomSheet";
 import { Button } from "../../../components/ui/Button";
 import { buildWhatsAppUrl } from "../../../lib/whatsapp";
 
+import { QuickSaleActions } from "./QuickSaleActions";
 import { OrderRelations } from "./OrderRelations";
 import { hasPermission } from "../../auth/utils/permissions";
 import { cashDate } from "../../cash/utils/cash-format";
@@ -53,18 +54,32 @@ export function PreorderDetail({
   scope,
   onEdit,
   onClose,
+  quick,
 }: {
   order: Order;
   resource: SalesResource;
   scope: SalesScope;
   onEdit: () => void;
   onClose: () => void;
+  quick?: {
+    autoPay: boolean;
+    cashSessionId: string;
+    onPaymentClose: () => void;
+    onNew: () => void;
+  };
 }) {
   const { session, settings } = useAppShell();
 
   const [paymentMode, setPaymentMode] = useState<
     "pay" | "refund" | null
-  >(null);
+  >(() =>
+    quick?.autoPay &&
+    order.status === "OPEN" &&
+    order.paymentStatus === "PENDING" &&
+    hasPermission(session, "orders.payments.manage")
+      ? "pay"
+      : null
+  );
 
   const [paymentDetail, setPaymentDetail] =
     useState<PreorderPaymentBatch | null>(null);
@@ -182,7 +197,14 @@ export function PreorderDetail({
             !hasDelivered))));
 
   const refundable =
-    !terminal && order.status === "OPEN" && verified && canRefund;
+    !terminal &&
+    verified &&
+    canRefund &&
+    (order.status === "OPEN" ||
+      (!!quick &&
+        order.status === "CONFIRMED" &&
+        !!history &&
+        !hasDelivered));
 
   const printable =
     !terminal &&
@@ -273,7 +295,9 @@ export function PreorderDetail({
 
         {pendingPayment && (
           <p className="preorder-banner">
-            Esta orden debe pagarse antes de enviarse a cocina.
+            {quick
+              ? "Verifica el pago antes de entregar o enviar a preparación."
+              : "Esta orden debe pagarse antes de enviarse a cocina."}{" "}
           </p>
         )}
 
@@ -294,7 +318,9 @@ export function PreorderDetail({
 
         {order.status === "CONFIRMED" && !refunded && (
           <p className="preorder-banner">
-            Orden confirmada y enviada a cocina.
+            {quick
+              ? "Orden confirmada. El pago sigue verificado."
+              : "Orden confirmada y enviada a cocina."}{" "}
           </p>
         )}
 
@@ -489,12 +515,22 @@ export function PreorderDetail({
         <dl className="preorder-totals">
           <div>
             <dt>Subtotal</dt>
-            <dd>{money(cents(order.subtotal))}</dd>
+            <dd>
+              {quick
+                ? order.netSubtotal
+                  ? money(cents(order.netSubtotal))
+                  : "Por consultar"
+                : money(cents(order.subtotal))}
+            </dd>{" "}
           </div>
 
           <div>
             <dt>Impuestos</dt>
-            <dd>No desglosados</dd>
+            <dd>
+              {quick && order.taxTotal
+                ? money(cents(order.taxTotal))
+                : "No desglosados"}
+            </dd>{" "}
           </div>
 
           <div>
@@ -590,55 +626,57 @@ export function PreorderDetail({
             </section>
           )}
 
-        {order.status !== "OPEN" && (
-          <section className="preorder-customer">
-            <strong>Seguimiento de preparación</strong>
+        {order.status !== "OPEN" &&
+          (!quick ||
+            order.kitchenWorkflowMode === "PRINT_AND_SCREEN") && (
+            <section className="preorder-customer">
+              <strong>Seguimiento de preparación</strong>
 
-            {related.loading && (
-              <p role="status">Consultando preparación…</p>
-            )}
+              {related.loading && (
+                <p role="status">Consultando preparación…</p>
+              )}
 
-            {related.data?.historyError && (
-              <p role="alert">{related.data.historyError}</p>
-            )}
+              {related.data?.historyError && (
+                <p role="alert">{related.data.historyError}</p>
+              )}
 
-            {history?.tickets.map((ticket) => (
-              <div className="preorder-ticket" key={ticket.id}>
-                <strong>
-                  {ticket.preparationAreaName}
-                  {" · "}
-                  {PREPARATION[ticket.status]}
-                </strong>
+              {history?.tickets.map((ticket) => (
+                <div className="preorder-ticket" key={ticket.id}>
+                  <strong>
+                    {ticket.preparationAreaName}
+                    {" · "}
+                    {PREPARATION[ticket.status]}
+                  </strong>
 
-                {ticket.items.map((item) => (
-                  <div className="pp-line" key={item.id}>
-                    <span>
-                      {item.quantity} × {item.productName}
-                    </span>
+                  {ticket.items.map((item) => (
+                    <div className="pp-line" key={item.id}>
+                      <span>
+                        {item.quantity} × {item.productName}
+                      </span>
 
-                    <small>
-                      {PREPARATION[item.preparationStatus]}
-                    </small>
-                  </div>
-                ))}
-              </div>
-            ))}
+                      <small>
+                        {PREPARATION[item.preparationStatus]}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              ))}
 
-            {history && !history.tickets.length && (
-              <p>No hay comandas disponibles para esta orden.</p>
-            )}
+              {history && !history.tickets.length && (
+                <p>No hay comandas disponibles para esta orden.</p>
+              )}
 
-            {related.data?.historyError && (
-              <Button
-                size="sm"
-                variant="soft"
-                onClick={related.reload}
-              >
-                Reintentar seguimiento
-              </Button>
-            )}
-          </section>
-        )}
+              {related.data?.historyError && (
+                <Button
+                  size="sm"
+                  variant="soft"
+                  onClick={related.reload}
+                >
+                  Reintentar seguimiento
+                </Button>
+              )}
+            </section>
+          )}
 
         {printable && (
           <OrderPrintPanel
@@ -684,7 +722,7 @@ export function PreorderDetail({
             </Button>
           )}
 
-          {pendingPayment && canManage && (
+          {!quick && pendingPayment && canManage && (
             <Button variant="soft" disabled>
               Confirmar y enviar a cocina
             </Button>
@@ -714,15 +752,18 @@ export function PreorderDetail({
             </Button>
           )}
 
-          {order.status === "OPEN" && verified && canManage && (
-            <Button
-              disabled={blocked || pending > 0 || cancelling}
-              loading={resource.sending}
-              onClick={() => void resource.retryConfirmation()}
-            >
-              Confirmar y enviar a cocina
-            </Button>
-          )}
+          {!quick &&
+            order.status === "OPEN" &&
+            verified &&
+            canManage && (
+              <Button
+                disabled={blocked || pending > 0 || cancelling}
+                loading={resource.sending}
+                onClick={() => void resource.retryConfirmation()}
+              >
+                Confirmar y enviar a cocina
+              </Button>
+            )}
 
           {cancellable && (
             <Button
@@ -748,7 +789,7 @@ export function PreorderDetail({
             </Button>
           )}
 
-          {directDelivery && (
+          {!quick && directDelivery && (
             <Button
               disabled={blocked || pending > 0}
               onClick={() => setConfirmation("deliver")}
@@ -757,6 +798,15 @@ export function PreorderDetail({
             </Button>
           )}
         </div>
+
+        {quick && (
+          <QuickSaleActions
+            order={order}
+            resource={resource}
+            scope={scope}
+            onNew={quick.onNew}
+          />
+        )}
 
         {refunded && order.status === "CONFIRMED" && hasDelivered && (
           <p role="alert">
@@ -770,11 +820,13 @@ export function PreorderDetail({
         <PreorderPaymentDialog
           key={order.id + ":" + paymentMode}
           mode={paymentMode}
+          initialCashSessionId={quick?.cashSessionId}
           order={order}
           scope={scope}
           resource={resource}
           onClose={() => {
             setPaymentMode(null);
+            quick?.onPaymentClose();
             related.reload();
           }}
         />

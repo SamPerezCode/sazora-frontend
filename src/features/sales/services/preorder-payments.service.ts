@@ -20,6 +20,11 @@ const id = z.string().regex(/^[1-9]\d*$/);
 
 const paymentBatchSchema = z.object({
   id,
+  businessId: id,
+  orderId: id,
+  cashSessionId: id,
+  saleId: id.nullable(),
+  refundedAt: z.iso.datetime({ offset: true }).nullable(),
   status: paymentStatusSchema,
   paidTotal: amount,
   changeTotal: amount,
@@ -69,7 +74,17 @@ export async function readPreorderPayment(
     }
   );
 
-  return response.data.paymentBatch;
+  const batch = response.data.paymentBatch;
+
+  if (
+    batch &&
+    (batch.orderId !== orderId ||
+      batch.businessId !== session.business.id)
+  ) {
+    throw new Error("El pago recibido no corresponde a esta orden.");
+  }
+
+  return batch;
 }
 
 export async function readPreorderPaymentOptions(

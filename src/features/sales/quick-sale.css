@@ -1,0 +1,66 @@
+.quick-sale-dialog {
+  width: min(96vw, 1440px);
+  max-width: none;
+}
+
+.quick-sale-context {
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--border-color, #d3ddeb);
+}
+
+.quick-sale-context > * {
+  flex: 1 1 18rem;
+}
+
+.quick-sale-actions {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.quick-sale-dialog .sales-current > .preorder-content {
+  padding: 1rem;
+}
+
+.quick-sale-dialog .sales-current > .preorder-footer {
+  position: static;
+  padding: 1rem;
+}
+
+.quick-sale-dialog .preorder-footer .sales-form-actions {
+  flex-wrap: wrap;
+}
+
+.quick-sale-dialog .sales-product small {
+  display: block;
+}
+
+.quick-sale-dialog .sales-current {
+  min-width: 0;
+  overflow-y: auto;
+}
+
+@media (min-width: 48rem) {
+  .quick-sale-dialog.mp-workspace .sales-order-layout {
+    grid-template-columns:
+      minmax(0, 1.4fr)
+      minmax(22rem, 1fr);
+  }
+
+  .quick-sale-dialog.mp-workspace
+    .sales-order-layout[data-readonly="true"]
+    > .sales-catalog {
+    display: block;
+  }
+
+  .quick-sale-dialog.mp-workspace
+    .sales-order-layout[data-readonly="true"]
+    > .sales-current {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}

@@ -6,6 +6,10 @@ import { useRouteState } from "../../../hooks/useRouteState";
 import { request } from "../../../lib/http/client";
 import { orderResponseSchema } from "../schemas/sales.schema";
 import { useRemote } from "../hooks/usePublicOrders";
+import { QuickSaleContext } from "../components/QuickSaleContext";
+import { isQuickSale } from "../services/quick-sale.service";
+
+import "../quick-sale.css";
 import {
   History,
   MapPin,
@@ -13,6 +17,7 @@ import {
   RefreshCw,
   Store,
   UtensilsCrossed,
+  Zap,
 } from "lucide-react";
 
 import { MesasGrid } from "../components/MesasGrid";
@@ -370,6 +375,10 @@ function SalesContent({
 
   const [checkoutId, setCheckoutId] = useState<string | null>(null);
 
+  const [quickAutoPay, setQuickAutoPay] = useState(false);
+
+  const [quickCashSessionId, setQuickCashSessionId] = useState("");
+
   const canCheckout = hasEveryPermission(session, [
     "orders.close",
     "cash.sessions.read",
@@ -420,6 +429,8 @@ function SalesContent({
       : null);
 
   const canManageOrders = hasPermission(session, "orders.manage");
+
+  const quickSale = !!workspaceOrder && isQuickSale(workspaceOrder);
 
   const preorderDetail =
     !!active &&
@@ -482,14 +493,15 @@ function SalesContent({
     }
   }
 
-  function startTakeaway() {
+  function startTakeaway(quick = false) {
     if (!canManageOrders || blocked) return;
 
     setEditingPreorderId(null);
+    setQuickAutoPay(false);
 
     resource.start({
       serviceType: "TAKEAWAY",
-      sourceChannel: "IN_PERSON",
+      sourceChannel: quick ? "IN_PERSON" : "WHATSAPP",
       restaurantTableId: null,
       customerCount: null,
       customerName: null,
@@ -555,7 +567,7 @@ function SalesContent({
     <Button
       size="compact"
       disabled={blocked || !canManageOrders}
-      onClick={startTakeaway}
+      onClick={() => startTakeaway()}
     >
       <Plus size={16} />
       Nuevo pedido para recoger
@@ -618,7 +630,7 @@ function SalesContent({
                 onClick={resource.retry}
                 aria-label="Actualizar mesas y pedidos"
               >
-                <RefreshCw size={17} />
+                <RefreshCw size={17} aria-hidden="true" />
               </Button>
 
               <Button
@@ -627,9 +639,22 @@ function SalesContent({
                 disabled={blocked}
                 onClick={() => setChooseTable(true)}
               >
-                <UtensilsCrossed size={16} />
+                <UtensilsCrossed size={16} aria-hidden="true" />
                 Abrir mesa
               </Button>
+
+              {canManageOrders && (
+                <Button
+                  variant="soft"
+                  size="compact"
+                  className="mp-quick-sale-button"
+                  disabled={blocked}
+                  onClick={() => startTakeaway(true)}
+                >
+                  <Zap size={16} aria-hidden="true" />
+                  Caja rápida
+                </Button>
+              )}
 
               {newPickup}
             </div>
@@ -725,6 +750,7 @@ function SalesContent({
 
               <PreorderList
                 orders={data.orders}
+                scope={scope}
                 disabled={blocked}
                 onOpen={(id) => {
                   setEditingPreorderId(null);
@@ -752,7 +778,7 @@ function SalesContent({
                 </div>
 
                 <div
-                  className="mesa-filters flex gap-2 overflow-x-auto pb-1"
+                  className="preorder-filters"
                   role="group"
                   aria-label="Estado de las mesas"
                 >
@@ -761,7 +787,7 @@ function SalesContent({
                       key={option.id}
                       size="compact"
                       variant={
-                        filter === option.id ? "primary" : "secondary"
+                        filter === option.id ? "primary" : "soft"
                       }
                       aria-pressed={filter === option.id}
                       onClick={() => setFilter(option.id)}
@@ -836,35 +862,85 @@ function SalesContent({
           open
           variant="modal"
           title={
-            preorderDetail && active ? `Orden #${active.id}` : title
+            quickSale
+              ? "Caja rápida"
+              : preorderDetail && active
+                ? `Orden #${active.id}`
+                : title
           }
           busy={resource.busy}
           className={
-            preorderDetail
-              ? "preorder-dialog"
-              : `sales-workspace mp-workspace ${
-                  active?.status === "DELIVERED"
-                    ? "mp-workspace-summary"
-                    : ""
-                }`
+            quickSale
+              ? "sales-workspace mp-workspace quick-sale-dialog"
+              : preorderDetail
+                ? "preorder-dialog"
+                : `sales-workspace mp-workspace ${
+                    active?.status === "DELIVERED"
+                      ? "mp-workspace-summary"
+                      : ""
+                  }`
           }
           onClose={closeWorkspace}
         >
-          {!preorderDetail && active?.status === "DELIVERED" && (
-            <div className="mp-workspace-location">
-              <MapPin size={14} />
-              Punto de venta:
-              <strong>
-                {location.name} · {location.code}
-              </strong>
-              <span>
-                Orden #{active.id}
-                <OrderStatusBadge status={active.status} />
-              </span>
-            </div>
+          {quickSale && (
+            <QuickSaleContext
+              scope={scope}
+              order={active}
+              value={quickCashSessionId}
+              onChange={setQuickCashSessionId}
+              disabled={blocked}
+            />
           )}
 
-          {preorderDetail && active ? (
+          {!quickSale &&
+            !preorderDetail &&
+            active?.status === "DELIVERED" && (
+              <div className="mp-workspace-location">
+                <MapPin size={14} />
+                Punto de venta:
+                <strong>
+                  {location.name} · {location.code}
+                </strong>
+                <span>
+                  Orden #{active.id}
+                  <OrderStatusBadge status={active.status} />
+                </span>
+              </div>
+            )}
+
+          {quickSale && workspaceOrder && data ? (
+            <OrderWorkspace
+              key={workspaceOrder.id ?? "quick-draft"}
+              resource={resource}
+              order={workspaceOrder}
+              data={data}
+              quickSale
+              onBeforeSave={() =>
+                setQuickAutoPay(
+                  hasPermission(session, "orders.payments.manage")
+                )
+              }
+              onSaved={() => setEditingPreorderId(null)}
+              summary={
+                preorderDetail && active ? (
+                  <PreorderDetail
+                    key={active.id}
+                    order={active}
+                    resource={resource}
+                    scope={scope}
+                    onEdit={() => setEditingPreorderId(active.id)}
+                    onClose={closeWorkspace}
+                    quick={{
+                      autoPay: quickAutoPay,
+                      cashSessionId: quickCashSessionId,
+                      onPaymentClose: () => setQuickAutoPay(false),
+                      onNew: () => startTakeaway(true),
+                    }}
+                  />
+                ) : undefined
+              }
+            />
+          ) : preorderDetail && active ? (
             <PreorderDetail
               key={active.id}
               order={active}

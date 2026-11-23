@@ -15,12 +15,14 @@ import {
 export function OrderCustomerForm({
   initial,
   existing,
+  channels = ["IN_PERSON", "WHATSAPP", "PHONE"],
   busy,
   onSave,
   onCancel,
 }: {
   initial: OrderInput;
   existing: boolean;
+  channels?: readonly ("IN_PERSON" | "WHATSAPP" | "PHONE")[];
   busy: boolean;
   onSave: (input: OrderInput) => Promise<boolean>;
   onCancel: () => void;
@@ -63,7 +65,7 @@ export function OrderCustomerForm({
           : "Se envían junto con los productos al crear el pedido."}
       </p>
 
-      {existing ? (
+      {existing || channels.length === 1 ? (
         <p>
           Origen:{" "}
           {initial.sourceChannel
@@ -76,12 +78,10 @@ export function OrderCustomerForm({
           required
           disabled={busy}
           value={value.sourceChannel ?? "IN_PERSON"}
-          options={(["IN_PERSON", "WHATSAPP", "PHONE"] as const).map(
-            (channel) => ({
-              value: channel,
-              label: CHANNELS[channel],
-            })
-          )}
+          options={channels.map((channel) => ({
+            value: channel,
+            label: CHANNELS[channel],
+          }))}
           onValueChange={(sourceChannel) => {
             if (
               sourceChannel === "IN_PERSON" ||

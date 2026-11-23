@@ -42,7 +42,16 @@ export const sourceChannelSchema = z.enum([
   "PUBLIC_MENU",
 ]);
 
+export const fulfillmentSummarySchema = z.object({
+  activeItemCount: z.number().int().nonnegative(),
+  activeUnitCount: z.number().int().nonnegative(),
+  readyToServeUnitCount: z.number().int().nonnegative(),
+  prepareToOrderUnitCount: z.number().int().nonnegative(),
+  requiresPreparation: z.boolean(),
+});
+
 const orderBase = z.object({
+  fulfillmentSummary: fulfillmentSummarySchema.optional(),
   paymentStatus: paymentStatusSchema.optional(),
   paymentVerifiedAt: z.iso
     .datetime({ offset: true })
@@ -81,6 +90,8 @@ export const orderItemSchema = z.object({
 
 export const orderSchema = orderBase.extend({
   businessId: id,
+  netSubtotal: moneySchema.optional(),
+  taxTotal: moneySchema.optional(),
   location: orderLocationSchema,
   closedAt: z.iso.datetime({ offset: true }).nullable().optional(),
   cancelledAt: z.iso.datetime({ offset: true }).nullable().optional(),

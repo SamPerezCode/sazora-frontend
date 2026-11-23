@@ -267,6 +267,7 @@ export async function getSales(
       tables.data.restaurantTables.filter((table) => table.isActive),
       orders
     ),
+    catalogProducts: products.data.products,
     products: products.data.products.filter(
       (product) => product.isAvailable
     ),
