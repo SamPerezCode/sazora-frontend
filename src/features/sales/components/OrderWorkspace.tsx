@@ -14,7 +14,8 @@ import {
   Printer,
 } from "lucide-react";
 import { OrderStatusBadge } from "./OrderStatusBadge";
-
+import { useAppShell } from "../../../app/layout/shell-context";
+import { hasPermission } from "../../auth/utils/permissions";
 import { OrderCustomerForm } from "./OrderCustomerForm";
 
 import {
@@ -98,6 +99,18 @@ export function OrderWorkspace({
   };
   data: SalesData;
 }) {
+  const { session } = useAppShell();
+
+  const tableOrder = order.serviceType === "TABLE";
+
+  const canManage =
+    !tableOrder || hasPermission(session, "orders.manage");
+
+  const canCancel = hasPermission(session, "orders.cancel");
+
+  const canDeliverItem =
+    !tableOrder || hasPermission(session, "kitchen.tickets.update");
+
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [showAccount, setShowAccount] = useState(false);
@@ -132,6 +145,7 @@ export function OrderWorkspace({
 
   const blocked =
     resource.busy ||
+    (tableOrder && resource.loading) ||
     resource.accessLost ||
     resource.uncertain ||
     !!resource.error ||
@@ -142,13 +156,14 @@ export function OrderWorkspace({
 
   const editable =
     !summary &&
+    canManage &&
     (prepaid
       ? !order.id || canEditPreorder(order)
       : order.status === "OPEN");
 
   const canAdd =
-    editable || (!prepaid && order.status === "CONFIRMED");
-
+    editable ||
+    (!prepaid && canManage && order.status === "CONFIRMED");
   const workflowMode = resolveKitchenMode(
     order,
     resource.kitchenSettings.data?.workflowMode ?? null
@@ -157,6 +172,7 @@ export function OrderWorkspace({
   const screenWorkflow = workflowMode === "PRINT_AND_SCREEN";
 
   const directDelivery =
+    canManage &&
     order.status === "CONFIRMED" &&
     order.kitchenWorkflowMode === "PRINT_ONLY";
 
@@ -921,6 +937,7 @@ export function OrderWorkspace({
                         )}
 
                         {!prepaid &&
+                          canCancel &&
                           order.status === "CONFIRMED" &&
                           item.status === "ACTIVE" &&
                           ticket &&
@@ -970,6 +987,7 @@ export function OrderWorkspace({
                           )}
 
                         {screenWorkflow &&
+                          canDeliverItem &&
                           ticket?.preparationStatus === "READY" && (
                             <Button
                               size="sm"
@@ -988,40 +1006,48 @@ export function OrderWorkspace({
                           )}
                       </div>
 
-                      {editing === item.id && canAdd && (
-                        <BottomSheet
-                          id={accountId + "-deliver"}
-                          open
-                          variant="modal"
-                          title="¿Marcar esta orden como entregada?"
-                          className="app-confirm-dialog"
-                          busy={resource.busy}
-                          onClose={() => setConfirmDelivery(false)}
-                        >
-                          <div className="mp-dialog-content">
-                            <ItemEditor
-                              key={`${item.id}:${order.status}`}
-                              item={item}
-                              cancel={!editable}
-                              busy={blocked}
-                              onClose={() => setEditing(null)}
-                              onSave={async (body) => {
-                                const ok = await resource.action(
-                                  `/orders/${order.id}/items/${item.id}${
-                                    editable ? "" : "/cancel"
-                                  }`,
-                                  editable ? "PATCH" : "POST",
-                                  body
-                                );
+                      {editing === item.id &&
+                        (canAdd ||
+                          (tableOrder &&
+                            canCancel &&
+                            order.status === "CONFIRMED")) && (
+                          <BottomSheet
+                            id={accountId + "-item-" + item.id}
+                            open
+                            variant="modal"
+                            title={
+                              editable
+                                ? "Editar producto"
+                                : "Cancelar producto"
+                            }
+                            className="app-confirm-dialog"
+                            busy={resource.busy}
+                            onClose={() => setEditing(null)}
+                          >
+                            <div className="mp-dialog-content">
+                              <ItemEditor
+                                key={`${item.id}:${order.status}`}
+                                item={item}
+                                cancel={!editable}
+                                busy={blocked}
+                                onClose={() => setEditing(null)}
+                                onSave={async (body) => {
+                                  const ok = await resource.action(
+                                    `/orders/${order.id}/items/${item.id}${
+                                      editable ? "" : "/cancel"
+                                    }`,
+                                    editable ? "PATCH" : "POST",
+                                    body
+                                  );
 
-                                if (ok) {
-                                  setEditing(null);
-                                }
-                              }}
-                            />
-                          </div>
-                        </BottomSheet>
-                      )}
+                                  if (ok) {
+                                    setEditing(null);
+                                  }
+                                }}
+                              />
+                            </div>
+                          </BottomSheet>
+                        )}
                     </article>
                   );
                 })}
@@ -1194,7 +1220,7 @@ export function OrderWorkspace({
               <small>{pendingCount} por enviar</small>
             )}
           </div>
-          {quickSale && (
+          {(quickSale || tableOrder) && (
             <dl className="preorder-totals">
               <div>
                 <dt>Subtotal neto</dt>

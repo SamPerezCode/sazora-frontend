@@ -303,4 +303,93 @@ export async function readPrepaidSale(
   return rememberPrepaidSale(session, sale);
 }
 
+export async function readCheckoutOrder(
+  session: AuthSession,
+  orderId: string,
+  locationId: string,
+  signal: AbortSignal
+) {
+  if (!hasEveryPermission(session, ["orders.read"])) {
+    throw new Error("No tienes permiso para consultar la orden.");
+  }
+
+  const response = await request(
+    "/orders/" + saleId.parse(orderId),
+    envelope(z.object({ order: checkoutOrder })),
+    options(session, signal)
+  );
+
+  const order = verify(response.data.order, session, locationId);
+
+  if (order.id !== orderId) {
+    throw new Error("La respuesta corresponde a otra orden.");
+  }
+
+  return order;
+}
+
+export async function recoverTableCheckout(
+  session: AuthSession,
+  orderId: string,
+  locationId: string,
+  signal: AbortSignal
+) {
+  const before = await readCheckoutOrder(
+    session,
+    orderId,
+    locationId,
+    signal
+  );
+
+  if (
+    before.serviceType !== "TABLE" ||
+    before.sourceChannel !== "IN_PERSON"
+  ) {
+    throw new Error(
+      "Esta recuperación corresponde únicamente a mesas presenciales."
+    );
+  }
+
+  try {
+    const sale = await findCheckout(
+      session,
+      orderId,
+      locationId,
+      signal
+    );
+
+    if (sale) {
+      return {
+        order: before,
+        sale,
+        closed: true,
+      };
+    }
+  } catch (cause) {
+    // Una orden cerrada no puede cobrarse de nuevo,
+    // aunque falle la consulta del historial.
+    if (before.status !== "CLOSED") throw cause;
+
+    return {
+      order: before,
+      sale: null,
+      closed: true,
+    };
+  }
+
+  // El primer GET pudo ocurrir antes de que terminara el POST.
+  const order = await readCheckoutOrder(
+    session,
+    orderId,
+    locationId,
+    signal
+  );
+
+  return {
+    order,
+    sale: null,
+    closed: order.status === "CLOSED",
+  };
+}
+
 export type CheckoutData = Awaited<ReturnType<typeof readCheckout>>;

@@ -681,10 +681,7 @@ export function useSales(
   }
 
   function start(input: OrderInput) {
-    if (
-      input.serviceType !== "TABLE" &&
-      !hasPermission(session, "orders.manage")
-    ) {
+    if (!hasPermission(session, "orders.manage")) {
       return;
     }
 
@@ -757,6 +754,13 @@ export function useSales(
     const key = currentLocal.current;
     const draft = key ? localDrafts[key] : null;
 
+    if (
+      draft?.serviceType === "TABLE" &&
+      !hasPermission(session, "orders.manage")
+    ) {
+      return false;
+    }
+
     if (locked.current || uncertain || !key || !draft) {
       return false;
     }
@@ -781,6 +785,13 @@ export function useSales(
 
   function setDraft(id: string | null, draft: Draft) {
     if (locked.current || uncertain) return;
+
+    const table = id
+      ? data?.order?.serviceType === "TABLE"
+      : !!currentLocal.current &&
+        localDrafts[currentLocal.current]?.serviceType === "TABLE";
+
+    if (table && !hasPermission(session, "orders.manage")) return;
 
     const key = currentLocal.current;
 
@@ -968,10 +979,7 @@ export function useSales(
   async function confirm(id: string) {
     const current = await readOrder(id);
 
-    if (
-      current.serviceType !== "TABLE" &&
-      !hasPermission(session, "orders.manage")
-    ) {
+    if (!hasPermission(session, "orders.manage")) {
       throw new RecoveryError(
         "No tienes permiso para confirmar pedidos."
       );
@@ -1200,10 +1208,7 @@ export function useSales(
     await run(async () => {
       const current = await checkCancellation(id);
 
-      if (
-        current.serviceType !== "TABLE" &&
-        !hasPermission(session, "orders.cancel")
-      ) {
+      if (!hasPermission(session, "orders.cancel")) {
         throw new RecoveryError(
           "No tienes permiso para cancelar pedidos."
         );
@@ -1357,6 +1362,26 @@ export function useSales(
         !hasPermission(session, "orders.manage"))
     ) {
       return Promise.resolve(false);
+    }
+
+    if (order.serviceType === "TABLE") {
+      if (path === `/orders/${id}/close`) {
+        setNotice(
+          "Cobra la cuenta mediante la creación de la venta."
+        );
+        return Promise.resolve(false);
+      }
+
+      const permission = path.startsWith("/kitchen-tickets/")
+        ? "kitchen.tickets.update"
+        : path.endsWith("/cancel")
+          ? "orders.cancel"
+          : "orders.manage";
+
+      if (!hasPermission(session, permission)) {
+        setNotice("No tienes permiso para realizar esta operación.");
+        return Promise.resolve(false);
+      }
     }
 
     if (body && typeof body === "object" && "locationId" in body) {
@@ -1552,6 +1577,7 @@ export function useSales(
       order.id !== id ||
       order.status !== "CONFIRMED" ||
       order.serviceType !== "TABLE" ||
+      !hasPermission(session, "orders.cancel") ||
       item?.status !== "ACTIVE" ||
       !preparation ||
       !["PENDING", "PREPARING", "IN_PREPARATION", "READY"].includes(
@@ -1732,10 +1758,7 @@ export function useSales(
     const order =
       data.order?.id === selected.current ? data.order : null;
 
-    if (
-      (local?.serviceType ?? order?.serviceType) !== "TABLE" &&
-      !hasPermission(session, "orders.manage")
-    ) {
+    if (!hasPermission(session, "orders.manage")) {
       return false;
     }
 
@@ -2048,6 +2071,8 @@ export function useSales(
       order.id !== id ||
       order.status !== "CONFIRMED" ||
       order.kitchenWorkflowMode !== "PRINT_ONLY" ||
+      (order.serviceType === "TABLE" &&
+        !hasPermission(session, "orders.manage")) ||
       (order.serviceType !== "TABLE" &&
         order.paymentStatus !== "VERIFIED") ||
       confirmationIds[id] ||

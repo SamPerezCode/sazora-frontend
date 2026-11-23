@@ -483,9 +483,10 @@ function SalesContent({
 
     if (entry.order) {
       resource.select(entry.order.id);
-    } else if (!blocked) {
+    } else if (!blocked && canManageOrders) {
       resource.start({
         serviceType: "TABLE",
+        sourceChannel: "IN_PERSON",
         restaurantTableId: id,
         customerCount: null,
         notes: null,
@@ -636,7 +637,7 @@ function SalesContent({
               <Button
                 variant="soft"
                 size="compact"
-                disabled={blocked}
+                disabled={blocked || !canManageOrders}
                 onClick={() => setChooseTable(true)}
               >
                 <UtensilsCrossed size={16} aria-hidden="true" />
@@ -801,7 +802,8 @@ function SalesContent({
                   entries={visible}
                   loading={resource.loading}
                   disabled={({ order }) =>
-                    resource.busy || (!order && blocked)
+                    resource.busy ||
+                    (!order && (blocked || !canManageOrders))
                   }
                   onOpen={openTable}
                   pendingCount={pendingCount}
@@ -848,7 +850,7 @@ function SalesContent({
               entries={board.filter(
                 ({ table, order }) => table.isActive && !order
               )}
-              disabled={() => blocked}
+              disabled={() => blocked || !canManageOrders}
               onOpen={openTable}
               emptyText="Todas las mesas están ocupadas o no hay mesas activas en este punto de venta."
             />

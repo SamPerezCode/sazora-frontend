@@ -121,8 +121,10 @@ function CheckoutForm({
   const sale = mutation.sale;
 
   const blocked =
-    mutation.busy || mutation.review || mutation.uncertain;
-
+    mutation.busy ||
+    mutation.review ||
+    mutation.uncertain ||
+    mutation.closed;
   const canSubmit =
     !blocked &&
     !!selected &&
@@ -141,9 +143,11 @@ function CheckoutForm({
           ? sale.status === "COMPLETED"
             ? "Cuenta cobrada y cerrada"
             : "Venta registrada"
-          : "Cobrar y cerrar cuenta"
+          : mutation.closed
+            ? "Orden cerrada"
+            : "Cobrar y cerrar cuenta"
       }
-      busy={mutation.busy}
+      busy={mutation.busy || mutation.uncertain}
       onClose={onClose}
     >
       <p className="checkout-subtitle">
@@ -199,6 +203,25 @@ function CheckoutForm({
             <Button onClick={onClose}>Finalizar</Button>
           </footer>
         </>
+      ) : mutation.closed ? (
+        <>
+          <div className="checkout-success" role="status">
+            <Check size={38} aria-hidden="true" />
+
+            <h3>La orden está cerrada</h3>
+
+            <p>No se enviarán nuevos cobros.</p>
+
+            <p>
+              No fue posible recuperar el detalle de la venta. Puedes
+              consultarlo en el historial.
+            </p>
+          </div>
+
+          <footer className="checkout-footer">
+            <Button onClick={onClose}>Finalizar</Button>
+          </footer>
+        </>
       ) : (
         <form
           onSubmit={(event) => {
@@ -232,6 +255,22 @@ function CheckoutForm({
             <dl className="checkout-totals" aria-live="polite">
               {(
                 [
+                  ...(order.serviceType === "TABLE"
+                    ? ([
+                        [
+                          "Subtotal neto",
+                          order.netSubtotal
+                            ? cashCents(order.netSubtotal)
+                            : null,
+                        ],
+                        [
+                          "Impuestos",
+                          order.taxTotal
+                            ? cashCents(order.taxTotal)
+                            : null,
+                        ],
+                      ] as const)
+                    : []),
                   ["Total de la cuenta", cashCents(order.total)],
                   ["Total aplicado", result.paid],
                   [
@@ -243,7 +282,11 @@ function CheckoutForm({
               ).map(([label, value]) => (
                 <div key={label}>
                   <dt>{label}</dt>
-                  <dd>{cashMoney(value, currency)}</dd>
+                  <dd>
+                    {value === null
+                      ? "No disponible"
+                      : cashMoney(value, currency)}
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -389,7 +432,7 @@ function CheckoutForm({
             {!data.sessions.length && (
               <Button
                 variant="secondary"
-                disabled={mutation.busy}
+                disabled={mutation.busy || mutation.uncertain}
                 onClick={reload}
               >
                 Consultar turnos nuevamente
@@ -400,7 +443,7 @@ function CheckoutForm({
           <footer className="checkout-footer">
             <Button
               variant="secondary"
-              disabled={mutation.busy}
+              disabled={mutation.busy || mutation.uncertain}
               onClick={onClose}
             >
               Volver

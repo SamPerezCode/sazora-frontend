@@ -211,6 +211,36 @@ export function OrderSummaryView({
           <strong>{money(cents(order.subtotal))}</strong>
           <p>Suma de los productos consumidos.</p>
 
+          {order.serviceType === "TABLE" && (
+            <dl className="preorder-totals">
+              <div>
+                <dt>Subtotal neto</dt>
+                <dd>
+                  {order.netSubtotal
+                    ? money(cents(order.netSubtotal))
+                    : "No disponible"}
+                </dd>
+              </div>
+
+              <div>
+                <dt>Impuestos</dt>
+                <dd>
+                  {order.taxTotal
+                    ? money(cents(order.taxTotal))
+                    : "No disponible"}
+                </dd>
+              </div>
+
+              <div>
+                <dt>Total</dt>
+                <dd>
+                  {order.total
+                    ? money(cents(order.total))
+                    : "No disponible"}
+                </dd>
+              </div>
+            </dl>
+          )}
           <div className="mp-badges">
             <OrderStatusBadge status={order.status} />
             {order.status === "DELIVERED" && (
@@ -235,11 +265,17 @@ export function OrderSummaryView({
       <footer className="mp-summary-footer">
         <div>
           <small>
-            Subtotal ·{" "}
+            {order.serviceType === "TABLE" ? "Total" : "Subtotal"} ·{" "}
             {active.reduce((sum, item) => sum + item.quantity, 0)}{" "}
             unidades
           </small>
-          <strong>{money(cents(order.subtotal))}</strong>
+          <strong>
+            {order.serviceType === "TABLE"
+              ? order.total
+                ? money(cents(order.total))
+                : "No disponible"
+              : money(cents(order.subtotal))}
+          </strong>
         </div>
 
         {resource && order.status === "DELIVERED" && onCheckout && (

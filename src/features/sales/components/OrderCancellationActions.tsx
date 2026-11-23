@@ -41,8 +41,7 @@ export function OrderCancellationActions({
       ? resource.data?.order?.serviceType
       : resource.localDraft?.serviceType) !== "TABLE";
 
-  const allowed = !prepaid || hasPermission(session, "orders.cancel");
-
+  const allowed = hasPermission(session, "orders.cancel");
   const confirmed = status === "CONFIRMED";
   const verificationPending =
     !!orderId && !!resource.cancellationIds[orderId];
