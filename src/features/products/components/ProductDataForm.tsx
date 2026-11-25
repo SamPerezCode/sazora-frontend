@@ -9,6 +9,7 @@ import type { Category } from "../../categories/schemas/category.schema";
 import type { PreparationArea } from "../../preparation-areas/schemas/preparation-area.schema";
 import type { Product } from "../schemas/product.schema";
 import { productEditSchema } from "../schemas/product-action.schema";
+import { useInventorySetupLocations } from "../../inventory/hooks/useInventorySetupLocations";
 
 import { inventorySetupSchema } from "../../inventory/services/inventory-setup";
 import type {
@@ -36,6 +37,7 @@ export function ProductDataForm({
   onCancel,
 }: Props) {
   const editing = kind === "edit";
+  const locations = useInventorySetupLocations(!editing);
 
   const [draft, setDraft] = useState<Record<string, string>>(() => ({
     name: product.name,
@@ -47,10 +49,13 @@ export function ProductDataForm({
     fulfillmentMode: product.fulfillmentMode,
     trackingType: "RESALE",
     baseUnit: "UNIT",
+    locationId: "",
     openingQuantity: "0",
     minimumStock: "0",
     quantityPerProduct: "1",
   }));
+  const locationReady =
+    editing || locations.hasSelection(draft.locationId);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const alive = useRef(false);
@@ -69,8 +74,7 @@ export function ProductDataForm({
   }
 
   async function submit(form: HTMLFormElement) {
-    if (busy) return;
-
+    if (busy || !locationReady) return;
     setMessage("");
     setErrors({});
 
@@ -208,6 +212,70 @@ export function ProductDataForm({
         <legend className="sr-only">
           {editing ? "Editar producto" : "Configurar inventario"}
         </legend>
+
+        {!editing && (
+          <>
+            <SelectField
+              label="Ubicación del inventario"
+              name="locationId"
+              required
+              value={draft.locationId}
+              options={locations.options}
+              placeholder={
+                locations.loading
+                  ? "Cargando ubicaciones…"
+                  : "Selecciona una ubicación"
+              }
+              disabled={
+                busy ||
+                locations.loading ||
+                !!locations.error ||
+                !locations.options.length
+              }
+              error={
+                errors.locationId ||
+                (draft.locationId &&
+                !locations.loading &&
+                !locations.error &&
+                !locations.hasSelection(draft.locationId)
+                  ? "La ubicación seleccionada ya no está disponible."
+                  : undefined)
+              }
+              onValueChange={(value) => {
+                change("locationId", value);
+              }}
+            />
+
+            {locations.error && (
+              <div role="alert">
+                <p className="inv-error">{locations.error}</p>
+
+                <Button
+                  type="button"
+                  variant="soft"
+                  disabled={busy}
+                  onClick={locations.reload}
+                >
+                  Reintentar ubicaciones
+                </Button>
+              </div>
+            )}
+
+            {!locations.loading &&
+              !locations.error &&
+              !locations.options.length && (
+                <p role="status">
+                  No hay ubicaciones activas habilitadas para
+                  inventario a las que tengas acceso.
+                </p>
+              )}
+
+            <p className="inv-note">
+              La existencia inicial y el stock mínimo se registrarán
+              en esta ubicación.
+            </p>
+          </>
+        )}
 
         {fields.map((field, index) => (
           <TextField
@@ -351,7 +419,7 @@ export function ProductDataForm({
           type="submit"
           size="sm"
           loading={busy}
-          disabled={busy}
+          disabled={busy || !locationReady}
         >
           {editing ? "Guardar cambios" : "Configurar inventario"}
         </Button>

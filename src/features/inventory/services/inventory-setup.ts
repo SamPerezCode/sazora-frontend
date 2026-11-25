@@ -34,6 +34,10 @@ export const inventorySetupSchema = z.object({
 
   baseUnit: baseUnitSchema,
 
+  locationId: z
+    .string()
+    .trim()
+    .regex(/^[1-9]\d*$/, "Selecciona una ubicación de inventario."),
   openingQuantity: quantity,
 
   minimumStock: quantity,

@@ -9,6 +9,7 @@ import type { ProductDetailData } from "../../products/schemas/product.schema";
 import { useInventoryQuery } from "../hooks/useInventoryQuery";
 import { useNavigate } from "react-router";
 import { productCompositionPath } from "../../products/utils/product-inventory";
+import { useInventorySetupLocations } from "../hooks/useInventorySetupLocations";
 import {
   configureInventory,
   inventorySetupSchema,
@@ -178,11 +179,13 @@ function SetupForm({
   onComboBlocked: (message: string) => void;
 }) {
   const { session } = useAppShell();
+  const locations = useInventorySetupLocations();
 
   const [initial] = useState<InventorySetupDraft>(() => ({
     trackingType: "RESALE",
     sku: product.sku ?? "",
     baseUnit: "UNIT",
+    locationId: "",
     openingQuantity: "0",
     minimumStock: "0",
     quantityPerProduct: "1",
@@ -210,7 +213,11 @@ function SetupForm({
       description="Crea el inventario de este producto y activa el descuento por venta."
       submitLabel="Guardar configuración"
       dirty={dirty}
-      valid={validation.success && product.isActive}
+      valid={
+        validation.success &&
+        product.isActive &&
+        locations.hasSelection(draft.locationId)
+      }
       onClose={onClose}
       onSaved={() => {
         if (blockedCombo.current !== null) {
@@ -260,6 +267,58 @@ function SetupForm({
       </p>
 
       <div className="inv-fields">
+        <SelectField
+          label="Ubicación del inventario"
+          name="locationId"
+          required
+          value={draft.locationId}
+          options={locations.options}
+          placeholder={
+            locations.loading
+              ? "Cargando ubicaciones…"
+              : "Selecciona una ubicación"
+          }
+          disabled={
+            locations.loading ||
+            !!locations.error ||
+            !locations.options.length
+          }
+          error={
+            draft.locationId &&
+            !locations.loading &&
+            !locations.error &&
+            !locations.hasSelection(draft.locationId)
+              ? "La ubicación seleccionada ya no está disponible."
+              : undefined
+          }
+          onValueChange={(value) => {
+            update({ locationId: value });
+          }}
+        />
+
+        {locations.error && (
+          <div role="alert">
+            <p className="inv-error">{locations.error}</p>
+
+            <Button
+              type="button"
+              variant="soft"
+              onClick={locations.reload}
+            >
+              Reintentar ubicaciones
+            </Button>
+          </div>
+        )}
+
+        {!locations.loading &&
+          !locations.error &&
+          !locations.options.length && (
+            <p role="status">
+              No hay ubicaciones activas habilitadas para inventario a
+              las que tengas acceso.
+            </p>
+          )}
+
         <SelectField
           label="Tipo de seguimiento"
           required
