@@ -2,6 +2,9 @@ import { SelectField } from "../../../components/forms/SelectField";
 import { Button } from "../../../components/ui/Button";
 import { DateField } from "../../../components/forms/DateField";
 
+import type { ReactNode } from "react";
+import { CHANNELS } from "../../sales/utils/preorders";
+
 import type {
   ReportFilters as Filters,
   ReportTab,
@@ -22,6 +25,7 @@ export interface FilterOption {
 
 interface Props {
   tab: ReportTab;
+  extraActions?: ReactNode;
   draft: Filters;
   errors: Record<string, string>;
 
@@ -40,6 +44,7 @@ interface Props {
 
 export function ReportFilters({
   tab,
+  extraActions,
   timeZone,
   draft,
   errors,
@@ -60,7 +65,7 @@ export function ReportFilters({
   ) => (
     <SelectField
       label={label}
-      value={draft[key]}
+      value={draft[key] ?? ""}
       options={options}
       error={errors[key]}
       disabled={disabled}
@@ -132,6 +137,13 @@ export function ReportFilters({
 
         {tab === "sales" &&
           select(
+            "sourceChannel",
+            "Canal",
+            choices(CHANNELS, "Todos los canales")
+          )}
+
+        {tab === "sales" &&
+          select(
             "openedByMembershipId",
             "Empleado",
             [
@@ -200,6 +212,8 @@ export function ReportFilters({
         <Button type="submit" className="rp-apply-button">
           Aplicar filtros
         </Button>
+
+        {extraActions}
       </div>
     </form>
   );

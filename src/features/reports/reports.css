@@ -1040,3 +1040,54 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Ventas: rentabilidad y exportación. */
+
+.rp-profitability {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.rp-profitability h2 {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.rp-page .rp-profitability .rp-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rp-profitability .rp-metric > span {
+  overflow-wrap: anywhere;
+}
+
+.rp-page .rp-actions .rp-export-button {
+  min-height: 2.5rem;
+  white-space: normal;
+}
+
+.rp-export-error {
+  flex: 0 0 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1000px) {
+  .rp-page .rp-profitability .rp-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .rp-page .rp-actions .rp-export-button {
+    flex: 0 0 100%;
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .rp-page .rp-profitability .rp-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

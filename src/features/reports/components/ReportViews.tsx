@@ -37,6 +37,8 @@ import type {
   KitchenTimingMetric,
 } from "../schemas/reports.schema";
 
+import { SalesProfitability } from "./SalesProfitability";
+
 export type OrderSelection = {
   orderId: string;
 
@@ -244,13 +246,16 @@ export function SalesView({
   return (
     <>
       {d.financialSource === "CLOSED_ORDERS" && (
-        <Notice>Los importes corresponden a órdenes cerradas.</Notice>
+        <Notice>
+          Indicadores de órdenes cerradas: importes y cantidades según
+          la fecha de cierre de la orden.
+        </Notice>
       )}
 
       <Metrics
         items={[
           {
-            label: "Ventas totales",
+            label: "Importe de órdenes cerradas",
             value: money(d.summary.salesTotal),
           },
           {
@@ -258,14 +263,19 @@ export function SalesView({
             value: number(d.summary.orderCount),
           },
           {
-            label: "Unidades vendidas",
+            label: "Unidades de órdenes cerradas",
             value: number(d.summary.unitsSold),
           },
           {
-            label: "Ticket promedio",
+            label: "Ticket promedio de órdenes cerradas",
             value: money(d.summary.averageTicket),
           },
         ]}
+      />
+
+      <SalesProfitability
+        data={d.profitability}
+        currency={d.business.currencyCode}
       />
 
       <div className="rp-grid">
@@ -326,7 +336,7 @@ export function SalesView({
         </Panel>
       )}
 
-      <Panel title="Historial de ventas">
+      <Panel title="Historial de órdenes cerradas">
         {d.history.sales.length ? (
           <DataTable
             headers={[
@@ -376,7 +386,6 @@ export function SalesView({
             No hay ventas cerradas para los filtros seleccionados.
           </Empty>
         )}
-
         <Pager pagination={d.history.pagination} onPage={onPage} />
       </Panel>
     </>
@@ -471,7 +480,7 @@ export function CancellationsView({
         {d.history.cancellations.length ? (
           <DataTable
             headers={[
-              "Fecha y hora",
+              "Fecha de cierre",
               "Orden",
               "Ubicación",
               "Mesa / modalidad",
@@ -526,8 +535,7 @@ export function CancellationsView({
           </DataTable>
         ) : (
           <Empty>
-            No se registraron cancelaciones para los filtros
-            seleccionados.
+            No hay órdenes cerradas para los filtros seleccionados.
           </Empty>
         )}
 

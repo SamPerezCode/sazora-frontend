@@ -21,6 +21,8 @@ import { HistoryOrderDetail } from "../../sales/components/HistoryOrderDetail";
 
 import { useReportQuery } from "../hooks/useReportQuery";
 
+import { SalesExportButton } from "../components/SalesExportButton";
+
 import {
   getOverview,
   getSalesReport,
@@ -500,7 +502,12 @@ function ReportsContent({
       <div className="rp-toolbar">
         <nav className="rp-tabs" aria-label="Informes">
           {tabs
-            .filter((item) => admin || item.id === "conversion")
+            .filter(
+              (item) =>
+                admin ||
+                item.id === "sales" ||
+                item.id === "conversion"
+            )
             .map((item) => (
               <button
                 type="button"
@@ -556,6 +563,20 @@ function ReportsContent({
       {tab !== "summary" && (
         <>
           <ReportFilters
+            extraActions={
+              tab === "sales" ? (
+                <SalesExportButton
+                  session={session}
+                  locationId={locationId}
+                  filters={active.applied}
+                  disabled={
+                    report.loading ||
+                    !!report.error ||
+                    report.data?.tab !== "sales"
+                  }
+                />
+              ) : undefined
+            }
             tab={tab}
             timeZone={timezone}
             draft={active.draft}

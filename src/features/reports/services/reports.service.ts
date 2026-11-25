@@ -1,7 +1,12 @@
 import { z } from "zod";
 
-import { ApiError, request } from "../../../lib/http/client";
+import {
+  ApiError,
+  request,
+  requestBlob,
+} from "../../../lib/http/client";
 
+import { exportFilename } from "../utils/sales-export";
 import type { AuthSession } from "../../auth/types/auth.types";
 import { hasPermission } from "../../auth/utils/permissions";
 
@@ -47,11 +52,14 @@ async function read<
   session: AuthSession,
   locationId: string,
   params: Params,
-  signal: AbortSignal
+  signal: AbortSignal,
+  permission?: string
 ): Promise<T> {
   if (
     !session.accessToken ||
-    !session.authorization.roles.includes("ADMIN")
+    (permission
+      ? !hasPermission(session, permission)
+      : !session.authorization.roles.includes("ADMIN"))
   ) {
     throw new ApiError(
       403,
@@ -112,15 +120,13 @@ export const getSalesReport = (
     session,
     locationId,
     {
-      from: filters.from,
-      to: filters.to,
-      serviceType: filters.serviceType,
-      openedByMembershipId: filters.openedByMembershipId,
+      ...salesReportParams(filters),
       page,
       pageSize: 20,
       topLimit: 5,
     },
-    signal
+    signal,
+    "sales.reports.read"
   );
 
 export const getCancellationReport = (
@@ -254,4 +260,69 @@ export async function getPublicMenuConversion(
   }
 
   return data;
+}
+
+function salesReportParams(filters: SalesFilters) {
+  const valid = filterSchema.parse({
+    ...filters,
+    cancelledByMembershipId: "",
+    eventType: "",
+    preparationAreaId: "",
+    workflowMode: "",
+  });
+
+  return {
+    from: valid.from,
+    to: valid.to,
+    serviceType: valid.serviceType,
+    sourceChannel: valid.sourceChannel,
+    openedByMembershipId: valid.openedByMembershipId,
+  };
+}
+
+export async function downloadSalesReport(
+  session: AuthSession,
+  locationId: string,
+  filters: SalesFilters,
+  signal: AbortSignal
+) {
+  if (!hasPermission(session, "sales.reports.read")) {
+    throw new ApiError(
+      403,
+      "FORBIDDEN",
+      "No tienes permiso para descargar este informe."
+    );
+  }
+
+  const params = salesReportParams(filters);
+
+  const file = await requestBlob(
+    "/sales-reports/history/export" +
+      reportQuery({
+        ...params,
+        locationId,
+      }),
+    {
+      accessToken: session.accessToken,
+      signal,
+      cache: "no-store",
+      timeoutMs: 120_000,
+    }
+  );
+
+  if (!file.blob.size) {
+    throw new ApiError(
+      502,
+      "INVALID_RESPONSE",
+      "El servidor devolvió un archivo vacío."
+    );
+  }
+
+  return {
+    blob: file.blob,
+    filename: exportFilename(
+      file.contentDisposition,
+      `ventas-${params.from}-a-${params.to}.xlsx`
+    ),
+  };
 }

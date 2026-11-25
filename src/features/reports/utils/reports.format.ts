@@ -46,7 +46,11 @@ export function amount(value: string, currency: string) {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   })
-    .formatToParts(BigInt(whole))
+    .formatToParts(
+      whole.startsWith("-") && BigInt(whole) === 0n
+        ? -0
+        : BigInt(whole)
+    )
     .map((part) => (part.type === "fraction" ? fraction : part.value))
     .join("");
 }
@@ -109,6 +113,7 @@ export function initialFilters(timezone: string): ReportFilters {
   return {
     ...dateRange(timezone, "month"),
     serviceType: "",
+    sourceChannel: "",
     openedByMembershipId: "",
     cancelledByMembershipId: "",
     eventType: "",

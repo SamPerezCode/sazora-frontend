@@ -46,6 +46,7 @@ interface RequestOptions {
   accessToken?: string;
   signal?: AbortSignal;
   cache?: RequestCache;
+  timeoutMs?: number;
 }
 
 type UnauthorizedListener = (accessToken: string) => void;
@@ -65,10 +66,13 @@ export function subscribeToUnauthorized(
 async function sendRequest<T>(
   path: string,
   schema: z.ZodType<T>,
-  options: RequestOptions = {}
+  options: RequestOptions = {},
+  binary = false
 ): Promise<T> {
   const headers = new Headers({
-    Accept: "application/json",
+    Accept: binary
+      ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      : "application/json",
   });
 
   const multipart = options.body instanceof FormData;
@@ -81,7 +85,9 @@ async function sendRequest<T>(
     headers.set("Authorization", `Bearer ${options.accessToken}`);
   }
 
-  const timeoutSignal = AbortSignal.timeout(15_000);
+  const timeoutSignal = AbortSignal.timeout(
+    options.timeoutMs ?? 15_000
+  );
   const signal = options.signal
     ? AbortSignal.any([options.signal, timeoutSignal])
     : timeoutSignal;
@@ -107,7 +113,14 @@ async function sendRequest<T>(
     payload =
       response.status === 204
         ? null
-        : await response.json().catch(() => null);
+        : binary && response.ok
+          ? {
+              blob: await response.blob(),
+              contentDisposition: response.headers.get(
+                "Content-Disposition"
+              ),
+            }
+          : await response.json().catch(() => null);
   } catch (error: unknown) {
     if (options.signal?.aborted) {
       throw error;
@@ -207,4 +220,19 @@ export async function request<T>(
 
     throw cause;
   }
+}
+
+export function requestBlob(
+  path: string,
+  options: Omit<RequestOptions, "method" | "body"> = {}
+) {
+  return sendRequest(
+    path,
+    z.object({
+      blob: z.instanceof(Blob),
+      contentDisposition: z.string().nullable(),
+    }),
+    { ...options, method: "GET" },
+    true
+  );
 }

@@ -4,6 +4,7 @@ import { dashboardSchema } from "../../dashboard/schemas/dashboard.schema";
 
 import {
   serviceTypeSchema,
+  sourceChannelSchema,
   orderStatusSchema,
 } from "../../sales/schemas/sales.schema";
 
@@ -85,9 +86,21 @@ export const overviewSchema = dashboardSchema.extend({
   ),
 });
 
+export const salesProfitabilitySchema = z.object({
+  dateBasis: z.literal("SOLD_AT"),
+  netSalesBeforeRefunds: decimal,
+  refundedNetAmount: decimal,
+  effectiveNetSales: decimal,
+  costOfGoodsSold: decimal.nullable(),
+  grossProfit: decimal.nullable(),
+  grossMarginPercentage: decimal.nullable(),
+  unknownCostLineCount: count,
+});
+
 export const salesReportSchema = z.object({
   ...base,
   period,
+  profitability: salesProfitabilitySchema,
 
   summary: z.object({
     ...salesMetrics,
@@ -292,6 +305,9 @@ const range = z.object({
 export const filterSchema = range
   .extend({
     serviceType: z.union([serviceTypeSchema, z.literal("")]),
+    sourceChannel: z
+      .union([sourceChannelSchema, z.literal("")])
+      .default(""),
     openedByMembershipId: z.union([id, z.literal("")]),
     cancelledByMembershipId: z.union([id, z.literal("")]),
     eventType: z.union([eventTypeSchema, z.literal("")]),
@@ -337,7 +353,11 @@ export type ReportFilters = z.infer<typeof filterSchema>;
 
 export type SalesFilters = Pick<
   ReportFilters,
-  "from" | "to" | "serviceType" | "openedByMembershipId"
+  | "from"
+  | "to"
+  | "serviceType"
+  | "sourceChannel"
+  | "openedByMembershipId"
 >;
 
 export type CancellationFilters = Pick<
