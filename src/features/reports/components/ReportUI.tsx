@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 import { Info } from "lucide-react";
 
-import { Button } from "../../components/ui/Button";
-import type { Pagination } from "./reports.schema";
-import { number } from "./reports.format";
+import { Button } from "../../../components/ui/Button";
+
+import type { Pagination } from "../schemas/reports.schema";
+
+import { number } from "../utils/reports.format";
 
 export function Panel({
   title,

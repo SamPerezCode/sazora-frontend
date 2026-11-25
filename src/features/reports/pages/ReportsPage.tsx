@@ -1,19 +1,25 @@
 import { useCallback, useMemo, useState } from "react";
 
-import type { AuthSession } from "../auth/types/auth.types";
+import type { AuthSession } from "../../auth/types/auth.types";
+import { hasPermission } from "../../auth/utils/permissions";
 
-import { useAppShell } from "../../app/layout/shell-context";
-import { ApiError } from "../../lib/http/client";
-import { Alert } from "../../components/feedback/Alert";
-import { Button } from "../../components/ui/Button";
-import { SelectField } from "../../components/forms/SelectField";
+import { useAppShell } from "../../../app/layout/shell-context";
+import { ApiError } from "../../../lib/http/client";
 
-import { useSalesLocations } from "../sales/hooks/useSalesLocations";
-import { getEmployees } from "../employees/services/employee.service";
-import { getPreparationAreas } from "../preparation-areas/services/preparation-area.service";
-import { HistoryOrderDetail } from "../sales/components/HistoryOrderDetail";
+import { Alert } from "../../../components/feedback/Alert";
+import { Button } from "../../../components/ui/Button";
+import { SelectField } from "../../../components/forms/SelectField";
 
-import { useReportQuery } from "./useReportQuery";
+import { useRemote } from "../../sales/hooks/usePublicOrders";
+import { useSalesLocations } from "../../sales/hooks/useSalesLocations";
+
+import { getEmployees } from "../../employees/services/employee.service";
+
+import { getPreparationAreas } from "../../preparation-areas/services/preparation-area.service";
+
+import { HistoryOrderDetail } from "../../sales/components/HistoryOrderDetail";
+
+import { useReportQuery } from "../hooks/useReportQuery";
 
 import {
   getOverview,
@@ -21,14 +27,15 @@ import {
   getCancellationReport,
   getKitchenReport,
   reportError,
-} from "./reports.service";
+  getPublicMenuConversion,
+} from "../services/reports.service";
 
-import { filterSchema } from "./reports.schema";
+import { filterSchema } from "../schemas/reports.schema";
 
 import type {
   ReportFilters as Filters,
   ReportTab,
-} from "./reports.schema";
+} from "../schemas/reports.schema";
 
 import {
   amount,
@@ -37,27 +44,30 @@ import {
   eventLabels,
   initialFilters,
   number,
-} from "./reports.format";
+} from "../utils/reports.format";
 
-import { ReportFilters } from "./ReportFilters";
-import { Notice, ReportSkeleton } from "./ReportUI";
+import { PublicMenuConversion } from "../components/PublicMenuConversion";
+import { ReportFilters } from "../components/ReportFilters";
+
+import { Notice, ReportSkeleton } from "../components/ReportUI";
 
 import {
   Overview,
   SalesView,
   CancellationsView,
   KitchenView,
-} from "./ReportViews";
+} from "../components/ReportViews";
 
-import type { OrderSelection } from "./ReportViews";
+import type { OrderSelection } from "../components/ReportViews";
 
-import "./reports.css";
+import "../reports.css";
 
 const tabs: { id: ReportTab; label: string }[] = [
   { id: "summary", label: "Resumen" },
   { id: "sales", label: "Ventas" },
   { id: "cancellations", label: "Cancelaciones" },
   { id: "kitchen", label: "Cocina" },
+  { id: "conversion", label: "Conversión del menú" },
 ];
 
 interface FilterState {
@@ -83,7 +93,7 @@ export function ReportsPage() {
 
   if (
     !session.accessToken ||
-    !session.authorization.roles.includes("ADMIN")
+    !hasPermission(session, "sales.reports.read")
   ) {
     return (
       <Alert>No tienes permisos para consultar estos informes.</Alert>
@@ -94,14 +104,15 @@ export function ReportsPage() {
 
   if (!settings.data || settings.error) {
     return (
-      <Alert>
-        {settings.error ??
-          "No pudimos cargar la configuración del negocio."}
-
-        <Button variant="soft" onClick={settings.retry}>
-          Reintentar
-        </Button>
-      </Alert>
+      <ReportsContext
+        key={JSON.stringify([
+          session.business.id,
+          session.membership.id,
+          session.accessToken,
+          session.authorization,
+        ])}
+        session={session}
+      />
     );
   }
 
@@ -111,10 +122,60 @@ export function ReportsPage() {
         session.business.id,
         session.membership.id,
         session.accessToken,
+        JSON.stringify(session.authorization),
       ].join(":")}
       session={session}
       timezone={settings.data.timezone}
       currency={settings.data.currencyCode}
+    />
+  );
+}
+
+function ReportsContext({ session }: { session: AuthSession }) {
+  const load = useCallback(
+    async (signal: AbortSignal) => {
+      // Esta consulta solo obtiene los metadatos del negocio.
+      // El informe visible se consulta después en su zona horaria real.
+      const day = new Date().toISOString().slice(0, 10);
+
+      const data = await getPublicMenuConversion(
+        session,
+        "",
+        {
+          ...initialFilters("UTC"),
+          from: day,
+          to: day,
+        },
+        signal
+      );
+
+      return data.business;
+    },
+    [session]
+  );
+
+  const resource = useRemote(load);
+
+  if (resource.loading) return <ReportSkeleton />;
+
+  if (!resource.data || resource.error) {
+    return (
+      <Alert>
+        {resource.error ||
+          "No pudimos consultar el contexto del informe."}
+
+        <Button variant="soft" onClick={resource.reload}>
+          Reintentar
+        </Button>
+      </Alert>
+    );
+  }
+
+  return (
+    <ReportsContent
+      session={session}
+      timezone={resource.data.timezone}
+      currency={resource.data.currencyCode}
     />
   );
 }
@@ -131,8 +192,11 @@ function ReportsContent({
   const locations = useSalesLocations(session);
 
   const [locationId, setLocationId] = useState("");
-  const [tab, setTab] = useState<ReportTab>("summary");
+  const admin = session.authorization.roles.includes("ADMIN");
 
+  const [tab, setTab] = useState<ReportTab>(
+    admin ? "summary" : "conversion"
+  );
   const [states, setStates] = useState<
     Record<ReportTab, FilterState>
   >(() => ({
@@ -140,6 +204,7 @@ function ReportsContent({
     sales: newState(timezone),
     cancellations: newState(timezone),
     kitchen: newState(timezone),
+    conversion: newState(timezone),
   }));
 
   const [notice, setNotice] = useState("");
@@ -153,38 +218,42 @@ function ReportsContent({
     session.accessToken,
   ].join(":");
 
-  const changeLocation = useCallback((id: string) => {
-    setLocationId(id);
-    setOrder(null);
+  const changeLocation = useCallback(
+    (id: string) => {
+      setLocationId(id);
+      setOrder(null);
 
-    setStates((previous) => {
-      const reset = (state: FilterState) => ({
-        ...state,
-        page: 1,
-        errors: {},
+      setStates((previous) => {
+        const reset = (state: FilterState) => ({
+          ...state,
+          page: 1,
+          errors: {},
+        });
+
+        return {
+          summary: reset(previous.summary),
+          sales: reset(previous.sales),
+          cancellations: reset(previous.cancellations),
+          conversion: reset(previous.conversion),
+
+          kitchen: {
+            ...reset(previous.kitchen),
+
+            draft: {
+              ...previous.kitchen.draft,
+              preparationAreaId: "",
+            },
+
+            applied: {
+              ...previous.kitchen.applied,
+              preparationAreaId: "",
+            },
+          },
+        };
       });
-
-      return {
-        summary: reset(previous.summary),
-        sales: reset(previous.sales),
-        cancellations: reset(previous.cancellations),
-
-        kitchen: {
-          ...reset(previous.kitchen),
-
-          draft: {
-            ...previous.kitchen.draft,
-            preparationAreaId: "",
-          },
-
-          applied: {
-            ...previous.kitchen.applied,
-            preparationAreaId: "",
-          },
-        },
-      };
-    });
-  }, []);
+    },
+    [setLocationId, setOrder, setStates]
+  );
 
   const handleError = useCallback(
     (error: ApiError) => {
@@ -229,7 +298,7 @@ function ReportsContent({
         }));
       }
     },
-    [changeLocation, tab]
+    [changeLocation, tab, setNotice, setStates]
   );
 
   const loadEmployees = useCallback(
@@ -263,6 +332,16 @@ function ReportsContent({
   const load = useCallback(
     async (signal: AbortSignal) => {
       switch (tab) {
+        case "conversion":
+          return {
+            tab,
+            data: await getPublicMenuConversion(
+              session,
+              locationId,
+              active.applied,
+              signal
+            ),
+          } as const;
         case "summary":
           return {
             tab,
@@ -411,22 +490,30 @@ function ReportsContent({
   );
 
   return (
-    <div className="rp-page">
+    <div
+      className={
+        tab === "conversion"
+          ? "rp-page rp-conversion-page"
+          : "rp-page"
+      }
+    >
       <div className="rp-toolbar">
         <nav className="rp-tabs" aria-label="Informes">
-          {tabs.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              aria-current={tab === item.id ? "page" : undefined}
-              onClick={() => {
-                setTab(item.id);
-                setOrder(null);
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
+          {tabs
+            .filter((item) => admin || item.id === "conversion")
+            .map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                aria-current={tab === item.id ? "page" : undefined}
+                onClick={() => {
+                  setTab(item.id);
+                  setOrder(null);
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
         </nav>
 
         <SelectField
@@ -449,7 +536,6 @@ function ReportsContent({
           }}
         />
       </div>
-
       <p className="rp-muted">
         {locationId
           ? selectedLocation
@@ -457,7 +543,6 @@ function ReportsContent({
             : "Ubicación seleccionada"
           : "Todas las ubicaciones"}
       </p>
-
       {locations.error && (
         <Alert>
           {locations.error}
@@ -467,9 +552,7 @@ function ReportsContent({
           </Button>
         </Alert>
       )}
-
       {notice && <Notice>{notice}</Notice>}
-
       {tab !== "summary" && (
         <>
           <ReportFilters
@@ -562,9 +645,7 @@ function ReportsContent({
           )}
         </>
       )}
-
       {report.loading && <ReportSkeleton />}
-
       {report.error && (
         <Alert>
           <p>{reportError(report.error)}</p>
@@ -586,10 +667,12 @@ function ReportsContent({
         </Alert>
       )}
 
+      {report.data?.tab === "conversion" && (
+        <PublicMenuConversion data={report.data.data} />
+      )}
       {report.data?.tab === "summary" && (
         <Overview data={report.data.data} />
       )}
-
       {report.data?.tab === "sales" && (
         <SalesView
           data={report.data.data}
@@ -597,7 +680,6 @@ function ReportsContent({
           onPage={(page) => update({ page })}
         />
       )}
-
       {report.data?.tab === "cancellations" && (
         <CancellationsView
           data={report.data.data}
@@ -605,11 +687,9 @@ function ReportsContent({
           onPage={(page) => update({ page })}
         />
       )}
-
       {report.data?.tab === "kitchen" && (
         <KitchenView data={report.data.data} />
       )}
-
       {report.data && (
         <footer className="rp-footer">
           <span>
@@ -625,7 +705,6 @@ function ReportsContent({
           </Button>
         </footer>
       )}
-
       {order && scope && (
         <HistoryOrderDetail
           row={{

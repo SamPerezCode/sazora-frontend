@@ -1,5 +1,4 @@
-import type { ReportFilters } from "./reports.schema";
-
+import type { ReportFilters } from "../schemas/reports.schema";
 export const serviceLabels = {
   TABLE: "Mesa",
   TAKEAWAY: "Para recoger",

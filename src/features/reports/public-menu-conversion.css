@@ -1,0 +1,76 @@
+.pm-conversion {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pm-conversion h2 {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.pm-conversion .rp-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pm-funnel {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.pm-funnel li > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.pm-track {
+  height: 0.45rem;
+  border-radius: 1rem;
+  background: var(--sazora-secondary);
+  margin-top: 0.35rem;
+  overflow: hidden;
+}
+
+.pm-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--sazora-heading);
+}
+
+.rp-conversion-page .rp-tabs {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.rp-conversion-page .rp-tabs button {
+  white-space: normal;
+}
+
+@media (max-width: 39.999rem) {
+  .pm-conversion .rp-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pm-conversion .rp-metric strong {
+    font-size: 1.1rem;
+    overflow-wrap: anywhere;
+  }
+
+  .rp-conversion-page .rp-filter-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rp-conversion-page .rp-filter-grid > * {
+    width: 100%;
+    min-width: 0;
+  }
+}

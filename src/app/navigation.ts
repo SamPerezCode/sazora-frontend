@@ -12,6 +12,7 @@ import {
   Tags,
   Bike,
   ClipboardList,
+  ContactRound,
 } from "lucide-react";
 
 import type { LucideIcon } from "lucide-react";
@@ -92,6 +93,17 @@ const navigation: readonly NavigationItem[] = [
     group: "main",
     status: "ready",
     to: "/historial-ventas",
+  },
+  {
+    id: "customers",
+    label: "Clientes",
+    description:
+      "Consulta las personas que han realizado solicitudes, pedidos o compras.",
+    icon: ContactRound,
+    roles: null,
+    group: "main",
+    status: "ready",
+    to: "/clientes",
   },
   {
     id: "public-orders",

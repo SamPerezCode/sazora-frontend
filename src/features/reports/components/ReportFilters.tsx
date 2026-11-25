@@ -1,19 +1,19 @@
-import { SelectField } from "../../components/forms/SelectField";
-import { Button } from "../../components/ui/Button";
-import { DateField } from "../../components/forms/DateField";
+import { SelectField } from "../../../components/forms/SelectField";
+import { Button } from "../../../components/ui/Button";
+import { DateField } from "../../../components/forms/DateField";
 
 import type {
   ReportFilters as Filters,
   ReportTab,
-} from "./reports.schema";
+} from "../schemas/reports.schema";
 
 import {
   serviceLabels,
   eventLabels,
   modeLabels,
-} from "./reports.format";
+} from "../utils/reports.format";
 
-import type { DateShortcut } from "./reports.format";
+import type { DateShortcut } from "../utils/reports.format";
 
 export interface FilterOption {
   value: string;
@@ -118,8 +118,16 @@ export function ReportFilters({
 
         {select(
           "serviceType",
-          "Modalidad",
-          choices(serviceLabels, "Todas")
+          tab === "conversion" ? "Tipo de servicio" : "Modalidad",
+          choices(
+            tab === "conversion"
+              ? {
+                  TAKEAWAY: serviceLabels.TAKEAWAY,
+                  DELIVERY: serviceLabels.DELIVERY,
+                }
+              : serviceLabels,
+            tab === "conversion" ? "Todos" : "Todas"
+          )
         )}
 
         {tab === "sales" &&

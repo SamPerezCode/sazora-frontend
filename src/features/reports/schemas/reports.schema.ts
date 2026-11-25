@@ -1,11 +1,13 @@
 import { z } from "zod";
 
-import { dashboardSchema } from "../dashboard/schemas/dashboard.schema";
+import { dashboardSchema } from "../../dashboard/schemas/dashboard.schema";
+
 import {
   serviceTypeSchema,
   orderStatusSchema,
-} from "../sales/schemas/sales.schema";
-import { kitchenWorkflowModeSchema } from "../kitchen-flow/kitchen-flow.schema";
+} from "../../sales/schemas/sales.schema";
+
+import { kitchenWorkflowModeSchema } from "../../kitchen-flow/kitchen-flow.schema";
 
 const id = z.string().regex(/^[1-9]\d*$/);
 const count = z.number().int().nonnegative();
@@ -356,4 +358,55 @@ export type ReportTab =
   | "summary"
   | "sales"
   | "cancellations"
-  | "kitchen";
+  | "kitchen"
+  | "conversion";
+
+const rate = z
+  .string()
+  .regex(/^\d+(?:\.\d+)?$/)
+  .refine(
+    (value) => Number(value) <= 100,
+    "Porcentaje fuera de rango."
+  );
+
+export const publicMenuConversionSchema = z.object({
+  ...base,
+  period,
+
+  serviceType: z.enum(["TAKEAWAY", "DELIVERY"]).nullable(),
+
+  counts: z.object({
+    receivedRequests: count,
+    contactedRequests: count,
+    rejectedRequests: count,
+    acceptedRequests: count,
+    paidOrders: count,
+    confirmedOrders: count,
+    deliveredOrders: count,
+    createdSales: count,
+    completedSales: count,
+    voidedSales: count,
+    identifiedCustomers: count,
+  }),
+
+  rates: z.object({
+    contactRate: rate,
+    acceptanceRate: rate,
+    paymentRate: rate,
+    confirmationRate: rate,
+    deliveryRate: rate,
+    saleRate: rate,
+  }),
+
+  amounts: z.object({
+    grossSalesTotal: decimal,
+    refundedTotal: decimal,
+    effectiveSalesTotal: decimal,
+  }),
+
+  cohortSource: z.literal("PUBLIC_ORDER_REQUEST_CREATED_AT"),
+});
+
+export type PublicMenuConversionReport = z.infer<
+  typeof publicMenuConversionSchema
+>;

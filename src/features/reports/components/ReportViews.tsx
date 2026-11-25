@@ -1,6 +1,6 @@
 import { Eye } from "lucide-react";
 
-import { Button } from "../../components/ui/Button";
+import { Button } from "../../../components/ui/Button";
 
 import {
   Panel,
@@ -21,9 +21,12 @@ import {
   number,
   serviceLabels,
   statusLabels,
-} from "./reports.format";
+} from "../utils/reports.format";
 
-import { UNITS, WEEKDAYS } from "../dashboard/utils/dashboard-format";
+import {
+  UNITS,
+  WEEKDAYS,
+} from "../../dashboard/utils/dashboard-format";
 
 import type {
   DashboardResponse,
@@ -32,7 +35,7 @@ import type {
   KitchenOperationReportResponse,
   CancellationEvent,
   KitchenTimingMetric,
-} from "./reports.schema";
+} from "../schemas/reports.schema";
 
 export type OrderSelection = {
   orderId: string;

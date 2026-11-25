@@ -39,6 +39,13 @@ const modules: readonly ModuleDefinition[] = [
     available: true,
   },
   {
+    id: "customers",
+    label: "Clientes",
+    path: "/clientes",
+    permission: "customers.read",
+    available: true,
+  },
+  {
     id: "kitchen",
     label: "Cocina",
     path: "/cocina",

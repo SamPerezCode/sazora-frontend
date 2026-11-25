@@ -9,6 +9,7 @@ import { useBusinessProfile } from "../../features/business/hooks/useBusinessPro
 import { useDashboard } from "../../features/dashboard/hooks/useDashboard";
 import { businessDate } from "../../features/dashboard/utils/dashboard-format";
 import { resolveSessionAccess } from "../../features/auth/utils/resolve-session-access";
+import { hasPermission } from "../../features/auth/utils/permissions";
 import {
   readSidebarCollapsed,
   saveSidebarCollapsed,
@@ -150,6 +151,7 @@ export function AppShell() {
                         [
                           "cash",
                           "sale-history",
+                          "customers",
                           "public-orders",
                           "deliveries",
                         ].includes(current.id)
@@ -167,20 +169,23 @@ export function AppShell() {
           tabIndex={-1}
           className="shell-content"
         >
-          {error && !isSettings && (
-            <Alert className="mb-5">
-              <p>{error}</p>
+          {error &&
+            !isSettings &&
+            (!["/clientes", "/estadisticas"].includes(pathname) ||
+              hasPermission(session, "business.settings.read")) && (
+              <Alert className="mb-5">
+                <p>{error}</p>
 
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={retry}
-                className="mt-3"
-              >
-                Reintentar
-              </Button>
-            </Alert>
-          )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={retry}
+                  className="mt-3"
+                >
+                  Reintentar
+                </Button>
+              </Alert>
+            )}
 
           {typeof location.state?.accessNotice === "string" && (
             <Alert className="mb-5">

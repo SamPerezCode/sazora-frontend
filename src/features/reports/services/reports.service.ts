@@ -1,21 +1,26 @@
 import { z } from "zod";
 
-import { ApiError, request } from "../../lib/http/client";
-import type { AuthSession } from "../auth/types/auth.types";
+import { ApiError, request } from "../../../lib/http/client";
+
+import type { AuthSession } from "../../auth/types/auth.types";
+import { hasPermission } from "../../auth/utils/permissions";
 
 import {
+  publicMenuConversionSchema,
+  filterSchema,
   overviewSchema,
   salesReportSchema,
   cancellationReportSchema,
   kitchenReportSchema,
-} from "./reports.schema";
+} from "../schemas/reports.schema";
 
 import type {
+  ReportFilters,
   ReportScope,
   SalesFilters,
   CancellationFilters,
   KitchenFilters,
-} from "./reports.schema";
+} from "../schemas/reports.schema";
 
 type Params = Record<string, string | number | undefined>;
 
@@ -184,4 +189,69 @@ export function reportError(error: ApiError): string {
     default:
       return error.message;
   }
+}
+
+export async function getPublicMenuConversion(
+  session: AuthSession,
+  locationId: string,
+  filters: ReportFilters,
+  signal: AbortSignal
+) {
+  if (!hasPermission(session, "sales.reports.read")) {
+    throw new ApiError(
+      403,
+      "FORBIDDEN",
+      "No tienes permiso para consultar la conversión."
+    );
+  }
+
+  const valid = filterSchema.parse(filters);
+
+  if (
+    valid.serviceType &&
+    valid.serviceType !== "TAKEAWAY" &&
+    valid.serviceType !== "DELIVERY"
+  ) {
+    throw new Error("Selecciona para recoger, domicilio o todos.");
+  }
+
+  const response = await request(
+    "/sales-reports/public-menu-conversion" +
+      reportQuery({
+        from: valid.from,
+        to: valid.to,
+        locationId,
+        serviceType: valid.serviceType,
+      }),
+    z.object({
+      status: z.literal("success"),
+      data: publicMenuConversionSchema,
+    }),
+    {
+      accessToken: session.accessToken,
+      signal,
+      cache: "no-store",
+    }
+  );
+
+  const data = response.data;
+
+  if (
+    data.business.id !== session.business.id ||
+    (locationId
+      ? data.scope.type !== "LOCATION" ||
+        data.scope.location.id !== locationId
+      : data.scope.type !== "BUSINESS") ||
+    data.period.from !== valid.from ||
+    data.period.to !== valid.to ||
+    data.serviceType !== (valid.serviceType || null)
+  ) {
+    throw new ApiError(
+      502,
+      "SCOPE_MISMATCH",
+      "El informe no corresponde a los filtros seleccionados."
+    );
+  }
+
+  return data;
 }

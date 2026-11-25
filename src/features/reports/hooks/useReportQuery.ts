@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { ApiError } from "../../lib/http/client";
+import { ApiError } from "../../../lib/http/client";
 
 export function useReportQuery<T>(
   key: string,
