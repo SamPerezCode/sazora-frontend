@@ -1,264 +1,189 @@
-import { Toggle } from "../../../components/forms/Toggle";
+import { useState } from "react";
+
 import type { ConsumptionLink } from "../services/inventory-workspace";
-import { unitLabels } from "../utils/inventory-format";
+import { quantity } from "../utils/inventory-value";
 
-type Props = {
-  rows: ConsumptionLink[];
-  disabled: boolean;
-  busy: boolean;
-  onAutomatic: (link: ConsumptionLink, checked: boolean) => void;
-  onStatus: (link: ConsumptionLink) => void;
-  onEdit: (link: ConsumptionLink) => void;
+import { Button } from "./InventoryButton";
+import { Modal, Notice } from "./InventoryLocationUI";
+
+export type ConsumptionProduct = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  links: ConsumptionLink[];
 };
-
-const buttonClass =
-  "inline-flex min-h-10 w-fit items-center justify-center gap-2 rounded-lg border px-3 " +
-  "text-[13px] font-medium leading-5 transition-colors cursor-pointer " +
-  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent " +
-  "disabled:cursor-not-allowed motion-reduce:transition-none";
-
-function StatusButton({
-  link,
-  disabled,
-  onStatus,
-}: Pick<Props, "disabled" | "onStatus"> & {
-  link: ConsumptionLink;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      aria-pressed={link.isActive}
-      aria-label={
-        "Relación activa: " +
-        link.productName +
-        " / " +
-        link.inventoryItemName
-      }
-      title={
-        link.isActive ? "Desactivar relación" : "Activar relación"
-      }
-      onClick={() => onStatus(link)}
-      className={
-        buttonClass +
-        " h-10 min-w-[104px] whitespace-nowrap border-none bg-background text-heading enabled:hover:border-accent enabled:hover:bg-accent/15 enabled:hover:text-accent"
-      }
-    >
-      {link.isActive ? "Activa" : "Inactiva"}
-    </button>
-  );
-}
-
-function AutomaticSwitch({
-  link,
-  disabled,
-  busy,
-  onAutomatic,
-}: Pick<Props, "disabled" | "busy" | "onAutomatic"> & {
-  link: ConsumptionLink;
-}) {
-  return (
-    <Toggle
-      label={<span className="sr-only">Descuento automático</span>}
-      aria-label={
-        "Descuento automático: " +
-        link.productName +
-        " / " +
-        link.inventoryItemName
-      }
-      title={
-        link.isActive
-          ? "Cambiar descuento automático"
-          : "La relación está inactiva. Actívala para modificar el descuento."
-      }
-      checked={link.autoDeduct}
-      disabled={disabled || !link.isActive}
-      className={
-        "max-w-11 gap-0 [&>span:first-child]:sr-only" +
-        (busy && link.isActive
-          ? " [&_input:disabled~span]:opacity-100"
-          : "")
-      }
-      onChange={(event) => onAutomatic(link, event.target.checked)}
-    />
-  );
-}
 
 export function InventoryConsumptionList({
   rows,
   disabled,
   busy,
-  onAutomatic,
-  onStatus,
   onEdit,
-}: Props) {
-  const edit = (link: ConsumptionLink) => (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => onEdit(link)}
-      className={
-        buttonClass +
-        " whitespace-nowrap border-transparent bg-transparent text-heading enabled:hover:border-outline enabled:hover:bg-secondary"
-      }
-    >
-      Editar consumo
-    </button>
-  );
+}: {
+  rows: ConsumptionProduct[];
+  disabled: boolean;
+  busy: boolean;
+  onEdit: (productId: string) => void;
+}) {
+  const [detailId, setDetailId] = useState<string | null>(null);
+
+  const detail = rows.find((row) => row.id === detailId);
 
   return (
-    <div className="min-w-0" aria-busy={busy}>
-      {/* Tabla de escritorio */}
-      <div className="hidden min-w-0 overflow-x-auto rounded-[14px] border border-outline bg-surface lg:block">
-        <table className="w-full min-w-[1100px] table-fixed border-collapse text-left text-[13px] leading-5">
-          <colgroup>
-            <col style={{ width: "20%" }} />
-            <col style={{ width: "19%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "13%" }} />
-            <col style={{ width: "13%" }} />
-            <col style={{ width: "13%" }} />
-          </colgroup>{" "}
-          <thead className="bg-secondary/50 text-muted">
-            <tr>
-              {[
-                "Producto",
-                "Artículo",
-                "Cantidad por venta",
-                "Unidad",
-                "Descuento automático",
-                "Estado",
-                "Acción",
-              ].map((label) => (
-                <th
-                  key={label}
-                  scope="col"
-                  className="px-3 py-4 font-normal"
+    <div aria-busy={busy}>
+      <div className="inv-composition-list">
+        <div
+          className="inv-composition-list-heading"
+          aria-hidden="true"
+        >
+          <span>Producto</span>
+          <span>Composición</span>
+          <span>Insumos</span>
+          <span>Descuento automático</span>
+          <span>Acciones</span>
+        </div>
+
+        {rows.map((row) => {
+          const active = row.links.filter((link) => link.isActive);
+
+          const automatic = active.filter(
+            (link) => link.autoDeduct
+          ).length;
+
+          const status = !active.length
+            ? "Sin consumo configurado"
+            : automatic === active.length
+              ? "Todos"
+              : automatic
+                ? "Parcial"
+                : "Ninguno";
+
+          return (
+            <article
+              key={row.id}
+              className="inv-composition-list-row"
+              aria-label={row.name}
+            >
+              <strong>
+                {row.name}
+                {!row.isActive && " (inactivo)"}
+              </strong>
+
+              <p>
+                {active.length
+                  ? active
+                      .map(
+                        (link) =>
+                          link.inventoryItemName +
+                          " × " +
+                          quantity(
+                            link.quantityPerProduct,
+                            link.baseUnit
+                          )
+                      )
+                      .join("; ")
+                  : "Sin consumo configurado"}
+              </p>
+
+              <span>
+                <span className="inv-composition-mobile-label">
+                  Insumos:{" "}
+                </span>
+                {active.length}
+              </span>
+
+              <span>
+                <span className="inv-composition-mobile-label">
+                  Descuento automático:{" "}
+                </span>
+                {status}
+              </span>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="ghost"
+                  size="compact"
+                  onClick={() => setDetailId(row.id)}
                 >
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-outline [&_td]:break-words">
-            {rows.map((link, index) => (
-              <tr
-                key={link.id}
-                className={
-                  index % 2 === 0 ? "bg-surface" : "bg-secondary/40"
-                }
-              >
-                <td className="px-3 py-3">{link.productName}</td>
+                  Ver detalle
+                </Button>
 
-                <td className="px-3 py-3">
-                  {link.inventoryItemName}
-                </td>
-
-                <td className="px-3 py-3 tabular-nums">
-                  {link.quantityPerProduct}
-                </td>
-
-                <td className="px-3 py-3">
-                  {unitLabels[link.baseUnit]}
-                </td>
-
-                <td className="px-3 py-3">
-                  <AutomaticSwitch
-                    link={link}
-                    disabled={disabled}
-                    busy={busy}
-                    onAutomatic={onAutomatic}
-                  />
-                </td>
-
-                <td className="px-3 py-3">
-                  <StatusButton
-                    link={link}
-                    disabled={disabled}
-                    onStatus={onStatus}
-                  />
-                </td>
-
-                <td className="px-3 py-3">{edit(link)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  disabled={disabled || !row.isActive}
+                  onClick={() => onEdit(row.id)}
+                >
+                  Editar consumo
+                </Button>
+              </div>
+            </article>
+          );
+        })}
       </div>
 
-      {/* Tarjetas para móvil y tablet */}
-      <div className="grid min-w-0 gap-3 lg:hidden">
-        {rows.map((link, index) => (
-          <article
-            key={link.id}
-            aria-label={
-              "Consumo de " +
-              link.productName +
-              ": " +
-              link.inventoryItemName
-            }
-            className={
-              "min-w-0 rounded-[14px] border border-outline p-4 shadow-sm " +
-              (index % 2 === 0 ? "bg-surface" : "bg-secondary/70")
-            }
-          >
-            <dl className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 [&_dt]:mb-1 [&_dt]:text-[12px] [&_dt]:leading-4 [&_dt]:text-muted [&_dd]:break-words [&_dd]:text-[13px] [&_dd]:leading-5 [&_dd]:text-heading">
-              <div className="col-span-2 min-w-0">
-                <dt>Producto</dt>
-                <dd className="font-semibold">{link.productName}</dd>
-              </div>
+      {detail && (
+        <Modal
+          title={"Consumo de " + detail.name}
+          onClose={() => setDetailId(null)}
+        >
+          <div className="grid gap-4">
+            {[true, false].map((active) => {
+              const links = detail.links.filter(
+                (link) => link.isActive === active
+              );
 
-              <div className="min-w-0">
-                <dt>Artículo</dt>
-                <dd>{link.inventoryItemName}</dd>
-              </div>
+              if (!active && !links.length) return null;
 
-              <div className="min-w-0">
-                <dt>Cantidad por venta</dt>
-                <dd className="tabular-nums">
-                  {link.quantityPerProduct}
-                </dd>
-              </div>
+              return (
+                <section key={String(active)} className="grid gap-3">
+                  <h3 className="font-bold">
+                    {active
+                      ? "Insumos activos"
+                      : "Relaciones inactivas"}
+                  </h3>
 
-              <div className="min-w-0">
-                <dt>Unidad</dt>
-                <dd>{unitLabels[link.baseUnit]}</dd>
-              </div>
+                  {!links.length && <p>Sin consumo configurado</p>}
 
-              <div className="min-w-0">
-                <dt>Descuento automático</dt>
-                <dd>
-                  <dd>
-                    <AutomaticSwitch
-                      link={link}
-                      disabled={disabled}
-                      busy={busy}
-                      onAutomatic={onAutomatic}
-                    />
-                  </dd>
-                </dd>
-              </div>
+                  {links.map((link) => (
+                    <div
+                      key={link.id}
+                      className="rounded-xl border border-outline p-3"
+                    >
+                      <strong>{link.inventoryItemName}</strong>
 
-              <div className="min-w-0 border-t border-outline pt-3">
-                <dt>Estado</dt>
-                <dd>
-                  <StatusButton
-                    link={link}
-                    disabled={disabled}
-                    onStatus={onStatus}
-                  />
-                </dd>
-              </div>
+                      <p>
+                        {quantity(
+                          link.quantityPerProduct,
+                          link.baseUnit
+                        )}{" "}
+                        por unidad del producto.
+                      </p>
 
-              <div className="min-w-0 border-t border-outline pt-3">
-                <dt>Acción</dt>
-                <dd>{edit(link)}</dd>
-              </div>
-            </dl>
-          </article>
-        ))}
-      </div>
+                      <p>
+                        Descuento automático:{" "}
+                        {link.autoDeduct ? "Activado" : "Desactivado"}
+                        .
+                      </p>
+
+                      {!active && (
+                        <p>
+                          Relación inactiva: no descuenta existencias.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </section>
+              );
+            })}
+
+            <Notice>
+              La composición se configura para todo el negocio. El
+              inventario se descuenta de la ubicación de la orden
+              cuando esta se confirma.
+            </Notice>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

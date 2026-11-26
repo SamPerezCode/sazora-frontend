@@ -1,0 +1,124 @@
+dialog.inv-composition-dialog {
+  width: min(1040px, calc(100vw - 2rem));
+  max-width: 1040px;
+}
+
+.inv-composition-dialog .inv-dialog-body {
+  display: grid;
+  gap: 1rem;
+}
+
+.inv-composition-row {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 2.5fr)
+    minmax(0, 0.8fr)
+    minmax(0, 1.2fr)
+    minmax(0, 1.2fr)
+    auto;
+  gap: 0.8rem;
+  align-items: start;
+  padding: 1rem;
+  border: 1px solid var(--color-outline);
+  border-radius: 14px;
+}
+
+.inv-composition-row > * {
+  min-width: 0;
+}
+
+.inv-composition-unit {
+  display: grid;
+  gap: 0.65rem;
+  font-size: 0.875rem;
+}
+
+.inv-composition-unit strong {
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.inv-composition-row > button {
+  align-self: center;
+}
+
+.inv-composition-row-warning {
+  grid-column: 1 / -1;
+  color: var(--color-danger);
+  font-size: 0.875rem;
+}
+
+.inv-composition-list {
+  border: 1px solid var(--color-outline);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.inv-composition-list-heading,
+.inv-composition-list-row {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.2fr)
+    minmax(0, 2fr)
+    65px
+    minmax(0, 1fr)
+    minmax(0, 1.6fr);
+  gap: 1rem;
+  padding: 1rem;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.inv-composition-list-heading {
+  background: var(--color-secondary);
+  color: var(--color-muted);
+}
+
+.inv-composition-list-row + .inv-composition-list-row {
+  border-top: 1px solid var(--color-outline);
+}
+
+.inv-composition-list-row > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.inv-composition-mobile-label {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .inv-composition-row {
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(0, 1fr);
+  }
+
+  .inv-composition-row > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .inv-composition-list-heading {
+    display: none;
+  }
+
+  .inv-composition-list-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+
+  .inv-composition-mobile-label {
+    display: inline;
+  }
+}
+
+@media (max-width: 480px) {
+  .inv-composition-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inv-composition-dialog .inv-dialog-footer > button {
+    flex: 1;
+    white-space: normal;
+  }
+}

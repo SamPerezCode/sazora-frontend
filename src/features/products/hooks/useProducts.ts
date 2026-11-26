@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../../lib/http/client";
 import type { AuthSession } from "../../auth/types/auth.types";
 import type { ProductMutation } from "../schemas/product-action.schema";
+import { subscribeInventoryInvalidation } from "../../../lib/inventory-invalidation";
 import {
   getProductCatalog,
   getProductDetail,
@@ -47,6 +48,13 @@ export function useProducts(session: AuthSession) {
 
   const { accessToken } = session;
   const businessId = session.business.id;
+  useEffect(
+    () =>
+      subscribeInventoryInvalidation(businessId, () => {
+        setAttempt((value) => value + 1);
+      }),
+    [businessId]
+  );
   const allowed = hasPermission(session, "catalog.read");
   const canManage = hasPermission(session, "catalog.manage");
   const includeAreas = hasPermission(

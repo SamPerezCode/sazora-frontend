@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getProductDetail } from "../services/product.service";
 import type { CatalogDetail } from "../schemas/product-action.schema";
+import { subscribeInventoryInvalidation } from "../../../lib/inventory-invalidation";
 
 interface DetailResult {
   key: string;
@@ -18,6 +19,14 @@ export function useProductDetail(
   const [result, setResult] = useState<DetailResult | null>(null);
 
   const key = `${businessId}:${id}:${isCombo}:${token}:${attempt}`;
+
+  useEffect(
+    () =>
+      subscribeInventoryInvalidation(businessId, () => {
+        setAttempt((value) => value + 1);
+      }),
+    [businessId]
+  );
 
   useEffect(() => {
     const controller = new AbortController();
