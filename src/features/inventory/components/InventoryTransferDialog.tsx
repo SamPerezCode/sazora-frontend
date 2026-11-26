@@ -571,7 +571,7 @@ export function InventoryTransferDialog({
             {!review ? (
               <fieldset
                 disabled={busy || locked}
-                className="m-0 grid min-w-0 gap-5 border-0 p-0"
+                className="m-0 grid min-w-0 gap-2 border-0 p-0"
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Choice
@@ -686,7 +686,7 @@ export function InventoryTransferDialog({
                   return (
                     <section
                       key={line.key}
-                      className="grid gap-3 border-b border-outline pb-5"
+                      className="grid gap-2 border-b border-outline pb-1"
                     >
                       <div className="flex items-center justify-between">
                         <span>Línea {index + 1}</span>
