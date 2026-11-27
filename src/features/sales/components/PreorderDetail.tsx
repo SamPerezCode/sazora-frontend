@@ -12,6 +12,7 @@ import { hasPermission } from "../../auth/utils/permissions";
 import { cashDate } from "../../cash/utils/cash-format";
 import { useCashResource } from "../../cash/hooks/useCashResource";
 import { OrderPrintPanel } from "../../kitchen-flow/OrderPrintPanel";
+import { preciseOrderMoney } from "../schemas/sales.schema";
 
 import { cents, money, type Order } from "../schemas/sales.schema";
 
@@ -518,7 +519,7 @@ export function PreorderDetail({
             <dd>
               {quick
                 ? order.netSubtotal
-                  ? money(cents(order.netSubtotal))
+                  ? preciseOrderMoney(order.netSubtotal)
                   : "Por consultar"
                 : money(cents(order.subtotal))}
             </dd>{" "}
@@ -528,7 +529,7 @@ export function PreorderDetail({
             <dt>Impuestos</dt>
             <dd>
               {quick && order.taxTotal
-                ? money(cents(order.taxTotal))
+                ? preciseOrderMoney(order.taxTotal)
                 : "No desglosados"}
             </dd>{" "}
           </div>

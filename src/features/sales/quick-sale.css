@@ -64,3 +64,45 @@
     grid-row: 1;
   }
 }
+
+/* Caja rápida: permitir recorrer todo el resumen de la cuenta. */
+dialog.quick-sale-dialog.mp-workspace
+  .sales-order-layout
+  > .sales-current[data-summary="true"] {
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+
+/* El contenido conserva su altura y se desplaza dentro del panel. */
+dialog.quick-sale-dialog.mp-workspace
+  .sales-current[data-summary="true"]
+  > .preorder-content {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+/* Las acciones forman parte del recorrido y no se comprimen. */
+dialog.quick-sale-dialog.mp-workspace
+  .sales-current[data-summary="true"]
+  > .preorder-footer {
+  position: static;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+/* Mantener visible el encabezado mientras baja la cuenta. */
+dialog.quick-sale-dialog.mp-workspace
+  .sales-current[data-summary="true"]
+  > h3 {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  flex: 0 0 auto;
+  margin-top: 0;
+  background: var(--sazora-surface);
+}

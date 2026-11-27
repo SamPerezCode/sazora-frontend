@@ -10,6 +10,7 @@ import { useCashResource } from "../../cash/hooks/useCashResource";
 import { cashCents, cashMoney } from "../../cash/utils/cash-format";
 import { useCheckoutMutation } from "../hooks/useCheckoutMutation";
 import { saleLabels } from "../schemas/financial-sales.schema";
+import { preciseOrderMoney } from "../schemas/sales.schema";
 import {
   readCheckout,
   type CheckoutData,
@@ -253,24 +254,29 @@ function CheckoutForm({
             </div>
 
             <dl className="checkout-totals" aria-live="polite">
+              {order.serviceType === "TABLE" && (
+                <>
+                  <div>
+                    <dt>Subtotal neto</dt>
+                    <dd>
+                      {order.netSubtotal !== undefined
+                        ? preciseOrderMoney(order.netSubtotal)
+                        : "No disponible"}
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt>Impuestos</dt>
+                    <dd>
+                      {order.taxTotal !== undefined
+                        ? preciseOrderMoney(order.taxTotal)
+                        : "No disponible"}
+                    </dd>
+                  </div>
+                </>
+              )}
               {(
                 [
-                  ...(order.serviceType === "TABLE"
-                    ? ([
-                        [
-                          "Subtotal neto",
-                          order.netSubtotal
-                            ? cashCents(order.netSubtotal)
-                            : null,
-                        ],
-                        [
-                          "Impuestos",
-                          order.taxTotal
-                            ? cashCents(order.taxTotal)
-                            : null,
-                        ],
-                      ] as const)
-                    : []),
                   ["Total de la cuenta", cashCents(order.total)],
                   ["Total aplicado", result.paid],
                   [

@@ -3,7 +3,26 @@ import { z } from "zod";
 import { kitchenWorkflowModeSchema } from "../../kitchen-flow/kitchen-flow.schema";
 
 const id = z.string().regex(/^[1-9]\d*$/);
-const moneySchema = z.string().regex(/^\d+(?:\.\d{1,2})?$/);
+const moneySchema = z
+  .string()
+  .regex(
+    /^\d+(?:\.\d{1,2})?$/,
+    "Se esperaba un importe como string con máximo 2 decimales."
+  );
+
+const preciseMoneySchema = z
+  .string()
+  .regex(
+    /^\d+(?:\.\d{1,6})?$/,
+    "Se esperaba un importe como string con máximo 6 decimales."
+  );
+
+const taxRateSchema = z
+  .string()
+  .regex(
+    /^\d+(?:\.\d{1,4})?$/,
+    "Se esperaba un porcentaje como string con máximo 4 decimales."
+  );
 
 export const orderStatusSchema = z.enum([
   "OPEN",
@@ -83,6 +102,12 @@ export const orderItemSchema = z.object({
   quantity: z.number().int().positive(),
   unitPrice: moneySchema,
   lineTotal: moneySchema,
+
+  unitNetPrice: preciseMoneySchema.optional(),
+  unitTaxAmount: preciseMoneySchema.optional(),
+  lineNetTotal: preciseMoneySchema.optional(),
+  lineTaxTotal: preciseMoneySchema.optional(),
+  taxRate: taxRateSchema.optional(),
   notes: z.string().nullable(),
   status: z.enum(["ACTIVE", "CANCELLED"]),
   cancellationReason: z.string().nullable(),
@@ -90,8 +115,8 @@ export const orderItemSchema = z.object({
 
 export const orderSchema = orderBase.extend({
   businessId: id,
-  netSubtotal: moneySchema.optional(),
-  taxTotal: moneySchema.optional(),
+  netSubtotal: preciseMoneySchema.optional(),
+  taxTotal: preciseMoneySchema.optional(),
   location: orderLocationSchema,
   closedAt: z.iso.datetime({ offset: true }).nullable().optional(),
   cancelledAt: z.iso.datetime({ offset: true }).nullable().optional(),
@@ -246,6 +271,15 @@ export const SERVICE_LABELS: Record<ServiceType, string> = {
   TAKEAWAY: "Para recoger",
   DELIVERY: "Domicilio",
 };
+
+export function preciseOrderMoney(value: string): string {
+  const valid = preciseMoneySchema.parse(value);
+  const [whole, fraction] = valid.split(".");
+
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+  return `$ ${grouped}${fraction === undefined ? "" : "," + fraction}`;
+}
 
 export function cents(value: string): bigint {
   const [whole, decimal = ""] = value.split(".");

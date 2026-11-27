@@ -17,6 +17,7 @@ import { OrderStatusBadge } from "./OrderStatusBadge";
 import { useAppShell } from "../../../app/layout/shell-context";
 import { hasPermission } from "../../auth/utils/permissions";
 import { OrderCustomerForm } from "./OrderCustomerForm";
+import { preciseOrderMoney } from "../schemas/sales.schema";
 
 import {
   canEditPreorder,
@@ -788,10 +789,10 @@ export function OrderWorkspace({
               ))}
             </div>
           </section>
-
           <aside
             id={accountId}
             className="sales-current"
+            data-summary={summary != null ? "true" : undefined}
             aria-label="Cuenta actual"
           >
             <h3>
@@ -1226,7 +1227,7 @@ export function OrderWorkspace({
                 <dt>Subtotal neto</dt>
                 <dd>
                   {order.id && !pendingCount && order.netSubtotal
-                    ? money(cents(order.netSubtotal))
+                    ? preciseOrderMoney(order.netSubtotal)
                     : "Estimación pendiente de confirmar"}
                 </dd>
               </div>
@@ -1235,7 +1236,7 @@ export function OrderWorkspace({
                 <dt>Impuestos</dt>
                 <dd>
                   {order.id && !pendingCount && order.taxTotal
-                    ? money(cents(order.taxTotal))
+                    ? preciseOrderMoney(order.taxTotal)
                     : "Se calculan al guardar"}
                 </dd>
               </div>

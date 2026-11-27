@@ -138,12 +138,26 @@ export async function advanceQuickSale(
   ) => void,
   signal: AbortSignal
 ) {
+  if (import.meta.env.DEV) {
+    console.debug("[Caja rápida] Consultando orden y pago");
+  }
+
   let { order, sale } = await recoverQuickSale(
     session,
     scope,
     orderId,
     signal
   );
+
+  if (import.meta.env.DEV) {
+    console.debug("[Caja rápida] Consulta validada", {
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      hasFulfillmentSummary: !!order.fulfillmentSummary,
+      canManage: hasPermission(session, "orders.manage"),
+      goal,
+    });
+  }
 
   if (order.status === "CLOSED") {
     return { order, sale };
@@ -190,6 +204,10 @@ export async function advanceQuickSale(
   }
 
   if (order.status === "OPEN") {
+    if (import.meta.env.DEV) {
+      console.debug("[Caja rápida] Enviando confirmación");
+    }
+
     const result = await confirmSalesOrder(
       session.accessToken,
       orderId,

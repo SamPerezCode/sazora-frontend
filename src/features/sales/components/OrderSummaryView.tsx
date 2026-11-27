@@ -7,6 +7,7 @@ import { cents, money } from "../schemas/sales.schema";
 import type { SalesResource } from "../hooks/useSales";
 import type { SalesTable } from "../services/sales.service";
 import { OrderPrintPanel } from "../../kitchen-flow/OrderPrintPanel";
+import { preciseOrderMoney } from "../schemas/sales.schema";
 
 interface Props {
   order: Order;
@@ -217,7 +218,7 @@ export function OrderSummaryView({
                 <dt>Subtotal neto</dt>
                 <dd>
                   {order.netSubtotal
-                    ? money(cents(order.netSubtotal))
+                    ? preciseOrderMoney(order.netSubtotal)
                     : "No disponible"}
                 </dd>
               </div>
@@ -226,7 +227,7 @@ export function OrderSummaryView({
                 <dt>Impuestos</dt>
                 <dd>
                   {order.taxTotal
-                    ? money(cents(order.taxTotal))
+                    ? preciseOrderMoney(order.taxTotal)
                     : "No disponible"}
                 </dd>
               </div>

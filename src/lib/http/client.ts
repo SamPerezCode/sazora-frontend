@@ -167,10 +167,95 @@ async function sendRequest<T>(
   const parsedResponse = schema.safeParse(payload);
 
   if (!parsedResponse.success) {
+    const issues = parsedResponse.error.issues;
+
+    const validationErrors = issues.map((issue) => ({
+      field: issue.path.map(String).join(".") || "(respuesta)",
+      message: issue.message,
+    }));
+
+    if (import.meta.env.DEV) {
+      const monetaryFields = new Set([
+        "subtotal",
+        "total",
+        "netSubtotal",
+        "taxTotal",
+        "unitPrice",
+        "lineTotal",
+        "unitNetPrice",
+        "unitTaxAmount",
+        "lineNetTotal",
+        "lineTaxTotal",
+        "taxRate",
+      ]);
+
+      for (const issue of issues) {
+        let received: unknown = payload;
+
+        for (const segment of issue.path) {
+          if (
+            received === null ||
+            typeof received !== "object" ||
+            !Object.prototype.hasOwnProperty.call(received, segment)
+          ) {
+            received = undefined;
+            break;
+          }
+
+          received = (received as Record<PropertyKey, unknown>)[
+            segment
+          ];
+        }
+
+        const field =
+          issue.path.map(String).join(".") || "(respuesta)";
+
+        const fieldName = String(
+          issue.path[issue.path.length - 1] ?? ""
+        );
+
+        const monetary = monetaryFields.has(fieldName);
+
+        const safeNumericString =
+          typeof received === "string" &&
+          received.length <= 80 &&
+          /^[\d\s.,+\-eE]+$/.test(received);
+
+        const safeValue =
+          received === undefined
+            ? "(ausente)"
+            : received === null
+              ? null
+              : monetary &&
+                  (typeof received === "number" || safeNumericString)
+                ? received
+                : "(valor omitido por privacidad)";
+
+        console.error("[API INVALID_RESPONSE]", {
+          method: options.method ?? "GET",
+          endpoint: `${API_BASE_URL}${path.split("?")[0]}`,
+          httpStatus: response.status,
+          field,
+          code: issue.code,
+          message: monetary
+            ? issue.message
+            : `Validación fallida: ${issue.code}`,
+          received: safeValue,
+          receivedType:
+            received === null
+              ? "null"
+              : Array.isArray(received)
+                ? "array"
+                : typeof received,
+        });
+      }
+    }
+
     throw new ApiError(
       502,
       "INVALID_RESPONSE",
-      "El servidor devolvió una respuesta inesperada."
+      "El servidor devolvió una respuesta inesperada.",
+      validationErrors
     );
   }
 

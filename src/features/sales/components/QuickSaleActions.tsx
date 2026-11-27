@@ -77,6 +77,20 @@ export function QuickSaleActions({
     !!resource.error ||
     checking;
 
+  const blockingMessage = resource.accessLost
+    ? "Se perdió el acceso a esta orden o al punto de venta."
+    : resource.uncertain
+      ? "Hay una operación pendiente de verificar. Actualiza la orden para consultar su resultado antes de continuar."
+      : resource.error
+        ? `No se puede confirmar mientras exista este error: ${resource.error}`
+        : checking
+          ? "Consultando el estado de la orden y procesando la operación…"
+          : resource.busy
+            ? "Hay otra operación en curso. Espera a que termine."
+            : resource.loading
+              ? "Actualizando los datos de la orden…"
+              : "";
+
   const verified = order.paymentStatus === "VERIFIED";
 
   const mode =
@@ -103,6 +117,16 @@ export function QuickSaleActions({
     summary?.requiresPreparation === true;
 
   async function execute(recoverOnly = false, accepted = false) {
+    if (import.meta.env.DEV) {
+      console.debug("[Caja rápida] Clic recibido", {
+        recoverOnly,
+        locked: lock.current,
+        busy: resource.busy,
+        loading: resource.loading,
+        uncertain: resource.uncertain,
+        accessLost: resource.accessLost,
+      });
+    }
     if (
       lock.current ||
       resource.busy ||
@@ -119,6 +143,10 @@ export function QuickSaleActions({
 
     try {
       await resource.paymentOperation(async () => {
+        if (import.meta.env.DEV) {
+          console.debug("[Caja rápida] Operación iniciada");
+        }
+
         try {
           if (recoverOnly) {
             await recoverQuickSale(
@@ -157,6 +185,12 @@ export function QuickSaleActions({
 
           return "Estado de Caja rápida actualizado.";
         } catch (cause) {
+          if (import.meta.env.DEV) {
+            console.debug(
+              "[Caja rápida] Operación interrumpida; se consultará el estado"
+            );
+          }
+
           let text = message(cause);
 
           try {
@@ -287,10 +321,42 @@ export function QuickSaleActions({
         </div>
       )}
 
+      {blockingMessage && (
+        <div aria-live="polite">
+          <p role={resource.error ? "alert" : "status"}>
+            {blockingMessage}
+          </p>
+
+          {!resource.accessLost &&
+            !resource.busy &&
+            !resource.loading &&
+            !checking &&
+            (resource.uncertain || !!resource.error) && (
+              <Button
+                variant="secondary"
+                onClick={() => resource.retry()}
+              >
+                Consultar estado de la orden
+              </Button>
+            )}
+        </div>
+      )}
+
+      {resource.notice && (
+        <p role="status" aria-live="polite">
+          {resource.notice}
+        </p>
+      )}
+
       {verified && !!summary && !error && (
         <div className="sales-form-actions">
           {prepare && manage ? (
-            <Button disabled={blocked} onClick={() => void execute()}>
+            <Button
+              disabled={blocked}
+              loading={checking}
+              loadingText="Verificando y confirmando…"
+              onClick={() => void execute()}
+            >
               Confirmar y enviar a preparación
             </Button>
           ) : canFinish ? (
