@@ -319,9 +319,45 @@ export function ProductCreateForm({
             }}
           />
 
-          <p id={`${imageId}-help`} className="text-xs text-muted">
-            {imageError || "JPEG, PNG o WebP. Máximo 5 MB."}
-          </p>
+          <div
+            id={`${imageId}-help`}
+            className="space-y-2 text-xs text-muted"
+          >
+            <p>
+              <strong className="text-heading">
+                Formatos admitidos:
+              </strong>{" "}
+              JPEG, PNG o WebP. Tamaño máximo: 5 MB.
+            </p>
+
+            <p>
+              <strong className="text-heading">Recomendación:</strong>{" "}
+              imagen cuadrada de 1200 × 1200 píxeles, preferiblemente
+              WebP, con un peso de 100 a 300 KB.
+            </p>
+
+            <p>
+              Centra el producto, utiliza un fondo sencillo y deja
+              aproximadamente un 20 % de espacio arriba y abajo. Evita
+              incluir textos o precios dentro de la imagen.
+            </p>
+
+            <p>
+              El menú muestra una miniatura cuadrada y un detalle
+              horizontal. Los bordes pueden recortarse; mantén el
+              producto dentro de la zona central.
+            </p>
+
+            <p>
+              Las dimensiones y el peso recomendado son orientativos.
+            </p>
+
+            {imageError && (
+              <p role="alert" className="text-danger">
+                {imageError}
+              </p>
+            )}
+          </div>
 
           {file && (
             <Button
